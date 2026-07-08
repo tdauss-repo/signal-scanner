@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Local Signal Scanner — Free Audit Prototype</title>
+<style>
+  :root{
+    --blue:#145f8f;
+    --blue2:#0f4f78;
+    --light:#eef6fb;
+    --line:#d7e3ea;
+    --text:#1d2730;
+    --green:#2e7d32;
+    --yellow:#b7791f;
+    --red:#b42318;
+    --gray:#64748b;
+  }
+  *{box-sizing:border-box}
+  body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f7fafc;color:var(--text)}
+  header{background:linear-gradient(135deg,var(--blue),#0c3e63);color:#fff;padding:24px 28px}
+  header h1{margin:0 0 6px;font-size:28px}
+  header p{margin:0;opacity:.9}
+  .wrap{max-width:1280px;margin:0 auto;padding:22px}
+  .grid{display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:start}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.05);overflow:hidden}
+  .card h2{font-size:18px;margin:0;padding:14px 16px;background:#f1f7fb;border-bottom:1px solid var(--line)}
+  .card .content{padding:16px}
+  label{font-size:12px;font-weight:bold;color:#405261;display:block;margin:10px 0 5px;text-transform:uppercase;letter-spacing:.03em}
+  input, textarea, select{width:100%;padding:10px;border:1px solid #cfd9e0;border-radius:8px;font-size:14px;background:#fff}
+  textarea{min-height:76px;resize:vertical}
+  button{border:0;border-radius:9px;background:var(--blue);color:#fff;padding:10px 14px;font-weight:bold;cursor:pointer}
+  button.secondary{background:#e7eef3;color:#18384f;border:1px solid #cbd8e0}
+  button.warn{background:#b7791f}
+  button:hover{filter:brightness(.96)}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .scorebar{height:12px;background:#e8eef2;border-radius:999px;overflow:hidden}
+  .scorebar span{display:block;height:100%;width:0;background:var(--gray)}
+  .metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}
+  .metric{padding:14px;border-radius:12px;border:1px solid var(--line);background:#fff}
+  .metric .name{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#526475;font-weight:bold}
+  .metric .value{font-size:30px;font-weight:bold;margin:6px 0 4px}
+  .pill{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:bold}
+  .green{color:var(--green);background:#e9f6eb}
+  .yellow{color:var(--yellow);background:#fff5db}
+  .red{color:var(--red);background:#fdecec}
+  .gray{color:var(--gray);background:#eef2f6}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{border-bottom:1px solid var(--line);padding:9px;vertical-align:top}
+  th{background:#145f8f;color:#fff;text-align:left;position:sticky;top:0;z-index:1}
+  tr:nth-child(even) td{background:#f8fbfd}
+  .audit-grid{display:grid;grid-template-columns:1fr;gap:18px}
+  .audit-table{max-height:560px;overflow:auto}
+  .evidence{font-size:12px;color:#475569;margin-top:5px}
+  .links a{display:inline-block;margin:2px 4px 2px 0;padding:4px 7px;border-radius:6px;background:#eef6fb;border:1px solid #cddfeb;text-decoration:none;color:#144b70;font-size:12px}
+  .checks label{display:inline-flex;align-items:center;gap:5px;margin:2px 10px 2px 0;text-transform:none;letter-spacing:0;font-size:12px;color:#20313f;font-weight:normal}
+  .checks input{width:auto}
+  .small{font-size:12px;color:#5c6d7a}
+  .print-note{background:#fff8e6;border:1px solid #ffe0a3;padding:12px;border-radius:10px;margin-bottom:16px}
+  @media print{
+    header,.left,.btnrow,.print-note{display:none!important}
+    body{background:#fff}
+    .grid{display:block}
+    .card{box-shadow:none;break-inside:avoid}
+    .metrics{grid-template-columns:repeat(5,1fr)}
+    th{position:static}
+  }
+  @media(max-width:980px){.grid{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Local Signal Scanner</h1>
+  <p>Free local visibility audit prototype — listings, local SEO, AI-answer visibility, reviews, and voice-search readiness.</p>
+</header>
+<div class="wrap">
+  <div class="print-note">
+    <strong>Prototype note:</strong> This v0.1 tool does not scrape Google, Apple, Bing, Yelp, or social platforms. It creates evidence links, captures verification results, scores gaps, and produces a customer-facing audit summary. Use it as a sales/audit workflow before building API integrations.
+  </div>
+  <div class="grid">
+    <div class="left card">
+      <h2>Business Intake</h2>
+      <div class="content">
+        <label>Business Name</label>
+        <input id="bizName" value="JEM Photography"/>
+        <label>Website</label>
+        <input id="website" value="https://www.jemcamera.com"/>
+        <label>Phone</label>
+        <input id="phone" value="419.410.4974"/>
+        <label>Location / Service Area</label>
+        <input id="area" value="Sylvania, Toledo, Northwest Ohio, Southeast Michigan"/>
+        <label>Primary Services</label>
+        <textarea id="services">wedding photographer, senior pictures, business portraits, branding photography, family photographer</textarea>
+        <label>Target Search Location</label>
+        <input id="targetLocation" value="Sylvania OH"/>
+        <label>Target Keywords, one per line</label>
+        <textarea id="keywords">wedding photographer Sylvania OH
+senior pictures Sylvania OH
+business portraits Sylvania OH
+branding photographer Toledo
+family photographer Sylvania OH
+JEM Photography
+JEM Photography Sylvania</textarea>
+        <div class="btnrow">
+          <button onclick="generateAudit()">Generate Scan</button>
+          <button class="secondary" onclick="exportJSON()">Export JSON</button>
+          <button class="secondary" onclick="window.print()">Print / Save PDF</button>
+          <button class="warn" onclick="resetChecks()">Reset Checks</button>
+        </div>
+        <p class="small">Suggested workflow: generate links, open them during research, mark evidence, then print or save PDF for the customer discussion.</p>
+      </div>
+    </div>
+    <main>
+      <div class="metrics">
+        <div class="metric">
+          <div class="name">Overall</div><div class="value" id="overallScore">--</div>
+          <div id="overallPill" class="pill gray">Not scored</div>
+          <div class="scorebar"><span id="overallBar"></span></div>
+        </div>
+        <div class="metric">
+          <div class="name">Listings</div><div class="value" id="listingScore">--</div>
+          <div id="listingPill" class="pill gray">Not scored</div>
+          <div class="scorebar"><span id="listingBar"></span></div>
+        </div>
+        <div class="metric">
+          <div class="name">Website SEO</div><div class="value" id="seoScore">--</div>
+          <div id="seoPill" class="pill gray">Not scored</div>
+          <div class="scorebar"><span id="seoBar"></span></div>
+        </div>
+        <div class="metric">
+          <div class="name">Reviews</div><div class="value" id="reviewScore">--</div>
+          <div id="reviewPill" class="pill gray">Not scored</div>
+          <div class="scorebar"><span id="reviewBar"></span></div>
+        </div>
+        <div class="metric">
+          <div class="name">Voice Ready</div><div class="value" id="voiceScore">--</div>
+          <div id="voicePill" class="pill gray">Not scored</div>
+          <div class="scorebar"><span id="voiceBar"></span></div>
+        </div>
+      </div>
+
+      <div class="audit-grid">
+        <section class="card">
+          <h2>1. Listing Consistency Audit</h2>
+          <div class="content audit-table">
+            <table id="listingTable"></table>
+          </div>
+        </section>
+        <section class="card">
+          <h2>2. Website Local SEO Audit</h2>
+          <div class="content audit-table">
+            <table id="seoTable"></table>
+          </div>
+        </section>
+        <section class="card">
+          <h2>3. Keyword / Competitor Visibility Demo Links</h2>
+          <div class="content audit-table">
+            <table id="keywordTable"></table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>4. AI Answer / Generative Search Audit</h2>
+          <div class="content audit-table">
+            <table id="aiTable"></table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>5. Priority Fix Plan</h2>
+          <div class="content audit-table">
+            <table id="fixTable"></table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+const platforms = [
+  {id:"google", name:"Google Business Profile / Maps", control:"https://business.google.com/", query:"site:google.com/maps {bizName} {phone}", weight:18},
+  {id:"apple", name:"Apple Business / Apple Maps", control:"https://business.apple.com/", query:"{bizName} {area} Apple Maps", weight:15},
+  {id:"bing", name:"Bing Places / Bing Maps", control:"https://www.bing.com/forbusiness/", query:"{bizName} {area} Bing Maps", weight:12},
+  {id:"yelp", name:"Yelp", control:"https://biz.yelp.com/", query:"site:yelp.com {bizName} {area}", weight:8},
+  {id:"facebook", name:"Facebook Page", control:"https://www.facebook.com/pages/create", query:"site:facebook.com {bizName} {area}", weight:8},
+  {id:"instagram", name:"Instagram Business Profile", control:"https://www.instagram.com/", query:"site:instagram.com {bizName}", weight:8},
+  {id:"theknot", name:"WeddingWire / The Knot", control:"https://www.weddingpro.com/", query:"{bizName} WeddingWire The Knot {area}", weight:10},
+  {id:"localdir", name:"Local chamber / directories", control:"", query:"{bizName} chamber {area}", weight:6}
+];
+
+const aiPlatforms = [
+  {id:"chatgpt", name:"ChatGPT Search", url:"https://chatgpt.com/", weight:18},
+  {id:"gemini", name:"Google Gemini", url:"https://gemini.google.com/", weight:16},
+  {id:"perplexity", name:"Perplexity", url:"https://www.perplexity.ai/", weight:16},
+  {id:"copilot", name:"Microsoft Copilot", url:"https://copilot.microsoft.com/", weight:14},
+  {id:"claude", name:"Claude Web Search", url:"https://claude.ai/", weight:14},
+  {id:"grok", name:"Grok / X", url:"https://x.com/i/grok", weight:10}
+];
+
+function aiPrompts(){
+  const name=val("bizName"), web=val("website"), phone=val("phone"), area=val("area"), services=val("services");
+  return [
+    `Search the web. What does ${name} do? Include the website, phone number, location/service area, services, and sources.`,
+    `Search the web. Is ${name} a real local business? What services does it offer? Cite sources.`,
+    `Search the web. Find a ${services.split(",")[0] || "photographer"} near ${val("targetLocation")}. Does ${name} appear as a recommendation or source?`,
+    `Search the web. Compare ${name} with other local businesses for: ${services}. What information is missing or unclear?`,
+    `Search the web. What is the official website and phone number for ${name}? Check if it matches ${web} and ${phone}.`
+  ];
+}
+
+const seoChecks = [
+  {id:"title", item:"Homepage title includes business/service/location intent", impact:"High", weight:10, fix:"Rewrite title/meta to include primary service and location signal."},
+  {id:"h1", item:"Homepage H1 clearly explains who/what/where", impact:"High", weight:10, fix:"Update H1/H2 copy so customers and crawlers understand the business."},
+  {id:"servicepages", item:"Dedicated service pages exist for wedding, seniors, family, branding/business portraits", impact:"High", weight:20, fix:"Create/strengthen individual landing pages for each major service."},
+  {id:"localarea", item:"Service area is visible in page copy and contact page", impact:"High", weight:15, fix:"Add natural service-area language to home, service, and contact pages."},
+  {id:"contact", item:"Phone, contact form, and booking path are easy on mobile", impact:"High", weight:10, fix:"Improve CTA placement and mobile contact path."},
+  {id:"schema", item:"LocalBusiness/ProfessionalService/FAQ schema present and valid", impact:"Medium", weight:15, fix:"Add structured data for business, services, and FAQs."},
+  {id:"faq", item:"FAQ answers conversational search questions", impact:"Medium", weight:10, fix:"Add FAQ page/sections for pricing, booking, service area, session types."},
+  {id:"images", item:"Images have descriptive filenames/alt text and are optimized", impact:"Medium", weight:10, fix:"Optimize image sizes and add descriptive alt text."}
+];
+
+function val(id){return document.getElementById(id).value.trim();}
+function enc(s){return encodeURIComponent(s);}
+function templ(s){
+  return s.replaceAll("{bizName}", val("bizName"))
+          .replaceAll("{website}", val("website"))
+          .replaceAll("{phone}", val("phone"))
+          .replaceAll("{area}", val("area"))
+          .replaceAll("{targetLocation}", val("targetLocation"));
+}
+function googleSearch(q){return "https://www.google.com/search?q="+enc(q);}
+function bingSearch(q){return "https://www.bing.com/search?q="+enc(q);}
+function mapsSearch(q){return "https://www.google.com/maps/search/"+enc(q);}
+function getCheck(id){return localStorage.getItem("lss_"+id)||"unknown";}
+function setCheck(id,value){localStorage.setItem("lss_"+id,value); scoreAll();}
+function checkControls(prefix, id){
+  let current=getCheck(prefix+"_"+id);
+  let opts=[["pass","Pass"],["partial","Partial"],["fail","Fail"],["unknown","Unknown"]];
+  return '<select onchange="setCheck(\''+prefix+'_'+id+'\',this.value)">'+
+    opts.map(o=>'<option value="'+o[0]+'" '+(current===o[0]?'selected':'')+'>'+o[1]+'</option>').join("")+
+    '</select>';
+}
+function statusClass(score){
+  if(score>=80) return ["green","Green"];
+  if(score>=55) return ["yellow","Yellow"];
+  if(score>=1) return ["red","Red"];
+  return ["gray","Not scored"];
+}
+function applyMetric(id,score){
+  let s = Number.isFinite(score) ? Math.round(score) : null;
+  document.getElementById(id+"Score").textContent = s===null ? "--" : s;
+  let cls=statusClass(s||0);
+  const pill=document.getElementById(id+"Pill");
+  pill.className="pill "+cls[0];
+  pill.textContent=cls[1];
+  const bar=document.getElementById(id+"Bar");
+  bar.style.width=(s||0)+"%";
+  bar.style.background = cls[0]==="green" ? "var(--green)" : cls[0]==="yellow" ? "var(--yellow)" : cls[0]==="red" ? "var(--red)" : "var(--gray)";
+}
+function scoreGroup(prefix, items, weightField="weight"){
+  let possible=0, earned=0, checked=0;
+  items.forEach(it=>{
+    let w=it[weightField]||1; possible+=w;
+    let v=getCheck(prefix+"_"+it.id);
+    if(v!=="unknown") checked++;
+    if(v==="pass") earned+=w;
+    if(v==="partial") earned+=w*0.55;
+  });
+  if(checked===0) return null;
+  return earned/possible*100;
+}
+function generateAudit(){
+  const listingRows = platforms.map(p=>{
+    const q=templ(p.query);
+    return `<tr>
+      <td><strong>${p.name}</strong><div class="evidence">Control: ${p.control?`<a href="${p.control}" target="_blank">${p.control}</a>`:"manual / varies"}</div></td>
+      <td class="links">
+        <a href="${googleSearch(q)}" target="_blank">Google web</a>
+        <a href="${mapsSearch(val("bizName")+" "+val("area"))}" target="_blank">Google Maps</a>
+        <a href="${bingSearch(q)}" target="_blank">Bing web</a>
+      </td>
+      <td>${checkControls("listing",p.id)}</td>
+      <td>
+        Check: found, claimed/admin known, name match, phone match, website match, category fit.
+        <div class="evidence">Expected phone: ${val("phone")} | Website: ${val("website")}</div>
+      </td>
+      <td><input placeholder="Evidence / finding notes" onchange="localStorage.setItem('lss_note_listing_${p.id}',this.value)" value="${localStorage.getItem('lss_note_listing_'+p.id)||""}"></td>
+    </tr>`;
+  }).join("");
+  document.getElementById("listingTable").innerHTML = `<tr><th>Platform</th><th>Live Check Links</th><th>Status</th><th>What to Verify</th><th>Evidence Notes</th></tr>${listingRows}`;
+
+  const seoRows = seoChecks.map(c=>{
+    return `<tr>
+      <td><strong>${c.item}</strong><div class="evidence">Impact: ${c.impact}</div></td>
+      <td class="links">
+        <a href="${val("website")}" target="_blank">Open site</a>
+        <a href="https://search.google.com/test/rich-results?url=${enc(val("website"))}" target="_blank">Rich Results</a>
+        <a href="https://pagespeed.web.dev/analysis?url=${enc(val("website"))}" target="_blank">PageSpeed</a>
+      </td>
+      <td>${checkControls("seo",c.id)}</td>
+      <td>${c.fix}</td>
+      <td><input placeholder="Evidence / finding notes" onchange="localStorage.setItem('lss_note_seo_${c.id}',this.value)" value="${localStorage.getItem('lss_note_seo_'+c.id)||""}"></td>
+    </tr>`;
+  }).join("");
+  document.getElementById("seoTable").innerHTML = `<tr><th>SEO Item</th><th>Live Check Links</th><th>Status</th><th>Recommended Fix</th><th>Evidence Notes</th></tr>${seoRows}`;
+
+  const kwds = val("keywords").split("\n").map(s=>s.trim()).filter(Boolean);
+  const keyRows = kwds.map((k,i)=>{
+    const q = k + " " + val("targetLocation");
+    return `<tr>
+      <td><strong>${k}</strong><div class="evidence">Location bias: ${val("targetLocation")}</div></td>
+      <td class="links">
+        <a href="${googleSearch(q)}" target="_blank">Google web</a>
+        <a href="${mapsSearch(q)}" target="_blank">Google Maps</a>
+        <a href="${bingSearch(q)}" target="_blank">Bing</a>
+      </td>
+      <td>${checkControls("keyword","kw"+i)}</td>
+      <td>Customer visible? Are competitors stronger? Is there a relevant service page matching this query?</td>
+      <td><input placeholder="Visible position / competitors / gap" onchange="localStorage.setItem('lss_note_kw_${i}',this.value)" value="${localStorage.getItem('lss_note_kw_'+i)||""}"></td>
+    </tr>`;
+  }).join("");
+  document.getElementById("keywordTable").innerHTML = `<tr><th>Target Query</th><th>Live Demo Links</th><th>Status</th><th>What to Show Customer</th><th>Evidence Notes</th></tr>${keyRows}`;
+
+  const prompts = aiPrompts();
+  const aiRows = aiPlatforms.map(p=>{
+    return `<tr>
+      <td><strong>${p.name}</strong><div class="evidence">Open platform and paste one prompt at a time.</div></td>
+      <td class="links"><a href="${p.url}" target="_blank">Open ${p.name}</a></td>
+      <td>${checkControls("ai",p.id)}</td>
+      <td>
+        <strong>Prompt pack:</strong>
+        <ol style="margin:6px 0 0 18px;padding:0">${prompts.map(pr=>`<li><button class="secondary" onclick="navigator.clipboard.writeText(\`${pr.replace(/`/g,"\\`")}\`)">Copy</button> ${pr}</li>`).join("")}</ol>
+      </td>
+      <td><input placeholder="What did it say? Did it cite official sources? Any wrong/missing info?" onchange="localStorage.setItem('lss_note_ai_${p.id}',this.value)" value="${localStorage.getItem('lss_note_ai_'+p.id)||""}"></td>
+    </tr>`;
+  }).join("");
+  document.getElementById("aiTable").innerHTML = `<tr><th>AI Platform</th><th>Open Platform</th><th>Status</th><th>Audit Prompts</th><th>Evidence Notes</th></tr>${aiRows}`;
+
+  scoreAll();
+}
+function scoreAll(){
+  const listingScore = scoreGroup("listing", platforms);
+  const seoScore = scoreGroup("seo", seoChecks);
+  const kwds = val("keywords").split("\n").map(s=>s.trim()).filter(Boolean).map((_,i)=>({id:"kw"+i, weight:1}));
+  const keywordScore = scoreGroup("keyword", kwds);
+  const aiScore = scoreGroup("ai", aiPlatforms);
+  let reviewScore = listingScore===null ? null : listingScore * 0.7; // placeholder until review-specific API/checks exist
+  let voiceScore = null;
+  if(listingScore!==null || seoScore!==null || keywordScore!==null || aiScore!==null){
+    let parts=[listingScore, seoScore, keywordScore, aiScore].filter(x=>x!==null);
+    voiceScore = parts.reduce((a,b)=>a+b,0)/parts.length;
+  }
+  let parts=[listingScore, seoScore, keywordScore, aiScore, reviewScore, voiceScore].filter(x=>x!==null);
+  let overall = parts.length ? parts.reduce((a,b)=>a+b,0)/parts.length : null;
+  applyMetric("listing", listingScore);
+  applyMetric("seo", seoScore);
+  applyMetric("review", reviewScore);
+  applyMetric("voice", voiceScore);
+  applyMetric("overall", overall);
+  buildFixPlan();
+}
+function buildFixPlan(){
+  const fixes=[];
+  platforms.forEach(p=>{
+    let s=getCheck("listing_"+p.id);
+    if(s==="fail"||s==="partial") fixes.push({priority:s==="fail"?"High":"Medium", area:"Listing", issue:p.name+" needs correction/verification", fix:"Claim or update listing; align name, phone, website, category, and description."});
+  });
+  seoChecks.forEach(c=>{
+    let s=getCheck("seo_"+c.id);
+    if(s==="fail"||s==="partial") fixes.push({priority:s==="fail"?"High":"Medium", area:"Website", issue:c.item, fix:c.fix});
+  });
+  val("keywords").split("\n").map(s=>s.trim()).filter(Boolean).forEach((k,i)=>{
+    let s=getCheck("keyword_kw"+i);
+    if(s==="fail"||s==="partial") fixes.push({priority:s==="fail"?"High":"Medium", area:"Visibility", issue:"Weak or missing visibility for: "+k, fix:"Create/strengthen matching service/location content and profile signals."});
+  });
+  aiPlatforms.forEach(p=>{
+    let s=getCheck("ai_"+p.id);
+    if(s==="fail"||s==="partial") fixes.push({priority:s==="fail"?"High":"Medium", area:"AI Answer", issue:p.name+" gave weak, missing, uncited, or incorrect business information", fix:"Strengthen source-of-truth pages, schema, listings, profiles, reviews, and cited third-party references."});
+  });
+  if(!fixes.length) fixes.push({priority:"--", area:"--", issue:"No fail/partial items marked yet.", fix:"Run the live checks and mark each item."});
+  document.getElementById("fixTable").innerHTML = `<tr><th>Priority</th><th>Area</th><th>Issue</th><th>Recommended Fix</th><th>Offer / Price Placeholder</th></tr>`+
+    fixes.map(f=>`<tr><td><span class="pill ${f.priority==="High"?"red":f.priority==="Medium"?"yellow":"gray"}">${f.priority}</span></td><td>${f.area}</td><td>${f.issue}</td><td>${f.fix}</td><td><input placeholder="$199 / $399 / monthly"></td></tr>`).join("");
+}
+function exportJSON(){
+  const data={business:{name:val("bizName"),website:val("website"),phone:val("phone"),area:val("area"),services:val("services"),targetLocation:val("targetLocation"),keywords:val("keywords")},checks:{},notes:{}};
+  Object.keys(localStorage).filter(k=>k.startsWith("lss_")).forEach(k=>data[k.startsWith("lss_note")?"notes":"checks"][k]=localStorage.getItem(k));
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="local-signal-scan-"+val("bizName").replace(/\W+/g,"-").toLowerCase()+".json";
+  a.click();
+}
+function resetChecks(){
+  if(!confirm("Clear saved statuses and notes?")) return;
+  Object.keys(localStorage).filter(k=>k.startsWith("lss_")).forEach(k=>localStorage.removeItem(k));
+  generateAudit();
+}
+generateAudit();
+</script>
+</body>
+</html>
