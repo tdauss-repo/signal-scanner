@@ -1,75 +1,99 @@
-# React + TypeScript + Vite
+# Business Scanner Tool
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Business Scanner Tool is a local MVP for auditing a business presence across guided listings verification, automated website SEO checks, auto-generated search visibility scans, guided AI answer scans, voice-search readiness, and a printable customer report.
 
-Currently, two official plugins are available:
+The app keeps third-party platform checks manual with generated evidence links. It does not scrape Google, Apple, Bing, Yelp, Facebook, Instagram, ChatGPT, Gemini, Claude, Perplexity, Copilot, or Grok.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## What Runs Locally
 
-## React Compiler
+- React + TypeScript frontend with localStorage persistence
+- Small Node/Express API for an authorized customer website scan
+- One backend endpoint: `POST /api/audit-website`
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The website auto-audit fetches only the business website URL entered in the intake form. It analyzes the homepage only and checks signals such as title, meta description, headings, visible text, phone matches, service phrases, service-area phrases, JSON-LD schema, FAQ indicators, contact links, social links, sitemap.xml, and robots.txt.
 
-## Expanding the ESLint configuration
+## Install
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```cmd
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Local Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+The frontend runs on `http://localhost:5173`. The API backend listens on `http://localhost:5174`.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Option 1, run both in one Command Prompt:
 
+```cmd
+npm run dev:all
 ```
+
+Option 2, run two Command Prompt windows from `C:\Projects\local-signal-scanner`.
+
+Terminal 1, start the backend:
+
+```cmd
+npm run server
+```
+
+Terminal 2, start the frontend:
+
+```cmd
+npm run dev
+```
+
+Open the Vite URL shown in the frontend terminal, usually:
+
+```text
+http://localhost:5173/
+```
+
+The frontend proxies `/api` requests to the backend at `http://localhost:5174`.
+
+Frontend API calls should use relative URLs such as `/api/audit-website`; Vite handles the local proxy during development.
+
+## Build
+
+```cmd
+npm run build
+```
+
+## Website Auto-Audit Endpoint
+
+```http
+POST /api/audit-website
+Content-Type: application/json
+```
+
+Example body:
+
+```json
+{
+  "website": "https://www.jemcamera.com",
+  "businessName": "JEM Photography",
+  "phone": "419.410.4974",
+  "services": [
+    "wedding photographer",
+    "senior pictures",
+    "business portraits",
+    "branding photography",
+    "family photographer"
+  ],
+  "serviceAreas": [
+    "Sylvania",
+    "Toledo",
+    "Northwest Ohio",
+    "Southeast Michigan"
+  ]
+}
+```
+
+The endpoint uses a timeout, limits homepage HTML size, and does not crawl beyond the homepage in this version.
+
+Success responses and error responses are returned as JSON.
+
+If the homepage returns HTTP 403, the API treats that as a blocked automated
+scan rather than an SEO failure. The frontend shows “Website blocked automated
+scan — manual review required,” records the requested URL, HTTP status,
+redirect URL, timestamp, and recommended next step, and leaves manual Website
+SEO overrides available.
