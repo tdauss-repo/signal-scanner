@@ -31,12 +31,15 @@ export function ScoreCard({
         <p className="score-label">{label}</p>
         <strong>{formatScore(result.score)}</strong>
       </div>
-      <StatusBadge status={result.status} />
+      <StatusBadge status={result.status} label={result.statusLabel} />
       <div className="score-track" aria-hidden="true">
         <span style={{ width: `${score}%` }} />
       </div>
       <p className="score-meta">
         {result.checked} checked
+        {typeof result.unchecked === 'number'
+          ? ` | ${result.unchecked} unchecked`
+          : ''}
         {weight ? ` | ${weight}` : ''}
       </p>
     </button>

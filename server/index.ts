@@ -1,5 +1,7 @@
 import express from 'express'
 import type { ErrorRequestHandler } from 'express'
+import { checkPublicDirectoryPage } from './publicPageCheck.ts'
+import type { PublicPageCheckRequest } from './publicPageCheck.ts'
 import { auditWebsite, WebsiteAuditError } from './websiteAudit.ts'
 import type { WebsiteAuditRequest } from './websiteAudit.ts'
 
@@ -29,6 +31,38 @@ app.post('/api/audit-website', async (request, response) => {
     }
 
     response.status(500).json({ error: 'Website audit failed.' })
+  }
+})
+
+app.post('/api/check-public-directory-page', async (request, response) => {
+  try {
+    const body = request.body as Partial<PublicPageCheckRequest>
+    const result = await checkPublicDirectoryPage({
+      listingUrl: String(body.listingUrl ?? ''),
+      businessName: String(body.businessName ?? ''),
+      website: String(body.website ?? ''),
+      phone: String(body.phone ?? ''),
+      phoneNumbers: Array.isArray(body.phoneNumbers)
+        ? body.phoneNumbers.map(String)
+        : [],
+      contactStructureNote: String(body.contactStructureNote ?? ''),
+      localMarket: String(body.localMarket ?? ''),
+      serviceArea: String(body.serviceArea ?? ''),
+      primaryCategory: String(body.primaryCategory ?? ''),
+      secondaryCategories: String(body.secondaryCategories ?? ''),
+      industryTags: String(body.industryTags ?? ''),
+      primaryServices: String(body.primaryServices ?? ''),
+      targetLocation: String(body.targetLocation ?? ''),
+    })
+
+    response.json(result)
+  } catch (error) {
+    response.status(500).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Public directory page check failed.',
+    })
   }
 })
 

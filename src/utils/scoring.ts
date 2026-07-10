@@ -1,4 +1,6 @@
 import type {
+  AIAnswerPlatform,
+  AIAnswerTestState,
   AuditItem,
   CheckStatus,
   FixItem,
@@ -68,6 +70,92 @@ export const weightedAverage = (
   return earned / possible
 }
 
+export const aiAnswerPlatforms: AIAnswerPlatform[] = [
+  'ChatGPT',
+  'Gemini',
+  'Perplexity',
+  'Copilot',
+  'Claude',
+  'Grok',
+]
+
+export const scoreAIAnswerPlatform = (test: AIAnswerTestState): number => {
+  if (
+    test.resultStatus === 'unknown' ||
+    test.resultStatus === 'signin_required'
+  ) {
+    return 0
+  }
+
+  if (test.resultStatus === 'pass') {
+    if (test.priority === 'High') return 70
+    if (test.priority === 'Medium') return 85
+    return 100
+  }
+
+  if (test.resultStatus === 'partial') {
+    if (test.priority === 'High') return 40
+    if (test.priority === 'Medium') return 55
+    return 70
+  }
+
+  if (test.priority === 'High') return 0
+  if (test.priority === 'Medium') return 20
+  return 35
+}
+
+export const scoreAIAnswers = (
+  tests: Record<AIAnswerPlatform, AIAnswerTestState>,
+): ScoreResult => {
+  const platformScores = aiAnswerPlatforms.map((platform) =>
+    scoreAIAnswerPlatform(tests[platform]),
+  )
+  const checked = aiAnswerPlatforms.filter(
+    (platform) =>
+      tests[platform].resultStatus !== 'unknown' &&
+      tests[platform].resultStatus !== 'signin_required',
+  ).length
+  const unchecked = aiAnswerPlatforms.length - checked
+  const score =
+    platformScores.reduce((sum, platformScore) => sum + platformScore, 0) /
+    aiAnswerPlatforms.length
+
+  if (checked === 0) {
+    return {
+      score,
+      status: 'Gray',
+      statusLabel: 'Not tested',
+      earned: score,
+      possible: 100,
+      checked,
+      unchecked,
+    }
+  }
+
+  if (checked < aiAnswerPlatforms.length) {
+    return {
+      score,
+      status: 'Yellow',
+      statusLabel: 'Partial coverage',
+      earned: score,
+      possible: 100,
+      checked,
+      unchecked,
+    }
+  }
+
+  const status = score >= 80 ? 'Green' : score >= 50 ? 'Yellow' : 'Red'
+
+  return {
+    score,
+    status,
+    earned: score,
+    possible: 100,
+    checked,
+    unchecked,
+  }
+}
+
 export const buildFixPlan = (
   items: AuditItem[],
   checks: Record<string, CheckStatus>,
@@ -83,7 +171,7 @@ export const buildFixPlan = (
   const fixes = items
     .filter((item) => {
       const status = checks[item.id] ?? 'unknown'
-      return status === 'fail' || status === 'partial' || status === 'unknown'
+      return status === 'fail' || status === 'partial'
     })
     .sort((a, b) => b.weight - a.weight)
     .slice(0, 9)
@@ -92,7 +180,7 @@ export const buildFixPlan = (
       return {
         id: item.id,
         priority:
-          status === 'fail' ? 'High' : status === 'partial' ? 'Medium' : 'Watch',
+          status === 'fail' ? 'High' : item.weight >= 10 ? 'Medium' : 'Low',
         area: areaLabels[item.area],
         issue: item.label,
         fix: item.fix,

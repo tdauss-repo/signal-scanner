@@ -1,6 +1,6 @@
 # Business Scanner Tool
 
-Business Scanner Tool is a local MVP for auditing a business presence across guided listings verification, automated website SEO checks, auto-generated search visibility scans, guided AI answer scans, voice-search readiness, and a printable customer report.
+Business Scanner Tool v02 is a private/internal sales cockpit for preparing local visibility conversations before and during customer meetings. Operators can enter a business profile, run available checks and guided scans, identify potential fixes, count verified gaps, recommend a starter cleanup package, and keep placeholders for monthly monitoring or website implementation upsells.
 
 The app keeps third-party platform checks manual with generated evidence links. It does not scrape Google, Apple, Bing, Yelp, Facebook, Instagram, ChatGPT, Gemini, Claude, Perplexity, Copilot, or Grok.
 

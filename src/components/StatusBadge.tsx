@@ -1,7 +1,8 @@
 import type { CheckStatus, TrafficStatus } from '../types/audit'
 
 interface StatusBadgeProps {
-  status: TrafficStatus | CheckStatus | 'High' | 'Medium' | 'Watch'
+  status: TrafficStatus | CheckStatus | 'High' | 'Medium' | 'Low'
+  label?: string
 }
 
 const statusClass = (status: StatusBadgeProps['status']) => {
@@ -12,6 +13,7 @@ const statusClass = (status: StatusBadgeProps['status']) => {
   if (status === 'Red' || status === 'fail' || status === 'High') {
     return 'status status-red'
   }
+  if (status === 'Low') return 'status status-gray'
   return 'status status-gray'
 }
 
@@ -23,6 +25,6 @@ const label = (status: StatusBadgeProps['status']) => {
   return status
 }
 
-export function StatusBadge({ status }: StatusBadgeProps) {
-  return <span className={statusClass(status)}>{label(status)}</span>
+export function StatusBadge({ status, label: customLabel }: StatusBadgeProps) {
+  return <span className={statusClass(status)}>{customLabel ?? label(status)}</span>
 }

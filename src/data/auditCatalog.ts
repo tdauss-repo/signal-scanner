@@ -1,4 +1,5 @@
 import type { AuditItem, BusinessProfile, EvidenceLink } from '../types/audit'
+import { buildDirectorySuggestions } from '../utils/directorySuggestions'
 import {
   bingSearch,
   googleMapsSearch,
@@ -11,6 +12,16 @@ import {
 const ownerUnverified =
   'Owner access unverified - confirm during onboarding. Public checks use generated links only.'
 
+const hasMultiContactContext = (profile: BusinessProfile) =>
+  (profile.phoneNumbers ?? []).filter(
+    (record) => record.isValidPublicContact && record.number.trim(),
+  ).length > 1 || Boolean(profile.contactStructureNote?.trim())
+
+const contactFix = (profile: BusinessProfile) =>
+  hasMultiContactContext(profile)
+    ? 'Keep valid owner/contact numbers if they match the business workflow, label them clearly on the website, and use one preferred number only where a platform requires a single primary phone number.'
+    : 'Normalize NAP data across major listings, website schema, contact page, and trusted citations.'
+
 export const aiPlatforms = [
   { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/' },
   { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/' },
@@ -19,20 +30,6 @@ export const aiPlatforms = [
   { id: 'claude', name: 'Claude', url: 'https://claude.ai/' },
   { id: 'grok', name: 'Grok', url: 'https://x.com/i/grok' },
 ] as const
-
-export const aiPromptPack = (profile: BusinessProfile) => {
-  const firstService =
-    profile.primaryServices.split(',').map((service) => service.trim())[0] ||
-    'local service provider'
-
-  return [
-    `Search the web. What does ${profile.businessName} do? Include the website, phone number, location or service area, services, and sources.`,
-    `Search the web. Is ${profile.businessName} a real local business? What services does it offer? Cite sources.`,
-    `Search the web. Find a ${firstService} near ${profile.targetLocation}. Does ${profile.businessName} appear as a recommendation or source?`,
-    `Search the web. Compare ${profile.businessName} with other local businesses for: ${profile.primaryServices}. What information is missing or unclear?`,
-    `Search the web. What is the official website and phone number for ${profile.businessName}? Check if it matches ${profile.website} and ${profile.phone}.`,
-  ]
-}
 
 export const buildAuditItems = (profile: BusinessProfile): AuditItem[] => {
   const listingItems: AuditItem[] = [
@@ -50,7 +47,9 @@ export const buildAuditItems = (profile: BusinessProfile): AuditItem[] => {
         ),
         { label: 'Owner portal', url: 'https://business.google.com/' },
       ],
-      fix: 'Claim or verify the profile, align name, address/service area, phone, website, primary category, and core services.',
+      fix: hasMultiContactContext(profile)
+        ? 'Claim or verify the profile, align name, address/service area, website, primary category, and core services. If the platform requires one number, use the preferred primary listing number while keeping owner-specific numbers clearly labeled on the website.'
+        : 'Claim or verify the profile, align name, address/service area, phone, website, primary category, and core services.',
     },
     {
       id: 'listing-apple',
@@ -79,7 +78,9 @@ export const buildAuditItems = (profile: BusinessProfile): AuditItem[] => {
         { label: 'Bing web', url: bingSearch(`${profile.businessName} ${profile.serviceArea} Bing Maps`) },
         { label: 'Owner portal', url: 'https://www.bingplaces.com/' },
       ],
-      fix: 'Claim Bing Places and synchronize name, phone, website, services, and service area.',
+      fix: hasMultiContactContext(profile)
+        ? 'Claim Bing Places and synchronize name, website, services, and service area. Use one preferred primary listing number where required, and keep valid owner contact numbers clearly labeled on the website.'
+        : 'Claim Bing Places and synchronize name, phone, website, services, and service area.',
     },
     {
       id: 'listing-yelp',
@@ -111,14 +112,15 @@ export const buildAuditItems = (profile: BusinessProfile): AuditItem[] => {
       id: 'listing-industry-local',
       area: 'listings',
       label: 'Industry and local directory citations',
-      description: 'Guided public verification. Look for relevant directories, chamber pages, wedding/vendor profiles, and local mentions.',
+      description:
+        'Guided public verification. Suggested optional directories are generated from the business profile, services, local market, and service areas. Default owner/admin access status is Unverified - public listing only.',
       weight: 10,
       access: 'public',
-      evidenceLinks: makeSearchLinks(
-        profile,
-        `${profile.businessName} chamber WeddingWire The Knot ${profile.serviceArea}`,
-      ),
-      fix: 'Build or refresh trusted local and industry citations that can corroborate the business for search and AI answers.',
+      evidenceLinks: buildDirectorySuggestions(profile).map((directory) => ({
+        label: directory.directoryName,
+        url: directory.manualSearchUrl,
+      })),
+      fix: 'Review only the optional directories that apply. Activate or verify relevant listings manually, keep owner/admin access marked unverified unless confirmed by the business owner, and ignore suggestions that do not fit.',
     },
   ]
 
@@ -253,17 +255,17 @@ export const buildAuditItems = (profile: BusinessProfile): AuditItem[] => {
       fix: 'Search visibility fix: strengthen the matching service page, internal links, listing categories, local citations, reviews, proximity/service-area signals, and supporting content.',
     }))
 
-  const aiItems: AuditItem[] = aiPlatforms.map((platform, index) => ({
-    id: `ai-${platform.id}`,
-    area: 'ai',
-    label: `${platform.name} answer visibility`,
-    description:
-      'Guided AI answer scan. Open the platform, paste generated prompts, and note if the business is mentioned, sourced, accurate, and recommended.',
-    weight: index < 3 ? 12 : 8,
-    access: 'public',
-    evidenceLinks: [{ label: `Open ${platform.name}`, url: platform.url }],
-    fix: 'AI answer/source clarity fix: improve source-of-truth pages, schema, listings, third-party citations, reviews, and concise service/location facts.',
-  }))
+  const aiItems: AuditItem[] = aiPlatforms.map((platform) => ({
+      id: `ai-${platform.id}`,
+      area: 'ai',
+      label: `${platform.name} answer visibility`,
+      description:
+        'Guided manual test. Copy the consolidated prompt into this AI answer platform, then summarize whether the platform identifies the business, services, location, sources, and missing signals.',
+      weight: 10,
+      access: 'public',
+      evidenceLinks: [{ label: platform.name, url: platform.url }],
+      fix: 'AI answer/source clarity fix: improve source-of-truth pages, schema, listings, third-party citations, reviews, and concise service/location facts.',
+    }))
 
   const voiceItems: AuditItem[] = [
     {
@@ -278,7 +280,7 @@ export const buildAuditItems = (profile: BusinessProfile): AuditItem[] => {
         { label: 'Google query', url: googleSearch(`${profile.businessName} phone website`) },
         { label: 'Bing query', url: bingSearch(`${profile.businessName} phone website`) },
       ],
-      fix: 'Normalize NAP data across major listings, website schema, contact page, and trusted citations.',
+      fix: contactFix(profile),
     },
     {
       id: 'voice-near-me',

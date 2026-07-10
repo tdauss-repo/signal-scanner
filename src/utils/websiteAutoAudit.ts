@@ -35,6 +35,37 @@ const note = (label: string, value: string | string[] | boolean | number) => {
   return `${label}: ${rendered}`
 }
 
+const validProfilePhoneNumbers = (profile: BusinessProfile) =>
+  (profile.phoneNumbers ?? []).filter(
+    (record) => record.isValidPublicContact && record.number.trim(),
+  )
+
+const hasDocumentedMultiContactSetup = (profile: BusinessProfile) =>
+  validProfilePhoneNumbers(profile).length > 1 ||
+  Boolean(profile.contactStructureNote?.trim())
+
+const contactStructureEvidence = (
+  result: WebsiteAuditResult,
+  profile: BusinessProfile,
+) => {
+  if (!hasDocumentedMultiContactSetup(profile)) {
+    return note('Phone/contact interpretation', result.phoneNumberMatches)
+  }
+
+  return [
+    'Phone/contact interpretation: Multiple valid contact numbers - verify clarity.',
+    'Multiple phone numbers are listed. Based on the business profile, these appear to be valid owner/contact numbers rather than conflicting NAP data. The recommended cleanup is to make the contact structure clear for customers, search engines, maps, and AI tools.',
+    note('Contact structure note', profile.contactStructureNote),
+    note(
+      'Valid public contact numbers',
+      validProfilePhoneNumbers(profile).map((record) =>
+        `${record.label || 'Contact'}: ${record.number} (${record.role || 'valid public contact'})`,
+      ),
+    ),
+    note('Phone matches found on homepage', result.phoneNumberMatches),
+  ].join('\n')
+}
+
 const titleStatus = (result: WebsiteAuditResult, profile: BusinessProfile) => {
   const title = result.title.toLowerCase()
   const hasBusiness = title.includes(profile.businessName.toLowerCase())
@@ -174,7 +205,7 @@ export const mapAutoAuditToWebsiteChecks = (
       note('Page title found', result.title),
       note('Meta description found', result.metaDescription),
       note('Business name found', result.businessNameFound),
-      note('Phone found', result.phoneNumberMatches),
+      contactStructureEvidence(result, profile),
       note('Service terms found', result.servicePhraseMatches),
       note('Location/service-area terms found', result.serviceAreaPhraseMatches),
       note('Dedicated service navigation/links found', result.serviceLinks),
@@ -197,7 +228,7 @@ export const mapAutoAuditToWebsiteChecks = (
     ].join('\n'),
     'website-faq': note('FAQ indicators', result.faqIndicators),
     'website-mobile-conversion': [
-      note('Phone matches', result.phoneNumberMatches),
+      contactStructureEvidence(result, profile),
       note('Contact or booking links', result.contactLinks),
     ].join('\n'),
     'website-social-links': note(
@@ -227,6 +258,8 @@ export const runWebsiteAutoAudit = async (profile: BusinessProfile) => {
       website: profile.website,
       businessName: profile.businessName,
       phone: profile.phone,
+      phoneNumbers: validProfilePhoneNumbers(profile).map((record) => record.number),
+      contactStructureNote: profile.contactStructureNote,
       services: splitCsv(profile.primaryServices),
       serviceAreas: splitCsv(profile.serviceArea),
     }),
