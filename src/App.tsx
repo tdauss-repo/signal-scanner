@@ -12,14 +12,34 @@ import { FixPlan } from './components/FixPlan'
 import { IntakeForm } from './components/IntakeForm'
 import { ReportView } from './components/ReportView'
 import { ScoreCard } from './components/ScoreCard'
+import { SearchVisibilityPanel } from './components/SearchVisibilityPanel'
+import { VoiceReadinessPanel } from './components/VoiceReadinessPanel'
 import { buildAuditItems } from './data/auditCatalog'
 import { defaultProfile } from './data/demoProfile'
-import type { AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem } from './types/audit'
+import type { AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem, SearchVisibilityQuery, SearchVisibilityTestState, VoicePromptTestState } from './types/audit'
 import type { WebsiteAuditResponse } from './types/websiteAudit'
 import { aiAnswerPlatforms, buildFixPlan, scoreAIAnswerPlatform, scoreAIAnswers, scoreItems, trafficStatusForScore, weightedAverage } from './utils/scoring'
 import { mapAutoAuditToWebsiteChecks, runWebsiteAutoAudit } from './utils/websiteAutoAudit'
 import { bingSearch, googleMapsSearch, googleSearch } from './utils/links'
-import { businessDirectoryKey } from './utils/directorySuggestions'
+import {
+  businessDirectoryKey,
+  publicPageCheckEligibilityFor,
+  urlDiscoveryMethodFor,
+} from './utils/directorySuggestions'
+import {
+  actionPlanPriorityForSearchObservation,
+  defaultSearchVisibilityTest,
+  searchVisibilityResultLabel,
+  searchVisibilityResultToCheckStatus,
+} from './utils/searchVisibility'
+import {
+  buildVoicePromptTests,
+  buildVoiceReadinessCategories,
+  buildVoiceSourceReadinessGroups,
+  defaultVoicePromptTest,
+  voicePromptStatusLabel,
+  voicePromptStatusToCheckStatus,
+} from './utils/voiceReadiness'
 
 const storageKey = 'local-signal-scanner-state'
 const activeViewStorageKey = 'business-scanner-active-view'
@@ -60,6 +80,20 @@ const migrateDirectories = (
       (row.checkMethod as string) === 'Public page check candidate'
         ? 'Public page check available'
         : row.checkMethod ?? 'Manual verification only',
+    urlDiscoveryMethod:
+      row.urlDiscoveryMethod ??
+      urlDiscoveryMethodFor(
+        row.checkMethod ?? 'Manual verification only',
+      ),
+    publicPageCheckEligibility:
+      publicPageCheckEligibilityFor(
+        row.directoryName ?? '',
+        row.checkMethod ?? 'Manual verification only',
+        row.allowPublicPageFetch ?? false,
+        row.publicPageCheckEligibility === 'Allowed after URL confirmed'
+          ? row.publicPageCheckEligibility
+          : undefined,
+      ),
     relevance: row.relevance ?? row.authority ?? 'Medium',
     requiresOperatorUrl: row.requiresOperatorUrl ?? false,
     allowPublicPageFetch: row.allowPublicPageFetch ?? false,
@@ -77,9 +111,11 @@ const migrateDirectories = (
           : 'url_unavailable'),
     lastCheckedAt: row.lastCheckedAt ?? '',
     foundData: row.foundData ?? {},
+    candidateUrls: row.candidateUrls ?? [],
     evidenceConfidence: row.evidenceConfidence ?? 'manual_needs_confirmation',
     publicEvidenceNotes: row.publicEvidenceNotes ?? row.evidenceNotes ?? '',
     evidenceNotes: row.evidenceNotes ?? row.publicEvidenceNotes ?? '',
+    pastedVisiblePageText: row.pastedVisiblePageText ?? '',
     ownerAdminAccessStatus:
       row.ownerAdminAccessStatus ?? row.ownerAccessStatus ?? 'Unverified - public listing only',
     ownerAccessStatus:
@@ -249,6 +285,8 @@ const initialState: AuditState = {
   evidenceConfidence: {},
   selectedAIPlatform: 'Gemini',
   aiAnswerTests: buildDefaultAIAnswerTests(),
+  searchVisibilityTests: {},
+  voicePromptTests: {},
   directories: { activeRows: [], ignoredSuggestionIds: [] },
   manualFixes: [],
   lastUpdated: new Date().toISOString(),
@@ -293,6 +331,8 @@ const loadState = (): AuditState => {
           defaultProfile.contactStructureNote,
       },
       selectedAIPlatform: parsed.selectedAIPlatform ?? 'Gemini',
+      searchVisibilityTests: parsed.searchVisibilityTests ?? {},
+      voicePromptTests: parsed.voicePromptTests ?? {},
       aiAnswerTests: aiAnswerPlatforms.reduce(
         (tests, platform) => ({
           ...tests,
@@ -371,7 +411,23 @@ function App() {
       auditState.checks,
     )
     const ai = scoreAIAnswers(auditState.aiAnswerTests)
-    const voice = scoreItems(groups.voice, auditState.checks)
+    const voiceReadinessChecks = [
+      ...buildVoiceSourceReadinessGroups(auditState.profile, auditState.checks),
+      ...buildVoiceReadinessCategories(auditState.profile, auditState.checks),
+    ].reduce(
+      (checks, category) => ({
+        ...checks,
+        [category.id]: auditState.checks[category.id] ?? category.suggestedStatus,
+      }),
+      {} as Record<string, CheckStatus>,
+    )
+    const voiceItemsForScore = groups.voice.filter(
+      (item) => !item.id.startsWith('voice-prompt-'),
+    )
+    const voice = scoreItems(voiceItemsForScore, {
+      ...auditState.checks,
+      ...voiceReadinessChecks,
+    })
     const overallScore = weightedAverage([
       { score: listings.score, weight: 24 },
       { score: website.score, weight: 24 },
@@ -399,12 +455,14 @@ function App() {
       'AI Answers': ai,
       Voice: voice,
     }
-  }, [auditState.aiAnswerTests, auditState.checks, auditState.directories.activeRows, auditState.profile, groups])
+  }, [auditState.aiAnswerTests, auditState.checks, auditState.directories.activeRows, auditState.profile, auditState.voicePromptTests, groups])
 
   const fixes = useMemo(
     () => [
       ...buildFixPlan(
-        auditItems.filter((item) => item.area !== 'ai'),
+        auditItems.filter(
+          (item) => item.area !== 'ai' && !item.id.startsWith('voice-prompt-'),
+        ),
         auditState.checks,
       ),
       ...auditState.manualFixes,
@@ -463,6 +521,221 @@ function App() {
       notes: {
         ...auditState.notes,
         [`ai-${platform.toLowerCase()}`]: aiAnswerTest.evidenceNotes,
+      },
+    })
+  }
+
+  const setSearchVisibilityTest = (
+    id: string,
+    searchVisibilityTest: SearchVisibilityTestState,
+  ) => {
+    const checkStatus = searchVisibilityResultToCheckStatus(
+      searchVisibilityTest.visibilityResult,
+    )
+    updateState({
+      searchVisibilityTests: {
+        ...auditState.searchVisibilityTests,
+        [id]: searchVisibilityTest,
+      },
+      checks: {
+        ...auditState.checks,
+        [id]: checkStatus,
+      },
+      notes: {
+        ...auditState.notes,
+        [id]: searchVisibilityTest.evidenceNotes,
+      },
+      evidenceConfidence: {
+        ...auditState.evidenceConfidence,
+        [id]: searchVisibilityTest.evidenceConfidence,
+      },
+    })
+  }
+
+  const addSearchVisibilityToActionPlan = (query: SearchVisibilityQuery) => {
+    const test = {
+      ...defaultSearchVisibilityTest(),
+      ...auditState.searchVisibilityTests[query.id],
+    }
+    const status = searchVisibilityResultToCheckStatus(test.visibilityResult)
+    const observedPriority = actionPlanPriorityForSearchObservation(
+      query,
+      test.visibilityResult,
+    )
+    const manualFix: FixItem = {
+      id: `manual-search-visibility-${query.id}`,
+      priority: observedPriority,
+      area: `Search Visibility - ${query.intentType}`,
+      issue: `Search visibility for "${query.query}"`,
+      fix: test.recommendedAction,
+      status,
+      evidenceNote: [
+        `Query: ${query.query}`,
+        `Intent type: ${query.intentType}`,
+        `Query importance: ${query.priority}`,
+        `Finding priority: ${observedPriority}`,
+        `Visibility result: ${searchVisibilityResultLabel(test.visibilityResult)}`,
+        `Where found: ${test.whereFound}`,
+        test.evidenceNotes,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      sources: test.competitorsObserved
+        ? `Competitors observed: ${test.competitorsObserved}`
+        : '',
+      packageFit: test.packageFit,
+      effort: test.packageFit === 'Website SEO Implementation' ? 'Medium' : 'Low',
+      evidenceConfidence: test.evidenceConfidence,
+      whyItMatters:
+        'Manual search observations show whether customers are likely to encounter the business, a directory profile, or competitors for this query.',
+    }
+
+    updateState({
+      manualFixes: [
+        ...auditState.manualFixes.filter((fix) => fix.id !== manualFix.id),
+        manualFix,
+      ],
+      checks: {
+        ...auditState.checks,
+        [query.id]: status,
+      },
+      notes: {
+        ...auditState.notes,
+        [query.id]: test.evidenceNotes,
+        [manualFix.id]: manualFix.evidenceNote ?? '',
+      },
+      evidenceConfidence: {
+        ...auditState.evidenceConfidence,
+        [query.id]: test.evidenceConfidence,
+      },
+    })
+  }
+
+  const setVoicePromptTest = (
+    id: string,
+    voicePromptTest: VoicePromptTestState,
+  ) => {
+    const checkStatus = voicePromptStatusToCheckStatus(
+      voicePromptTest.testStatus,
+    )
+    updateState({
+      voicePromptTests: {
+        ...auditState.voicePromptTests,
+        [id]: voicePromptTest,
+      },
+      checks: {
+        ...auditState.checks,
+        [id]: checkStatus,
+      },
+      notes: {
+        ...auditState.notes,
+        [id]: voicePromptTest.evidenceNotes,
+      },
+      evidenceConfidence: {
+        ...auditState.evidenceConfidence,
+        [id]: voicePromptTest.evidenceConfidence,
+      },
+    })
+  }
+
+  const addVoiceCategoryToActionPlan = (id: string) => {
+    const category = [
+      ...buildVoiceSourceReadinessGroups(auditState.profile, auditState.checks),
+      ...buildVoiceReadinessCategories(auditState.profile, auditState.checks),
+    ].find((item) => item.id === id)
+    if (!category) return
+
+    const status = auditState.checks[id] ?? category.suggestedStatus
+    const manualFix: FixItem = {
+      id: `manual-${id}`,
+      priority:
+        status === 'fail' ? 'High' : category.weight >= 10 ? 'Medium' : 'Low',
+      area: 'Voice Search Readiness',
+      issue: category.label,
+      fix: category.recommendedAction,
+      status,
+      evidenceNote: [
+        `Suggested from scanner data: ${category.suggestedStatus}`,
+        category.suggestedReason,
+        auditState.notes[id] ?? '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      packageFit: category.packageFit,
+      effort: category.packageFit === 'Website SEO Implementation' ? 'Medium' : 'Low',
+      evidenceConfidence:
+        auditState.evidenceConfidence[id] ?? 'derived_readiness_signal',
+      whyItMatters:
+        'Voice-style answers depend on clear public signals for identity, contact, location, services, listings, reviews, FAQs, and structured data.',
+    }
+
+    updateState({
+      manualFixes: [
+        ...auditState.manualFixes.filter((fix) => fix.id !== manualFix.id),
+        manualFix,
+      ],
+      checks: {
+        ...auditState.checks,
+        [id]: status,
+      },
+      notes: {
+        ...auditState.notes,
+        [manualFix.id]: manualFix.evidenceNote ?? '',
+      },
+    })
+  }
+
+  const addVoicePromptToActionPlan = (id: string) => {
+    const prompt = buildVoicePromptTests(auditState.profile).find(
+      (item) => item.id === id,
+    )
+    if (!prompt) return
+    const test = {
+      ...defaultVoicePromptTest(prompt),
+      ...auditState.voicePromptTests[id],
+    }
+    const status = voicePromptStatusToCheckStatus(test.testStatus)
+    const manualFix: FixItem = {
+      id: `manual-${id}`,
+      priority: prompt.priority,
+      area: `Voice Search Readiness - ${prompt.intent}`,
+      issue: prompt.prompt,
+      fix: test.recommendedAction,
+      status,
+      evidenceNote: [
+        `Prompt: ${prompt.prompt}`,
+        `Platform tested: ${test.platformTested}`,
+        `Test device/context: ${test.deviceContext}`,
+        `Personalization risk: ${test.personalizationRisk}`,
+        `Test status: ${voicePromptStatusLabel(test.testStatus)}`,
+        test.evidenceNotes,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      packageFit: test.packageFit,
+      effort: test.packageFit === 'Website SEO Implementation' ? 'Medium' : 'Low',
+      evidenceConfidence: test.evidenceConfidence,
+      whyItMatters:
+        'Voice-style prompt tests reveal whether public signals resolve the correct business, contact path, services, and local relevance.',
+    }
+
+    updateState({
+      manualFixes: [
+        ...auditState.manualFixes.filter((fix) => fix.id !== manualFix.id),
+        manualFix,
+      ],
+      checks: {
+        ...auditState.checks,
+        [id]: status,
+      },
+      notes: {
+        ...auditState.notes,
+        [id]: test.evidenceNotes,
+        [manualFix.id]: manualFix.evidenceNote ?? '',
+      },
+      evidenceConfidence: {
+        ...auditState.evidenceConfidence,
+        [id]: test.evidenceConfidence,
       },
     })
   }
@@ -543,8 +816,10 @@ function App() {
         'Correct listing details, categories, NAP/contact information, website links, descriptions, photos, and owner access notes.',
       status: directoryRowToStatus(row),
       evidenceNote: [
+        row.listingUrl ? `Saved URL: ${row.listingUrl}` : '',
         `Listing result: ${row.listingResult ?? row.directoryStatus}`,
         row.lastCheckedAt ? `Last checked: ${new Date(row.lastCheckedAt).toLocaleString()}` : '',
+        `Evidence confidence: ${row.evidenceConfidence ?? 'manual_needs_confirmation'}`,
         row.publicEvidenceNotes ?? row.evidenceNotes,
       ]
         .filter(Boolean)
@@ -1025,16 +1300,11 @@ function App() {
 
     if (activeView === 'Search Visibility') {
       return (
-        <AuditSection
-          title="Search Visibility Audit"
-          eyebrow="Auto-Generated Visibility Scan"
-          subtitle="The scanner generates target search queries from the business services and service areas, then helps verify whether the business appears for the searches customers are likely to use. These results connect website SEO, listings, reviews, and local authority to real search visibility."
-          note="Automated query generation is included. Exact ranking verification requires manual review or a future SERP API integration."
-          items={groups.searchVisibility}
-          checks={auditState.checks}
-          notes={auditState.notes}
-          onStatusChange={setCheck}
-          onNoteChange={setNote}
+        <SearchVisibilityPanel
+          profile={auditState.profile}
+          tests={auditState.searchVisibilityTests}
+          onChange={setSearchVisibilityTest}
+          onAddToActionPlan={addSearchVisibilityToActionPlan}
         />
       )
     }
@@ -1093,15 +1363,18 @@ function App() {
     }
 
     return (
-      <AuditSection
-        title="Voice Search Readiness"
-        eyebrow="Guided Voice Readiness Review"
-        subtitle="Score whether assistants can resolve contact facts and answer conversational local service questions."
-        items={groups.voice}
+      <VoiceReadinessPanel
+        profile={auditState.profile}
         checks={auditState.checks}
         notes={auditState.notes}
+        evidenceConfidence={auditState.evidenceConfidence}
+        promptTests={auditState.voicePromptTests}
         onStatusChange={setCheck}
         onNoteChange={setNote}
+        onEvidenceConfidenceChange={setEvidenceConfidence}
+        onPromptChange={setVoicePromptTest}
+        onAddCategoryToActionPlan={addVoiceCategoryToActionPlan}
+        onAddPromptToActionPlan={addVoicePromptToActionPlan}
       />
     )
   }

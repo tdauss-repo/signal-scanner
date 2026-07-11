@@ -5,7 +5,10 @@ import type {
   DirectoryAuditRow,
   DirectoryAuditState,
   DirectoryAuthority,
+  DirectoryCandidateUrl,
   DirectoryCheckMethod,
+  DirectoryFoundData,
+  DirectoryFoundSignal,
   DirectoryListingStatus,
   DirectorySuggestion,
   DirectoryType,
@@ -15,11 +18,15 @@ import type {
 import type { PublicPageCheckResponse } from '../types/publicPageCheck'
 import { evidenceConfidenceOptions } from '../utils/evidenceConfidence'
 import { runPublicPageCheck } from '../utils/publicPageCheck'
+import { googleSearch } from '../utils/links'
+import { discoverDirectoryCandidateUrls } from '../utils/directoryCandidateDiscovery'
 import {
   businessDirectoryKey,
   buildDirectorySuggestions,
   directorySuggestionToRow,
   emptyDirectoryRow,
+  publicPageCheckEligibilityFor,
+  urlDiscoveryMethodFor,
 } from '../utils/directorySuggestions'
 import { StatusBadge } from './StatusBadge'
 
@@ -58,11 +65,19 @@ const checkFields: Array<{
   { key: 'duplicateFound', label: 'Duplicate/outdated listing found' },
 ]
 
+type DirectoryCheckFieldKey = (typeof checkFields)[number]['key']
+
 const statusOptions: Array<{ value: CheckStatus; label: string }> = [
   { value: 'unknown', label: 'Not checked' },
   { value: 'pass', label: 'Pass' },
   { value: 'partial', label: 'Partial' },
   { value: 'fail', label: 'Fail' },
+]
+
+const foundSignalOptions: Array<{ value: DirectoryFoundSignal; label: string }> = [
+  { value: 'Yes', label: 'Yes' },
+  { value: 'Partial', label: 'Partial' },
+  { value: 'No', label: 'No' },
 ]
 
 const directoryTypes: DirectoryType[] = [
@@ -188,7 +203,14 @@ const listingUrlStatusLabel = (row: DirectoryAuditRow) => {
 const checkMethodDisplay = (
   method: DirectoryCheckMethod,
   listingUrlStatus?: DirectoryAuditRow['listingUrlStatus'],
+  publicPageCheckEligibility?: DirectoryAuditRow['publicPageCheckEligibility'],
 ) => {
+  if (
+    listingUrlStatus === 'url_saved' &&
+    publicPageCheckEligibility === 'Allowed after URL confirmed'
+  ) {
+    return 'Public page check ready'
+  }
   if (method === 'Public search assist only') return 'Manual search required'
   if (method === 'Public page check available') {
     return listingUrlStatus === 'url_saved'
@@ -201,7 +223,20 @@ const checkMethodDisplay = (
 const checkMethodGuidance = (
   method: DirectoryCheckMethod,
   listingUrlStatus?: DirectoryAuditRow['listingUrlStatus'],
+  publicPageCheckEligibility?: DirectoryAuditRow['publicPageCheckEligibility'],
 ) => {
+  if (
+    listingUrlStatus === 'url_saved' &&
+    publicPageCheckEligibility === 'Allowed after URL confirmed'
+  ) {
+    return 'A public listing URL is saved and can be checked by the scanner. Review scanner-detected data before using it in the customer report or Action Plan.'
+  }
+  if (
+    listingUrlStatus === 'url_saved' &&
+    publicPageCheckEligibility === 'Blocked/protected'
+  ) {
+    return 'URL saved, but this platform should remain manual-only or protected for now.'
+  }
   if (method === 'Public page check available') {
     if (listingUrlStatus === 'url_saved') {
       return 'A public listing URL is saved and can be checked by the scanner.'
@@ -218,11 +253,142 @@ const checkMethodGuidance = (
 const protectedDirectoryPattern =
   /google business|google places|apple maps|apple business|bing places|bing maps|facebook|instagram|yelp|chatgpt|gemini|claude|copilot|perplexity|grok/i
 
+const effectivePublicPageCheckEligibility = (row: DirectoryAuditRow) =>
+  publicPageCheckEligibilityFor(
+    row.directoryName,
+    row.checkMethod,
+    row.allowPublicPageFetch,
+    row.publicPageCheckEligibility === 'Allowed after URL confirmed'
+      ? row.publicPageCheckEligibility
+      : undefined,
+  )
+
+const effectiveUrlDiscoveryMethod = (row: DirectoryAuditRow) =>
+  row.urlDiscoveryMethod ?? urlDiscoveryMethodFor(row.checkMethod)
+
 const canRunPublicPageCheck = (row: DirectoryAuditRow) =>
-  row.checkMethod === 'Public page check available' &&
+  effectivePublicPageCheckEligibility(row) === 'Allowed after URL confirmed' &&
   row.listingUrlStatus === 'url_saved' &&
   Boolean(row.listingUrl.trim()) &&
   !protectedDirectoryPattern.test(row.directoryName)
+
+const canShowDiscoveryAssist = (
+  method: DirectoryCheckMethod,
+  listingUrlStatus?: DirectoryAuditRow['listingUrlStatus'],
+) =>
+  method === 'Public search assist only' ||
+  (method === 'Public page check available' && listingUrlStatus !== 'url_saved')
+
+const websiteDomain = (website: string) => {
+  try {
+    return new URL(/^https?:\/\//i.test(website) ? website : `https://${website}`)
+      .hostname.replace(/^www\./i, '')
+  } catch {
+    return website.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0]
+  }
+}
+
+const displayUrlHost = (url: string) => {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return url
+  }
+}
+
+const firstListItem = (value: string) =>
+  value
+    .split(/[,;\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean)[0] ?? ''
+
+const directoryDomain = (directoryName: string) => {
+  const name = directoryName.toLowerCase()
+  if (name.includes('weddingwire')) return 'weddingwire.com'
+  if (name.includes('the knot')) return 'theknot.com'
+  if (name.includes('zola')) return 'zola.com'
+  if (name.includes('greatschools')) return 'greatschools.org'
+  if (name.includes('niche')) return 'niche.com'
+  if (name.includes('private school review')) return 'privateschoolreview.com'
+  if (name.includes('booksy')) return 'booksy.com'
+  if (name.includes('vagaro')) return 'vagaro.com'
+  if (name.includes('fresha')) return 'fresha.com'
+  if (name.includes('styleseat')) return 'styleseat.com'
+  if (name.includes('angi')) return 'angi.com'
+  if (name.includes('homeadvisor')) return 'homeadvisor.com'
+  if (name.includes('thumbtack')) return 'thumbtack.com'
+  if (name.includes('houzz')) return 'houzz.com'
+  if (name.includes('bbb')) return 'bbb.org'
+  return ''
+}
+
+const buildCandidateSearchLinks = (
+  profile: BusinessProfile,
+  directoryName: string,
+): DirectoryCandidateUrl[] => {
+  const city = profile.localMarket || profile.targetLocation || profile.serviceArea
+  const domain = websiteDomain(profile.website)
+  const service = firstListItem(profile.primaryServices || profile.industryTags)
+  const category = profile.primaryCategory || firstListItem(profile.secondaryCategories)
+  const expectedDomain = directoryDomain(directoryName)
+  const queries = [
+    {
+      label: 'Search by business + directory',
+      query: `${profile.businessName} ${city} ${directoryName}`,
+      reason: 'Searches for the business, local market, and directory name.',
+    },
+    {
+      label: 'Search by website + directory',
+      query: `${profile.businessName} ${domain} ${directoryName}`,
+      reason: 'Searches for the business website domain near the directory name.',
+    },
+    {
+      label: 'Search by city + directory',
+      query: `${profile.businessName} ${city} ${directoryName}`,
+      reason: 'Searches for a local listing match by city or service area.',
+    },
+    {
+      label: 'Search by service + directory',
+      query: `${profile.businessName} ${service || category} ${directoryName}`,
+      reason: 'Searches for a listing match by service/category and directory.',
+    },
+    expectedDomain
+      ? {
+          label: 'Search within directory domain',
+          query: `site:${expectedDomain} ${profile.businessName} ${city}`,
+          reason:
+            'Limits the manual search to the expected directory domain when known.',
+        }
+      : null,
+    expectedDomain && domain
+      ? {
+          label: 'Search by website within directory domain',
+          query: `site:${expectedDomain} ${profile.businessName} ${domain}`,
+          reason:
+            'Looks for a directory-domain page that references the business website.',
+        }
+      : null,
+  ]
+
+  return queries
+    .filter(Boolean)
+    .map((item) => item as { label: string; query: string; reason: string })
+    .filter((item) => item.query.replace(profile.businessName, '').trim())
+    .map((item, index) => ({
+      id: `${directoryName.toLowerCase().replace(/\W+/g, '-')}-candidate-search-${index}`,
+      title: item.label,
+      url: googleSearch(item.query),
+      displayDomain: 'google.com',
+      snippet:
+        'Manual search fallback. Open results, confirm the correct public listing URL, then save it in the scanner.',
+      source: 'Generated manual search link',
+      confidence: expectedDomain && item.query.includes(`site:${expectedDomain}`)
+        ? 'Medium'
+        : 'Low',
+      reason: `${item.reason} Candidate URLs are suggestions only; open the search result and save only the confirmed public listing URL.`,
+      discoveredAt: new Date().toISOString(),
+    }))
+}
 
 const foundDataRows: Array<{
   key: keyof NonNullable<DirectoryAuditRow['foundData']>
@@ -234,7 +400,201 @@ const foundDataRows: Array<{
   { key: 'addressOrServiceAreaFound', label: 'Address/service area' },
   { key: 'categoryServicesFound', label: 'Category/services' },
   { key: 'descriptionFound', label: 'Description' },
+  { key: 'reviewsRatingsVisible', label: 'Reviews/ratings' },
+  { key: 'photosPortfolioVisible', label: 'Photos/portfolio' },
 ]
+
+const foundSignalToCheckStatus = (
+  signal: DirectoryFoundSignal | undefined,
+): CheckStatus => {
+  if (signal === 'Yes') return 'pass'
+  if (signal === 'Partial') return 'partial'
+  if (signal === 'No') return 'fail'
+  return 'unknown'
+}
+
+const foundDataToCheckUpdates = (
+  foundData: DirectoryFoundData,
+): Pick<DirectoryAuditRow, DirectoryCheckFieldKey> => ({
+  listingFound: foundData.businessNameFound === 'Yes' ? 'pass' : 'partial',
+  nameMatches: foundSignalToCheckStatus(foundData.businessNameFound),
+  phoneMatches: foundSignalToCheckStatus(foundData.phoneFound),
+  websiteMatches: foundSignalToCheckStatus(foundData.websiteFound),
+  addressMatches: foundSignalToCheckStatus(foundData.addressOrServiceAreaFound),
+  categoryMatches: foundSignalToCheckStatus(foundData.categoryServicesFound),
+  descriptionAccurate: foundSignalToCheckStatus(foundData.descriptionFound),
+  reviewsVisible: foundSignalToCheckStatus(foundData.reviewsRatingsVisible),
+  photosPresent: foundSignalToCheckStatus(foundData.photosPortfolioVisible),
+  duplicateFound: 'pass',
+})
+
+const cleanComparableText = (value: string) =>
+  value.toLowerCase().replace(/\s+/g, ' ').trim()
+
+const splitProfileList = (value: string) =>
+  value
+    .split(/[,;\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+const normalizeDigits = (value: string) => value.replace(/\D/g, '')
+
+const phraseSignalFromText = (
+  text: string,
+  phrases: string[],
+): DirectoryFoundSignal => {
+  const comparable = cleanComparableText(text)
+  const filtered = phrases.filter((phrase) => phrase.trim().length > 1)
+  if (filtered.length === 0) return 'No'
+  const matches = filtered.filter((phrase) =>
+    comparable.includes(cleanComparableText(phrase)),
+  ).length
+  if (matches === 0) return 'No'
+  if (matches === filtered.length || matches >= 2) return 'Yes'
+  return 'Partial'
+}
+
+const phoneSignalFromText = (
+  text: string,
+  phones: string[],
+): DirectoryFoundSignal => {
+  const pageDigits = normalizeDigits(text)
+  const expected = phones.map(normalizeDigits).filter(Boolean)
+  if (expected.length === 0) return 'No'
+  if (expected.some((phone) => pageDigits.includes(phone))) return 'Yes'
+  return /\d{3}[\s.)-]*\d{3}[\s.-]*\d{4}/.test(text) ? 'Partial' : 'No'
+}
+
+const websiteSignalFromText = (
+  text: string,
+  website: string,
+): DirectoryFoundSignal => {
+  if (!website.trim()) return 'No'
+  const domain = websiteDomain(website).toLowerCase()
+  return cleanComparableText(text).includes(domain) ? 'Yes' : 'No'
+}
+
+const visibilitySignalFromText = (
+  text: string,
+  terms: string[],
+): DirectoryFoundSignal =>
+  terms.some((term) => cleanComparableText(text).includes(term)) ? 'Yes' : 'No'
+
+const descriptionSignalFromText = (
+  text: string,
+  profile: BusinessProfile,
+): DirectoryFoundSignal => {
+  const wordCount = text.split(/\s+/).filter(Boolean).length
+  const contextSignal = phraseSignalFromText(text, [
+    profile.primaryCategory,
+    ...splitProfileList(profile.secondaryCategories),
+    ...splitProfileList(profile.industryTags),
+    ...splitProfileList(profile.primaryServices),
+    profile.localMarket,
+    ...splitProfileList(profile.serviceArea),
+  ])
+  if (wordCount > 120 && contextSignal !== 'No') return 'Yes'
+  if (wordCount > 60 || contextSignal !== 'No') return 'Partial'
+  return 'No'
+}
+
+const analyzeVisiblePageText = (
+  profile: BusinessProfile,
+  pastedText: string,
+): DirectoryFoundData => {
+  const validContactNumbers = (profile.phoneNumbers ?? [])
+    .filter((record) => record.isValidPublicContact && record.number.trim())
+    .map((record) => record.number)
+
+  return {
+    businessNameFound: phraseSignalFromText(pastedText, [profile.businessName]),
+    phoneFound: phoneSignalFromText(pastedText, [
+      profile.phone,
+      ...validContactNumbers,
+    ]),
+    websiteFound: websiteSignalFromText(pastedText, profile.website),
+    addressOrServiceAreaFound: phraseSignalFromText(pastedText, [
+      profile.localMarket,
+      profile.targetLocation,
+      ...splitProfileList(profile.serviceArea),
+    ]),
+    categoryServicesFound: phraseSignalFromText(pastedText, [
+      profile.primaryCategory,
+      ...splitProfileList(profile.secondaryCategories),
+      ...splitProfileList(profile.industryTags),
+      ...splitProfileList(profile.primaryServices),
+    ]),
+    descriptionFound: descriptionSignalFromText(pastedText, profile),
+    reviewsRatingsVisible: visibilitySignalFromText(pastedText, [
+      'review',
+      'reviews',
+      'rating',
+      'ratings',
+      'stars',
+      'testimonial',
+      'testimonials',
+    ]),
+    photosPortfolioVisible: visibilitySignalFromText(pastedText, [
+      'photo',
+      'photos',
+      'gallery',
+      'portfolio',
+      'images',
+      'package',
+      'packages',
+    ]),
+  }
+}
+
+const listingResultFromFoundData = (
+  foundData: DirectoryFoundData,
+): DirectoryListingStatus => {
+  if (foundData.businessNameFound === 'No') return 'manual_review_needed'
+  const positiveSignals = [
+    foundData.phoneFound,
+    foundData.websiteFound,
+    foundData.addressOrServiceAreaFound,
+    foundData.categoryServicesFound,
+    foundData.descriptionFound,
+  ].filter((signal) => signal === 'Yes' || signal === 'Partial').length
+  if (positiveSignals >= 4) return 'found_accurate'
+  if (positiveSignals >= 2) return 'found_incomplete'
+  return 'manual_review_needed'
+}
+
+const evidenceNoteFromFoundData = (
+  foundData: DirectoryFoundData,
+  sourceLabel: string,
+) => {
+  const found: string[] = []
+  const missing: string[] = []
+  const partial: string[] = []
+  const labels: Array<[keyof DirectoryFoundData, string]> = [
+    ['businessNameFound', 'business name'],
+    ['phoneFound', 'phone/contact'],
+    ['websiteFound', 'website'],
+    ['addressOrServiceAreaFound', 'address/service area'],
+    ['categoryServicesFound', 'category/services'],
+    ['descriptionFound', 'description/context'],
+    ['reviewsRatingsVisible', 'reviews/ratings'],
+    ['photosPortfolioVisible', 'photos/portfolio'],
+  ]
+
+  labels.forEach(([key, label]) => {
+    if (foundData[key] === 'Yes') found.push(label)
+    if (foundData[key] === 'No') missing.push(label)
+    if (foundData[key] === 'Partial') partial.push(label)
+  })
+
+  return [
+    `${sourceLabel} confirms the listing was reviewed from visible public content.`,
+    found.length ? `Found: ${found.join(', ')}.` : '',
+    partial.length ? `Partially found or needs operator review: ${partial.join(', ')}.` : '',
+    missing.length ? `Not found in the reviewed text: ${missing.join(', ')}.` : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
 
 export function DirectoryAuditPanel({
   profile,
@@ -244,6 +604,15 @@ export function DirectoryAuditPanel({
 }: DirectoryAuditPanelProps) {
   const [checkingRowId, setCheckingRowId] = useState<string | null>(null)
   const [checkMessages, setCheckMessages] = useState<Record<string, string>>({})
+  const [openDiscoveryIds, setOpenDiscoveryIds] = useState<Record<string, boolean>>({})
+  const [candidateLoadingId, setCandidateLoadingId] = useState<string | null>(null)
+  const [candidateMessages, setCandidateMessages] = useState<Record<string, string>>({})
+  const [suggestionCandidates, setSuggestionCandidates] = useState<
+    Record<string, DirectoryCandidateUrl[]>
+  >({})
+  const [manualFallbackCandidates, setManualFallbackCandidates] = useState<
+    Record<string, DirectoryCandidateUrl[]>
+  >({})
   const businessId = businessDirectoryKey(profile)
   const currentRows = state.activeRows.filter(
     (row) => !row.businessId || row.businessId === businessId,
@@ -265,14 +634,157 @@ export function DirectoryAuditPanel({
 
   const updateListingUrl = (row: DirectoryAuditRow, listingUrl: string) => {
     const trimmedUrl = listingUrl.trim()
+    const nextEligibility = publicPageCheckEligibilityFor(
+      row.directoryName,
+      row.checkMethod,
+      row.allowPublicPageFetch,
+      row.publicPageCheckEligibility === 'Allowed after URL confirmed'
+        ? row.publicPageCheckEligibility
+        : undefined,
+    )
     updateRow(row.id, {
       ...row,
       listingUrl,
+      urlDiscoveryMethod: effectiveUrlDiscoveryMethod(row),
+      publicPageCheckEligibility: nextEligibility,
       listingUrlStatus: trimmedUrl
         ? 'url_saved'
         : row.requiresOperatorUrl
           ? 'url_needed'
           : 'url_unavailable',
+    })
+  }
+
+  const runCandidateDiscoveryForSuggestion = async (
+    suggestion: DirectorySuggestion,
+  ) => {
+    setOpenDiscoveryIds((current) => ({ ...current, [suggestion.id]: true }))
+    setCandidateLoadingId(suggestion.id)
+    try {
+      const result = await discoverDirectoryCandidateUrls(profile, suggestion)
+      setSuggestionCandidates((current) => ({
+        ...current,
+        [suggestion.id]: result.candidateUrls,
+      }))
+      setManualFallbackCandidates((current) => ({
+        ...current,
+        [suggestion.id]:
+          result.manualSearchLinks.length > 0
+            ? result.manualSearchLinks
+            : buildCandidateSearchLinks(profile, suggestion.directoryName),
+      }))
+      setCandidateMessages((current) => ({
+        ...current,
+        [suggestion.id]: result.message ?? '',
+      }))
+    } catch {
+      setSuggestionCandidates((current) => ({ ...current, [suggestion.id]: [] }))
+      setManualFallbackCandidates((current) => ({
+        ...current,
+        [suggestion.id]: buildCandidateSearchLinks(profile, suggestion.directoryName),
+      }))
+      setCandidateMessages((current) => ({
+        ...current,
+        [suggestion.id]: 'No candidate URLs found automatically. Use manual search.',
+      }))
+    } finally {
+      setCandidateLoadingId(null)
+    }
+  }
+
+  const runCandidateDiscoveryForRow = async (row: DirectoryAuditRow) => {
+    setOpenDiscoveryIds((current) => ({ ...current, [row.id]: true }))
+    setCandidateLoadingId(row.id)
+    try {
+      const result = await discoverDirectoryCandidateUrls(profile, row)
+      updateRow(row.id, {
+        ...row,
+        candidateUrls: result.candidateUrls,
+      })
+      setManualFallbackCandidates((current) => ({
+        ...current,
+        [row.id]:
+          result.manualSearchLinks.length > 0
+            ? result.manualSearchLinks
+            : buildCandidateSearchLinks(profile, row.directoryName),
+      }))
+      setCandidateMessages((current) => ({
+        ...current,
+        [row.id]: result.message ?? '',
+      }))
+    } catch {
+      updateRow(row.id, {
+        ...row,
+        candidateUrls: row.candidateUrls ?? [],
+      })
+      setManualFallbackCandidates((current) => ({
+        ...current,
+        [row.id]: buildCandidateSearchLinks(profile, row.directoryName),
+      }))
+      setCandidateMessages((current) => ({
+        ...current,
+        [row.id]: 'No candidate URLs found automatically. Use manual search.',
+      }))
+    } finally {
+      setCandidateLoadingId(null)
+    }
+  }
+
+  const saveCandidateUrl = (
+    row: DirectoryAuditRow,
+    candidate: DirectoryCandidateUrl,
+  ) => {
+    updateRow(row.id, {
+      ...row,
+      listingUrl: candidate.url,
+      listingUrlStatus: 'url_saved',
+      savedCandidateUrl: candidate,
+      urlDiscoveryMethod: effectiveUrlDiscoveryMethod(row),
+      publicPageCheckEligibility: effectivePublicPageCheckEligibility(row),
+      publicEvidenceNotes:
+        row.publicEvidenceNotes ||
+        `Candidate URL saved by operator from ${candidate.source}: ${candidate.title}.`,
+      evidenceNotes:
+        row.evidenceNotes ||
+        `Candidate URL saved by operator from ${candidate.source}: ${candidate.title}.`,
+    })
+  }
+
+  const dismissCandidateUrl = (
+    row: DirectoryAuditRow,
+    candidate: DirectoryCandidateUrl,
+  ) => {
+    updateRow(row.id, {
+      ...row,
+      candidateUrls: (row.candidateUrls ?? []).filter(
+        (item) => item.id !== candidate.id,
+      ),
+    })
+  }
+
+  const markUrlUnavailable = (row: DirectoryAuditRow) => {
+    updateRow(row.id, {
+      ...row,
+      listingUrlStatus: 'url_unavailable',
+      listingResult:
+        row.listingResult === 'not_found' ? 'not_found' : 'manual_review_needed',
+      directoryStatus:
+        row.listingResult === 'not_found' ? 'not_found' : 'manual_review_needed',
+      evidenceConfidence: 'manual_needs_confirmation',
+      publicEvidenceNotes:
+        row.publicEvidenceNotes ||
+        'Public listing URL is unavailable or could not be confirmed. Use manual verification.',
+      evidenceNotes:
+        row.evidenceNotes ||
+        'Public listing URL is unavailable or could not be confirmed. Use manual verification.',
+    })
+  }
+
+  const clearListingUrl = (row: DirectoryAuditRow) => {
+    updateRow(row.id, {
+      ...row,
+      listingUrl: '',
+      listingUrlStatus: row.requiresOperatorUrl ? 'url_needed' : 'url_unavailable',
     })
   }
 
@@ -300,6 +812,9 @@ export function DirectoryAuditPanel({
     updateRow(row.id, {
       ...row,
       foundData: result.foundData,
+      ...(result.ok ? foundDataToCheckUpdates(result.foundData) : {}),
+      duplicateFound:
+        result.ok && row.duplicateFound === 'unknown' ? 'pass' : row.duplicateFound,
       listingResult: result.listingResult,
       directoryStatus: result.listingResult,
       lastCheckedAt: result.lastCheckedAt,
@@ -316,7 +831,8 @@ export function DirectoryAuditPanel({
       ...messages,
       [row.id]: result.ok
         ? 'Public Page Check completed. Review before using in a customer report or Action Plan.'
-        : result.error ?? 'Public page fetch was unavailable or blocked. Use manual verification.',
+        : result.error ??
+          'Public page fetch was unavailable or blocked. Open the saved URL manually, mark it observed, or paste visible page text for assisted analysis.',
     }))
   }
 
@@ -334,20 +850,86 @@ export function DirectoryAuditPanel({
         directoryStatus: 'manual_review_needed',
         lastCheckedAt,
         publicEvidenceNotes:
-          'Public page fetch was unavailable or blocked. Use manual verification.',
+          'Public page fetch was unavailable or blocked. The operator can still review the page manually and mark the evidence as public page observed.',
         evidenceNotes:
-          'Public page fetch was unavailable or blocked. Use manual verification.',
+          'Public page fetch was unavailable or blocked. The operator can still review the page manually and mark the evidence as public page observed.',
         recommendedAction:
           'Manually review the directory listing and document whether the public information matches the business profile.',
         evidenceConfidence: 'manual_needs_confirmation',
       })
       setCheckMessages((messages) => ({
         ...messages,
-        [row.id]: 'Public page fetch was unavailable or blocked. Use manual verification.',
+        [row.id]:
+          'Public page fetch was unavailable or blocked. Open the saved URL manually, mark it observed, or paste visible page text for assisted analysis.',
       }))
     } finally {
       setCheckingRowId(null)
     }
+  }
+
+  const markPublicPageObserved = (row: DirectoryAuditRow) => {
+    const lastCheckedAt = new Date().toISOString()
+    updateRow(row.id, {
+      ...row,
+      listingResult:
+        row.listingResult === 'not_checked' ? 'manual_review_needed' : row.listingResult,
+      directoryStatus:
+        row.directoryStatus === 'not_checked'
+          ? 'manual_review_needed'
+          : row.directoryStatus,
+      lastCheckedAt,
+      evidenceConfidence: 'public_page_observed',
+      publicEvidenceNotes:
+        row.publicEvidenceNotes ||
+        'The saved public listing URL opened in the browser and was observed manually by the operator. Review and complete the evidence fields before using this in the customer report or Action Plan.',
+      evidenceNotes:
+        row.evidenceNotes ||
+        'The saved public listing URL opened in the browser and was observed manually by the operator. Review and complete the evidence fields before using this in the customer report or Action Plan.',
+    })
+    setCheckMessages((messages) => ({
+      ...messages,
+      [row.id]:
+        'Marked as Public Page Observed. This is operator-observed evidence, not a backend scanner fetch.',
+    }))
+  }
+
+  const analyzePastedTextForRow = (row: DirectoryAuditRow) => {
+    const pastedText = row.pastedVisiblePageText.trim()
+    if (!pastedText) {
+      setCheckMessages((messages) => ({
+        ...messages,
+        [row.id]: 'Paste visible page text before running assisted analysis.',
+      }))
+      return
+    }
+
+    const foundData = analyzeVisiblePageText(profile, pastedText)
+    const listingResult = listingResultFromFoundData(foundData)
+    const evidenceNote = evidenceNoteFromFoundData(
+      foundData,
+      'Operator-provided public page text',
+    )
+    updateRow(row.id, {
+      ...row,
+      foundData,
+      ...foundDataToCheckUpdates(foundData),
+      listingResult,
+      directoryStatus: listingResult,
+      lastCheckedAt: new Date().toISOString(),
+      evidenceConfidence: 'operator_provided_page_text',
+      publicEvidenceNotes: evidenceNote,
+      evidenceNotes: evidenceNote,
+      recommendedAction:
+        listingResult === 'found_accurate'
+          ? 'Review the observed public listing details and keep this directory record as supporting evidence.'
+          : 'Review the observed public listing and update missing or unclear contact, service, category, website, or service-area details where the directory allows edits.',
+      listingUrlStatus: 'url_saved',
+    })
+    setCheckMessages((messages) => ({
+      ...messages,
+      [row.id]:
+        'Pasted page text analyzed. Review and correct the detected fields before using this in the report or Action Plan.',
+    }))
   }
 
   const summary = currentRows.reduce(
@@ -413,6 +995,7 @@ export function DirectoryAuditPanel({
                   {checkMethodDisplay(
                     suggestion.checkMethod,
                     suggestion.requiresOperatorUrl ? 'url_needed' : 'url_unavailable',
+                    suggestion.publicPageCheckEligibility,
                   )}
                 </span>
                 <span className="method-pill method-pill-muted">
@@ -426,6 +1009,7 @@ export function DirectoryAuditPanel({
                 {checkMethodGuidance(
                   suggestion.checkMethod,
                   suggestion.requiresOperatorUrl ? 'url_needed' : 'url_unavailable',
+                  suggestion.publicPageCheckEligibility,
                 )}
               </p>
               <a href={suggestion.manualSearchUrl} target="_blank" rel="noreferrer">
@@ -433,6 +1017,21 @@ export function DirectoryAuditPanel({
               </a>
             </div>
             <div className="directory-actions">
+              {canShowDiscoveryAssist(
+                suggestion.checkMethod,
+                suggestion.requiresOperatorUrl ? 'url_needed' : 'url_unavailable',
+              ) ? (
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => void runCandidateDiscoveryForSuggestion(suggestion)}
+                  disabled={candidateLoadingId === suggestion.id}
+                >
+                  {candidateLoadingId === suggestion.id
+                    ? 'Finding Candidates...'
+                    : 'Find Candidate Listing URLs'}
+                </button>
+              ) : null}
               <button type="button" onClick={() => activateSuggestion(suggestion)}>
                 Activate
               </button>
@@ -452,6 +1051,67 @@ export function DirectoryAuditPanel({
                 Ignore
               </button>
             </div>
+            {openDiscoveryIds[suggestion.id] ? (
+              <div className="directory-discovery-panel">
+                <p>
+                  Candidate URLs are suggestions. Operator confirmation is
+                  required before saving. Activate this suggestion before saving
+                  a confirmed URL.
+                </p>
+                <p className="method-guidance">
+                  {candidateMessages[suggestion.id] ??
+                    'Candidate lookup has not returned results yet.'}
+                </p>
+                {(suggestionCandidates[suggestion.id] ?? []).length > 0 ? (
+                  <strong className="candidate-section-label">
+                    Candidate URLs found
+                  </strong>
+                ) : null}
+                <div className="candidate-url-list">
+                  {(suggestionCandidates[suggestion.id] ?? []).map(
+                    (candidate) => (
+                      <article className="candidate-url-card" key={candidate.id}>
+                        <div>
+                          <strong>{candidate.title}</strong>
+                          <span>{candidate.displayDomain || displayUrlHost(candidate.url)}</span>
+                        </div>
+                        {candidate.snippet ? <p>{candidate.snippet}</p> : null}
+                        <p>{candidate.reason}</p>
+                        <div className="candidate-meta">
+                          <span>Confidence: {candidate.confidence}</span>
+                          <span>{candidate.source}</span>
+                        </div>
+                        <a href={candidate.url} target="_blank" rel="noreferrer">
+                          Open
+                        </a>
+                      </article>
+                    ),
+                  )}
+                </div>
+                {(suggestionCandidates[suggestion.id] ?? []).length === 0 ? (
+                  <p className="empty-state">
+                    No candidate URLs found automatically. Use manual search.
+                  </p>
+                ) : null}
+                <details className="manual-search-fallback">
+                  <summary>Manual search fallback</summary>
+                  <div className="directory-discovery-links">
+                    {(manualFallbackCandidates[suggestion.id] ??
+                      buildCandidateSearchLinks(profile, suggestion.directoryName)
+                    ).map((candidate) => (
+                      <a
+                        href={candidate.url}
+                        key={`${suggestion.id}-${candidate.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {candidate.title.replace(/^Manual search: /, '')}
+                      </a>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            ) : null}
           </article>
         ))}
         {suggestions.length === 0 ? (
@@ -594,7 +1254,11 @@ export function DirectoryAuditPanel({
 
             <div className="directory-method-note">
               <strong>
-                {checkMethodDisplay(row.checkMethod, row.listingUrlStatus)}
+                {checkMethodDisplay(
+                  row.checkMethod,
+                  row.listingUrlStatus,
+                  effectivePublicPageCheckEligibility(row),
+                )}
               </strong>
               <span>
                 URL status: {listingUrlStatusLabel(row)}
@@ -602,7 +1266,18 @@ export function DirectoryAuditPanel({
                   ? ` | Last checked ${new Date(row.lastCheckedAt).toLocaleString()}`
                   : ''}
               </span>
-              <span>{checkMethodGuidance(row.checkMethod, row.listingUrlStatus)}</span>
+              <span>
+                {checkMethodGuidance(
+                  row.checkMethod,
+                  row.listingUrlStatus,
+                  effectivePublicPageCheckEligibility(row),
+                )}
+              </span>
+              <span>URL discovery: {effectiveUrlDiscoveryMethod(row)}</span>
+              <span>
+                Public Page Check:{' '}
+                {canRunPublicPageCheck(row) ? 'Ready' : effectivePublicPageCheckEligibility(row)}
+              </span>
               <span>{row.capabilityNotes}</span>
               {canRunPublicPageCheck(row) ? (
                 <span>
@@ -614,7 +1289,120 @@ export function DirectoryAuditPanel({
               {checkMessages[row.id] ? (
                 <span className="method-guidance">{checkMessages[row.id]}</span>
               ) : null}
+              {row.listingUrlStatus === 'url_saved' ? (
+                <span>
+                  Some public pages are visible in a browser but unavailable to
+                  scanner fetch. If that happens, open the saved URL manually,
+                  mark the page as Public Page Observed, or paste visible page
+                  text for assisted analysis.
+                </span>
+              ) : null}
             </div>
+
+            {openDiscoveryIds[row.id] ? (
+              <div className="directory-discovery-panel">
+                <p>
+                  Candidate URLs are suggestions. Operator confirmation is
+                  required before saving. Saved URLs can be used for Public Page
+                  Check where eligible.
+                </p>
+                <p className="method-guidance">
+                  {candidateMessages[row.id] ??
+                    'Candidate lookup has not returned results yet.'}
+                </p>
+                {(row.candidateUrls ?? []).length > 0 ? (
+                  <strong className="candidate-section-label">
+                    Candidate URLs found
+                  </strong>
+                ) : null}
+                <div className="candidate-url-list">
+                  {(row.candidateUrls ?? []).map((candidate) => (
+                    <article className="candidate-url-card" key={candidate.id}>
+                      <div>
+                        <strong>{candidate.title}</strong>
+                        <span>{candidate.displayDomain || displayUrlHost(candidate.url)}</span>
+                      </div>
+                      {candidate.snippet ? <p>{candidate.snippet}</p> : null}
+                      <p>{candidate.reason}</p>
+                      <div className="candidate-meta">
+                        <span>Confidence: {candidate.confidence}</span>
+                        <span>{candidate.source}</span>
+                      </div>
+                      <div className="directory-actions">
+                        <a href={candidate.url} target="_blank" rel="noreferrer">
+                          Open
+                        </a>
+                        {candidate.source !== 'Generated manual search link' &&
+                        candidate.source !== 'Manual search fallback' ? (
+                          <button
+                            type="button"
+                            onClick={() => saveCandidateUrl(row, candidate)}
+                          >
+                            Save this URL
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="ghost"
+                          onClick={() => dismissCandidateUrl(row, candidate)}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                {(row.candidateUrls ?? []).length === 0 ? (
+                  <p className="empty-state">
+                    No candidate URLs found automatically. Use manual search.
+                  </p>
+                ) : null}
+                <details className="manual-search-fallback">
+                  <summary>Manual search fallback</summary>
+                  <div className="directory-discovery-links">
+                    {(manualFallbackCandidates[row.id] ??
+                      buildCandidateSearchLinks(profile, row.directoryName)
+                    ).map((candidate) => (
+                      <a
+                        href={candidate.url}
+                        key={`${row.id}-${candidate.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {candidate.title.replace(/^Manual search: /, '')}
+                      </a>
+                    ))}
+                  </div>
+                </details>
+                <div className="directory-url-capture">
+                  <label>
+                    Confirmed public listing URL
+                    <input
+                      value={row.listingUrl}
+                      onChange={(event) =>
+                        updateListingUrl(row, event.target.value)
+                      }
+                      placeholder="Paste the exact public listing/profile URL."
+                    />
+                  </label>
+                  <div className="directory-actions">
+                    <button
+                      type="button"
+                      onClick={() => updateListingUrl(row, row.listingUrl)}
+                    >
+                      Save URL
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => markUrlUnavailable(row)}
+                    >
+                      Mark URL unavailable
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             <div className="found-data-summary">
               {foundDataRows.map((item) => (
@@ -676,6 +1464,55 @@ export function DirectoryAuditPanel({
               </label>
             </div>
 
+            {row.listingUrlStatus === 'url_saved' ? (
+              <div className="operator-observed-panel">
+                <div>
+                  <strong>Operator-observed fallback</strong>
+                  <p>
+                    If the page is visible in your browser but blocked from
+                    scanner fetch, mark it observed or paste visible text from
+                    the listing page for assisted analysis.
+                  </p>
+                </div>
+                <div className="directory-actions">
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => markPublicPageObserved(row)}
+                  >
+                    Mark as Public Page Observed
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => analyzePastedTextForRow(row)}
+                    disabled={!row.pastedVisiblePageText.trim()}
+                  >
+                    Analyze Pasted Page Text
+                  </button>
+                </div>
+                <label>
+                  Pasted visible page text
+                  <textarea
+                    className="large-textarea"
+                    value={row.pastedVisiblePageText}
+                    onChange={(event) =>
+                      updateRow(row.id, {
+                        ...row,
+                        pastedVisiblePageText: event.target.value,
+                      })
+                    }
+                    placeholder="Paste visible business name, services, packages, location, contact, reviews, or profile text from the public listing page."
+                  />
+                  <span className="helper-text">
+                    If the page is visible in your browser but blocked from
+                    scanner fetch, copy relevant visible text from the listing
+                    page and paste it here. The scanner can compare this pasted
+                    text against the business profile.
+                  </span>
+                </label>
+              </div>
+            ) : null}
+
             <details className="directory-details">
               <summary>Detailed public check fields</summary>
               <div className="directory-row-grid">
@@ -709,9 +1546,13 @@ export function DirectoryAuditPanel({
                 <label>
                   Public page fetch allowed
                   <input
-                    value={row.allowPublicPageFetch ? 'Yes, after URL is provided' : 'No'}
+                    value={effectivePublicPageCheckEligibility(row)}
                     readOnly
                   />
+                </label>
+                <label>
+                  URL discovery method
+                  <input value={effectiveUrlDiscoveryMethod(row)} readOnly />
                 </label>
                 <label>
                   Search result scraping
@@ -724,6 +1565,29 @@ export function DirectoryAuditPanel({
               </div>
 
               <div className="directory-check-grid">
+                {foundDataRows.map((field) => (
+                  <label key={`${row.id}-found-${field.key}`}>
+                    Scanner-detected: {field.label}
+                    <select
+                      value={row.foundData?.[field.key] ?? 'No'}
+                      onChange={(event) =>
+                        updateRow(row.id, {
+                          ...row,
+                          foundData: {
+                            ...(row.foundData ?? {}),
+                            [field.key]: event.target.value as DirectoryFoundSignal,
+                          },
+                        })
+                      }
+                    >
+                      {foundSignalOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
                 {checkFields.map((field) => (
                   <label key={`${row.id}-${field.key}`}>
                     {field.label}
@@ -767,6 +1631,42 @@ export function DirectoryAuditPanel({
                 <a href={row.manualSearchUrl} target="_blank" rel="noreferrer">
                   Manual search
                 </a>
+              ) : null}
+              {canShowDiscoveryAssist(row.checkMethod, row.listingUrlStatus) ||
+              row.listingUrlStatus === 'url_saved' ? (
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => void runCandidateDiscoveryForRow(row)}
+                  disabled={candidateLoadingId === row.id}
+                >
+                  {candidateLoadingId === row.id
+                    ? 'Finding Candidates...'
+                    : row.listingUrlStatus === 'url_saved'
+                      ? 'Edit URL'
+                      : 'Find Candidate Listing URLs'}
+                </button>
+              ) : null}
+              {row.listingUrlStatus === 'url_saved' && row.listingUrl ? (
+                <>
+                  <a href={row.listingUrl} target="_blank" rel="noreferrer">
+                    Open saved URL
+                  </a>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => markPublicPageObserved(row)}
+                  >
+                    Mark as Public Page Observed
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => clearListingUrl(row)}
+                  >
+                    Clear URL
+                  </button>
+                </>
               ) : null}
               {canRunPublicPageCheck(row) ? (
                 <button

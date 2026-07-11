@@ -11,6 +11,9 @@ export const googleMapsSearch = (query: string) =>
 export const bingSearch = (query: string) =>
   `https://www.bing.com/search?q=${encode(query)}`
 
+export const duckDuckGoSearch = (query: string) =>
+  `https://duckduckgo.com/?q=${encode(query)}`
+
 export const richResultsTest = (url: string) =>
   `https://search.google.com/test/rich-results?url=${encode(url)}`
 

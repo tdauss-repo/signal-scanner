@@ -8,7 +8,10 @@ export type EvidenceConfidence =
   | 'owner_confirmed'
   | 'public_page_observed'
   | 'scanner_detected_public_page'
+  | 'operator_provided_page_text'
+  | 'public_search_observed'
   | 'ai_answer_response'
+  | 'derived_readiness_signal'
   | 'manual_needs_confirmation'
 
 export interface BusinessProfile {
@@ -68,6 +71,8 @@ export interface AuditState {
   lastUpdated: string
   selectedAIPlatform: AIAnswerPlatform
   aiAnswerTests: Record<AIAnswerPlatform, AIAnswerTestState>
+  searchVisibilityTests: Record<string, SearchVisibilityTestState>
+  voicePromptTests: Record<string, VoicePromptTestState>
   directories: DirectoryAuditState
   manualFixes: FixItem[]
 }
@@ -125,6 +130,85 @@ export type AIAnswerPackageFit =
   | 'Monthly Visibility Monitoring'
   | 'Website SEO Implementation'
 
+export type SearchVisibilityIntentType =
+  | 'Brand search'
+  | 'Core service discovery'
+  | 'Service-area discovery'
+  | 'Category discovery'
+  | 'Competitor/comparison discovery'
+
+export type SearchVisibilityResult =
+  | 'not_checked'
+  | 'found_prominently'
+  | 'found_weak'
+  | 'found_directory_only'
+  | 'not_found'
+  | 'manual_review_needed'
+
+export type SearchVisibilityWhereFound =
+  | 'Website'
+  | 'Google Business Profile / map result'
+  | 'Directory'
+  | 'Social profile'
+  | 'Competitor results only'
+  | 'Not observed'
+
+export interface SearchVisibilityQuery {
+  id: string
+  query: string
+  intentType: SearchVisibilityIntentType
+  priority: 'High' | 'Medium' | 'Low'
+}
+
+export type SearchVisibilityFindingPriority =
+  | 'High'
+  | 'Medium'
+  | 'Low'
+  | 'No action needed'
+
+export interface SearchVisibilityTestState {
+  visibilityResult: SearchVisibilityResult
+  whereFound: SearchVisibilityWhereFound
+  evidenceNotes: string
+  competitorsObserved: string
+  recommendedAction: string
+  evidenceConfidence: EvidenceConfidence
+  packageFit: AIAnswerPackageFit
+}
+
+export type VoicePromptTestStatus =
+  | 'not_tested'
+  | 'business_found_accurate'
+  | 'business_found_incomplete'
+  | 'wrong_outdated'
+  | 'not_found'
+
+export type VoicePlatformTested =
+  | 'Google Assistant / Android'
+  | 'Siri / Apple'
+  | 'Alexa'
+  | 'Other/manual'
+
+export type VoiceTestDeviceContext =
+  | "Operator's normal device/account"
+  | 'Neutral/private device'
+  | 'Different-account device'
+  | 'Business owner/customer device'
+  | 'Other/manual'
+
+export type VoicePersonalizationRisk = 'Low' | 'Medium' | 'High'
+
+export interface VoicePromptTestState {
+  testStatus: VoicePromptTestStatus
+  platformTested: VoicePlatformTested
+  deviceContext: VoiceTestDeviceContext
+  personalizationRisk: VoicePersonalizationRisk
+  evidenceNotes: string
+  evidenceConfidence: EvidenceConfidence
+  packageFit: AIAnswerPackageFit
+  recommendedAction: string
+}
+
 export type DirectoryType =
   | 'Industry directory'
   | 'Local directory'
@@ -142,6 +226,18 @@ export type DirectoryCheckMethod =
   | 'Public page check available'
   | 'Future API only'
 
+export type DirectoryUrlDiscoveryMethod =
+  | 'Manual search required'
+  | 'Candidate discovery available'
+  | 'Known URL pattern'
+  | 'Future API'
+
+export type DirectoryPublicPageCheckEligibility =
+  | 'Allowed after URL confirmed'
+  | 'Not recommended / manual only'
+  | 'Future API only'
+  | 'Blocked/protected'
+
 export interface DirectoryCapabilityEntry {
   name: string
   aliases: string[]
@@ -149,6 +245,8 @@ export interface DirectoryCapabilityEntry {
   directoryType: DirectoryType
   defaultRelevance: DirectoryAuthority
   defaultCheckMethod: DirectoryCheckMethod
+  urlDiscoveryMethod?: DirectoryUrlDiscoveryMethod
+  publicPageCheckEligibility?: DirectoryPublicPageCheckEligibility
   requiresOperatorUrl: boolean
   allowPublicPageFetch: boolean
   allowSearchResultScraping: false
@@ -191,6 +289,20 @@ export interface DirectoryFoundData {
   addressOrServiceAreaFound?: DirectoryFoundSignal
   categoryServicesFound?: DirectoryFoundSignal
   descriptionFound?: DirectoryFoundSignal
+  reviewsRatingsVisible?: DirectoryFoundSignal
+  photosPortfolioVisible?: DirectoryFoundSignal
+}
+
+export interface DirectoryCandidateUrl {
+  id: string
+  title: string
+  url: string
+  displayDomain: string
+  snippet?: string
+  source: string
+  confidence: 'High' | 'Medium' | 'Low'
+  reason: string
+  discoveredAt: string
 }
 
 export interface DirectoryAuditRow {
@@ -199,6 +311,8 @@ export interface DirectoryAuditRow {
   directoryName: string
   directoryType: DirectoryType
   checkMethod: DirectoryCheckMethod
+  urlDiscoveryMethod: DirectoryUrlDiscoveryMethod
+  publicPageCheckEligibility: DirectoryPublicPageCheckEligibility
   relevance: DirectoryAuthority
   requiresOperatorUrl: boolean
   allowPublicPageFetch: boolean
@@ -211,6 +325,8 @@ export interface DirectoryAuditRow {
   listingResult: DirectoryListingStatus
   lastCheckedAt: string
   foundData?: DirectoryFoundData
+  candidateUrls: DirectoryCandidateUrl[]
+  savedCandidateUrl?: DirectoryCandidateUrl
   evidenceConfidence: EvidenceConfidence
   directoryStatus: DirectoryListingStatus
   listingFound: CheckStatus
@@ -226,6 +342,7 @@ export interface DirectoryAuditRow {
   authority: DirectoryAuthority
   publicEvidenceNotes: string
   evidenceNotes: string
+  pastedVisiblePageText: string
   recommendedAction: string
   ownerAdminAccessStatus: OwnerAccessStatus
   ownerAccessStatus: OwnerAccessStatus
@@ -241,6 +358,8 @@ export interface DirectorySuggestion {
   directoryType: DirectoryType
   authority: DirectoryAuthority
   checkMethod: DirectoryCheckMethod
+  urlDiscoveryMethod: DirectoryUrlDiscoveryMethod
+  publicPageCheckEligibility: DirectoryPublicPageCheckEligibility
   requiresOperatorUrl: boolean
   allowPublicPageFetch: boolean
   allowSearchResultScraping: false

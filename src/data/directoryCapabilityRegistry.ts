@@ -6,6 +6,9 @@ const publicPageNotes =
 const searchAssistNotes =
   'Use manual search links to confirm whether a listing exists. Do not scrape search results or platform pages in this version.'
 
+const searchAssistPublicPageNotes =
+  'Use candidate discovery or manual search to find the exact public listing URL. After the operator confirms and saves the URL, one-page Public Page Check is allowed where the page is publicly accessible.'
+
 const manualOnlyNotes =
   'Manual verification only. Owner/admin access must be confirmed with the business owner, not inferred from public evidence.'
 
@@ -116,11 +119,13 @@ export const directoryCapabilityRegistry: DirectoryCapabilityEntry[] = [
     directoryType: 'Industry directory',
     defaultRelevance: 'High',
     defaultCheckMethod: 'Public search assist only',
-    requiresOperatorUrl: false,
-    allowPublicPageFetch: false,
+    urlDiscoveryMethod: 'Candidate discovery available',
+    publicPageCheckEligibility: 'Allowed after URL confirmed',
+    requiresOperatorUrl: true,
+    allowPublicPageFetch: true,
     allowSearchResultScraping: false,
     ownerAdminAccessMethod: 'manual only',
-    notes: searchAssistNotes,
+    notes: searchAssistPublicPageNotes,
     suggestedReason: 'Wedding vendor discovery',
   },
   {
@@ -130,11 +135,13 @@ export const directoryCapabilityRegistry: DirectoryCapabilityEntry[] = [
     directoryType: 'Industry directory',
     defaultRelevance: 'High',
     defaultCheckMethod: 'Public search assist only',
-    requiresOperatorUrl: false,
-    allowPublicPageFetch: false,
+    urlDiscoveryMethod: 'Candidate discovery available',
+    publicPageCheckEligibility: 'Allowed after URL confirmed',
+    requiresOperatorUrl: true,
+    allowPublicPageFetch: true,
     allowSearchResultScraping: false,
     ownerAdminAccessMethod: 'manual only',
-    notes: searchAssistNotes,
+    notes: searchAssistPublicPageNotes,
     suggestedReason: 'Wedding vendor discovery',
   },
   {
@@ -144,11 +151,13 @@ export const directoryCapabilityRegistry: DirectoryCapabilityEntry[] = [
     directoryType: 'Industry directory',
     defaultRelevance: 'Medium',
     defaultCheckMethod: 'Public search assist only',
-    requiresOperatorUrl: false,
-    allowPublicPageFetch: false,
+    urlDiscoveryMethod: 'Candidate discovery available',
+    publicPageCheckEligibility: 'Allowed after URL confirmed',
+    requiresOperatorUrl: true,
+    allowPublicPageFetch: true,
     allowSearchResultScraping: false,
     ownerAdminAccessMethod: 'manual only',
-    notes: searchAssistNotes,
+    notes: searchAssistPublicPageNotes,
     suggestedReason: 'Wedding vendor discovery',
   },
   {

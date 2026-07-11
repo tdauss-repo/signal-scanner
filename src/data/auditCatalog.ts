@@ -2,12 +2,22 @@ import type { AuditItem, BusinessProfile, EvidenceLink } from '../types/audit'
 import { buildDirectorySuggestions } from '../utils/directorySuggestions'
 import {
   bingSearch,
-  googleMapsSearch,
   googleSearch,
   makeSearchLinks,
   pageSpeedTest,
   richResultsTest,
 } from '../utils/links'
+import {
+  buildSearchVisibilityQueries,
+  searchVisibilityQueryToAuditItem,
+} from '../utils/searchVisibility'
+import {
+  buildVoicePromptTests,
+  buildVoiceReadinessCategories,
+  buildVoiceSourceReadinessGroups,
+  voiceCategoryToAuditItem,
+  voicePromptToAuditItem,
+} from '../utils/voiceReadiness'
 
 const ownerUnverified =
   'Owner access unverified - confirm during onboarding. Public checks use generated links only.'
@@ -16,11 +26,6 @@ const hasMultiContactContext = (profile: BusinessProfile) =>
   (profile.phoneNumbers ?? []).filter(
     (record) => record.isValidPublicContact && record.number.trim(),
   ).length > 1 || Boolean(profile.contactStructureNote?.trim())
-
-const contactFix = (profile: BusinessProfile) =>
-  hasMultiContactContext(profile)
-    ? 'Keep valid owner/contact numbers if they match the business workflow, label them clearly on the website, and use one preferred number only where a platform requires a single primary phone number.'
-    : 'Normalize NAP data across major listings, website schema, contact page, and trusted citations.'
 
 export const aiPlatforms = [
   { id: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/' },
@@ -233,27 +238,9 @@ export const buildAuditItems = (profile: BusinessProfile): AuditItem[] => {
     },
   ]
 
-  const keywordItems: AuditItem[] = profile.keywords
-    .split('\n')
-    .map((keyword) => keyword.trim())
-    .filter(Boolean)
-    .map((keyword, index) => ({
-      id: `keyword-${index}`,
-      area: 'keywords',
-      label: keyword,
-      description:
-        'Auto-generated search visibility query. Open the evidence links and manually verify whether the business appears, competitors dominate, or content gaps are visible. Do not claim exact rankings unless verified.',
-      weight: keyword.toLowerCase().includes(profile.businessName.toLowerCase())
-        ? 7
-        : 10,
-      access: 'public',
-      evidenceLinks: [
-        { label: 'Google web', url: googleSearch(`${keyword} ${profile.targetLocation}`) },
-        { label: 'Google Maps', url: googleMapsSearch(`${keyword} ${profile.targetLocation}`) },
-        { label: 'Bing web', url: bingSearch(`${keyword} ${profile.targetLocation}`) },
-      ],
-      fix: 'Search visibility fix: strengthen the matching service page, internal links, listing categories, local citations, reviews, proximity/service-area signals, and supporting content.',
-    }))
+  const keywordItems: AuditItem[] = buildSearchVisibilityQueries(profile).map(
+    searchVisibilityQueryToAuditItem,
+  )
 
   const aiItems: AuditItem[] = aiPlatforms.map((platform) => ({
       id: `ai-${platform.id}`,
@@ -268,45 +255,9 @@ export const buildAuditItems = (profile: BusinessProfile): AuditItem[] => {
     }))
 
   const voiceItems: AuditItem[] = [
-    {
-      id: 'voice-nap',
-      area: 'voice',
-      label: 'Voice assistants can resolve name, phone, and website',
-      description:
-        'Manual readiness check. Ask assistants for official contact details and compare them to the intake profile.',
-      weight: 14,
-      access: 'public',
-      evidenceLinks: [
-        { label: 'Google query', url: googleSearch(`${profile.businessName} phone website`) },
-        { label: 'Bing query', url: bingSearch(`${profile.businessName} phone website`) },
-      ],
-      fix: contactFix(profile),
-    },
-    {
-      id: 'voice-near-me',
-      area: 'voice',
-      label: 'Near-me service questions have clear source answers',
-      description:
-        'Manual readiness check. Test conversational service and location queries without relying on scraped rankings.',
-      weight: 12,
-      access: 'public',
-      evidenceLinks: [
-        { label: 'Service query', url: googleSearch(`${profile.primaryServices.split(',')[0]} near ${profile.targetLocation}`) },
-        { label: 'Maps query', url: googleMapsSearch(`${profile.primaryServices.split(',')[0]} near ${profile.targetLocation}`) },
-      ],
-      fix: 'Add FAQ content, service-area language, reviews, and profile categories that match conversational search intent.',
-    },
-    {
-      id: 'voice-faq',
-      area: 'voice',
-      label: 'FAQ content answers booking and service-area questions',
-      description:
-        'Public check. Confirm the website answers common spoken questions about pricing, availability, service area, and session types.',
-      weight: 10,
-      access: 'public',
-      evidenceLinks: websiteLinks,
-      fix: 'Publish concise FAQs using natural question phrasing and mark them up where appropriate.',
-    },
+    ...buildVoiceSourceReadinessGroups(profile, {}).map(voiceCategoryToAuditItem),
+    ...buildVoiceReadinessCategories(profile, {}).map(voiceCategoryToAuditItem),
+    ...buildVoicePromptTests(profile).map(voicePromptToAuditItem),
   ]
 
   return [...listingItems, ...websiteItems, ...keywordItems, ...aiItems, ...voiceItems]

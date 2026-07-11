@@ -268,6 +268,9 @@ const descriptionSignal = (text: string, request: PublicPageCheckRequest) => {
   return 'No'
 }
 
+const visibilitySignal = (text: string, terms: string[]): 'Yes' | 'No' =>
+  terms.some((term) => new RegExp(`\\b${term}\\b`, 'i').test(text)) ? 'Yes' : 'No'
+
 const recommendedActionFor = (listingResult: DirectoryListingStatus) => {
   if (listingResult === 'found_accurate') {
     return 'Listing appears accurate based on the public page checked. No immediate cleanup needed.'
@@ -299,6 +302,8 @@ const evidenceNotesFor = (
     ['addressOrServiceAreaFound', 'address/service-area wording'],
     ['categoryServicesFound', 'category/services'],
     ['descriptionFound', 'description/context'],
+    ['reviewsRatingsVisible', 'reviews/ratings'],
+    ['photosPortfolioVisible', 'photos/portfolio'],
   ]
 
   labels.forEach(([key, label]) => {
@@ -334,9 +339,11 @@ const manualReviewResponse = (
     addressOrServiceAreaFound: 'No',
     categoryServicesFound: 'No',
     descriptionFound: 'No',
+    reviewsRatingsVisible: 'No',
+    photosPortfolioVisible: 'No',
   },
   publicEvidenceNotes:
-    'Public page fetch was unavailable or blocked. Use manual verification.',
+    'Public page fetch was unavailable or blocked. The operator can still review the page manually and mark the evidence as public page observed.',
   recommendedAction: recommendedActionFor('manual_review_needed'),
   evidenceConfidence: 'manual_needs_confirmation',
   lastCheckedAt: new Date().toISOString(),
@@ -413,6 +420,24 @@ export const checkPublicDirectoryPage = async (
         ...splitList(request.primaryServices),
       ]),
       descriptionFound: descriptionSignal(visibleText, request),
+      reviewsRatingsVisible: visibilitySignal(visibleText, [
+        'review',
+        'reviews',
+        'rating',
+        'ratings',
+        'stars',
+        'testimonial',
+        'testimonials',
+      ]),
+      photosPortfolioVisible: visibilitySignal(visibleText, [
+        'photo',
+        'photos',
+        'gallery',
+        'portfolio',
+        'images',
+        'picture',
+        'pictures',
+      ]),
     }
 
     let listingResult: DirectoryListingStatus = 'manual_review_needed'

@@ -1167,6 +1167,109 @@ button.ghost {
   line-height: 1.45;
 }
 
+.directory-discovery-panel {
+  background: #f7fbfd;
+  border: 1px dashed #cfe0eb;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.directory-discovery-panel p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+
+.directory-discovery-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.directory-discovery-links a {
+  background: #fff;
+  border: 1px solid #cfe0eb;
+  border-radius: 999px;
+  color: #184e74;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 6px 9px;
+  text-decoration: none;
+}
+
+.manual-search-fallback {
+  border-top: 1px solid #dce8ef;
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.manual-search-fallback summary {
+  color: #184e74;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.candidate-url-list {
+  display: grid;
+  gap: 8px;
+}
+
+.candidate-section-label {
+  color: #263746;
+  font-size: 12px;
+}
+
+.candidate-url-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.candidate-url-card div:first-child {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.candidate-url-card strong {
+  color: #263746;
+  font-size: 13px;
+}
+
+.candidate-url-card span,
+.candidate-url-card p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+
+.candidate-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.candidate-meta span {
+  background: #f4f7fa;
+  border-radius: 999px;
+  font-weight: 800;
+  padding: 4px 7px;
+}
+
+.directory-url-capture {
+  display: grid;
+  gap: 8px;
+}
+
 .found-data-summary {
   display: grid;
   gap: 8px;
@@ -1213,6 +1316,145 @@ button.ghost {
 
 .directory-row-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.operator-observed-panel {
+  background: #fffaf0;
+  border: 1px solid #f4d79b;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.operator-observed-panel p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.operator-observed-panel label {
+  display: grid;
+  gap: 6px;
+}
+
+.large-textarea {
+  min-height: 150px;
+  resize: vertical;
+}
+
+.search-visibility-panel {
+  display: grid;
+  gap: 0;
+}
+
+.search-query-list {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.search-query-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.search-priority-stack {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.search-observation-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.full-width-label {
+  display: grid;
+  gap: 6px;
+}
+
+.voice-readiness-panel {
+  display: grid;
+  gap: 0;
+}
+
+.voice-section {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.voice-samples-details summary {
+  cursor: pointer;
+  list-style-position: outside;
+}
+
+.voice-samples-details summary div {
+  display: inline-grid;
+  gap: 4px;
+  margin-left: 6px;
+  vertical-align: top;
+}
+
+.voice-samples-details summary p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.voice-category-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.voice-source-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.voice-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.voice-card h3 {
+  font-size: 15px;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.voice-card p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.voice-card .method-pill {
+  color: #184e74;
+  justify-self: flex-start;
+}
+
+.voice-source-card {
+  background: #f7fbfd;
+}
+
+.voice-prompt-list {
+  display: grid;
+  gap: 12px;
 }
 
 .directory-compact-grid {
@@ -1474,6 +1716,9 @@ button.ghost {
   .ai-platform-coverage-list,
   .listings-overview-panel,
   .core-listing-grid,
+  .search-observation-grid,
+  .voice-source-grid,
+  .voice-category-grid,
   .found-data-summary,
   .directory-summary-grid,
   .directory-compact-grid,

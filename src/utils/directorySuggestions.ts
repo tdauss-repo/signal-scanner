@@ -3,7 +3,10 @@ import type {
   BusinessProfile,
   DirectoryAuditRow,
   DirectoryCapabilityEntry,
+  DirectoryCheckMethod,
+  DirectoryPublicPageCheckEligibility,
   DirectorySuggestion,
+  DirectoryUrlDiscoveryMethod,
 } from '../types/audit'
 import { googleSearch } from './links'
 
@@ -57,6 +60,37 @@ const shouldSuggest = (
   return includesAny(profileSearchText, capability.businessCategoryFit)
 }
 
+export const protectedDirectoryPattern =
+  /google business|google places|apple maps|apple business|bing places|bing maps|facebook|instagram|yelp|chatgpt|gemini|claude|copilot|perplexity|grok/i
+
+const publicPageEligibleSearchAssistPattern =
+  /the knot|weddingwire|zola/i
+
+export const urlDiscoveryMethodFor = (
+  method: DirectoryCheckMethod,
+  override?: DirectoryUrlDiscoveryMethod,
+): DirectoryUrlDiscoveryMethod => {
+  if (override) return override
+  if (method === 'Future API only') return 'Future API'
+  if (method === 'Public search assist only') return 'Candidate discovery available'
+  return 'Manual search required'
+}
+
+export const publicPageCheckEligibilityFor = (
+  name: string,
+  method: DirectoryCheckMethod,
+  allowPublicPageFetch: boolean,
+  override?: DirectoryPublicPageCheckEligibility,
+): DirectoryPublicPageCheckEligibility => {
+  if (override) return override
+  if (protectedDirectoryPattern.test(name)) return 'Blocked/protected'
+  if (method === 'Future API only') return 'Future API only'
+  if (allowPublicPageFetch || publicPageEligibleSearchAssistPattern.test(name)) {
+    return 'Allowed after URL confirmed'
+  }
+  return 'Not recommended / manual only'
+}
+
 const capabilityToSuggestion = (
   profile: BusinessProfile,
   capability: DirectoryCapabilityEntry,
@@ -66,6 +100,16 @@ const capabilityToSuggestion = (
   directoryType: capability.directoryType,
   authority: capability.defaultRelevance,
   checkMethod: capability.defaultCheckMethod,
+  urlDiscoveryMethod: urlDiscoveryMethodFor(
+    capability.defaultCheckMethod,
+    capability.urlDiscoveryMethod,
+  ),
+  publicPageCheckEligibility: publicPageCheckEligibilityFor(
+    capability.name,
+    capability.defaultCheckMethod,
+    capability.allowPublicPageFetch,
+    capability.publicPageCheckEligibility,
+  ),
   requiresOperatorUrl: capability.requiresOperatorUrl,
   allowPublicPageFetch: capability.allowPublicPageFetch,
   allowSearchResultScraping: capability.allowSearchResultScraping,
@@ -98,6 +142,8 @@ export const directorySuggestionToRow = (
   directoryName: suggestionItem.directoryName,
   directoryType: suggestionItem.directoryType,
   checkMethod: suggestionItem.checkMethod,
+  urlDiscoveryMethod: suggestionItem.urlDiscoveryMethod,
+  publicPageCheckEligibility: suggestionItem.publicPageCheckEligibility,
   relevance: suggestionItem.authority,
   requiresOperatorUrl: suggestionItem.requiresOperatorUrl,
   allowPublicPageFetch: suggestionItem.allowPublicPageFetch,
@@ -110,6 +156,7 @@ export const directorySuggestionToRow = (
   listingResult: 'not_checked',
   lastCheckedAt: '',
   foundData: {},
+  candidateUrls: [],
   evidenceConfidence: 'manual_needs_confirmation',
   directoryStatus: 'not_checked',
   listingFound: 'unknown',
@@ -125,6 +172,7 @@ export const directorySuggestionToRow = (
   authority: suggestionItem.authority,
   publicEvidenceNotes: '',
   evidenceNotes: '',
+  pastedVisiblePageText: '',
   recommendedAction:
     'Verify the public listing, correct inaccurate details, and document whether owner/admin access needs to be requested during onboarding.',
   ownerAdminAccessStatus: 'Unverified - public listing only',
@@ -144,6 +192,8 @@ export const emptyDirectoryRow = (businessId = 'current-business'): DirectoryAud
   directoryName: '',
   directoryType: 'Industry directory',
   checkMethod: 'Manual verification only',
+  urlDiscoveryMethod: 'Manual search required',
+  publicPageCheckEligibility: 'Not recommended / manual only',
   relevance: 'Medium',
   requiresOperatorUrl: false,
   allowPublicPageFetch: false,
@@ -157,6 +207,7 @@ export const emptyDirectoryRow = (businessId = 'current-business'): DirectoryAud
   listingResult: 'not_checked',
   lastCheckedAt: '',
   foundData: {},
+  candidateUrls: [],
   evidenceConfidence: 'manual_needs_confirmation',
   directoryStatus: 'not_checked',
   listingFound: 'unknown',
@@ -172,6 +223,7 @@ export const emptyDirectoryRow = (businessId = 'current-business'): DirectoryAud
   authority: 'Medium',
   publicEvidenceNotes: '',
   evidenceNotes: '',
+  pastedVisiblePageText: '',
   recommendedAction: '',
   ownerAdminAccessStatus: 'Unverified - public listing only',
   ownerAccessStatus: 'Unverified - public listing only',

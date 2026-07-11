@@ -1,5 +1,7 @@
 import express from 'express'
 import type { ErrorRequestHandler } from 'express'
+import { discoverDirectoryCandidates } from './directoryCandidates.ts'
+import type { DirectoryCandidateRequest } from './directoryCandidates.ts'
 import { checkPublicDirectoryPage } from './publicPageCheck.ts'
 import type { PublicPageCheckRequest } from './publicPageCheck.ts'
 import { auditWebsite, WebsiteAuditError } from './websiteAudit.ts'
@@ -62,6 +64,36 @@ app.post('/api/check-public-directory-page', async (request, response) => {
         error instanceof Error
           ? error.message
           : 'Public directory page check failed.',
+    })
+  }
+})
+
+app.post('/api/directory-candidates', async (request, response) => {
+  try {
+    const body = request.body as Partial<DirectoryCandidateRequest>
+    const result = await discoverDirectoryCandidates({
+      businessName: String(body.businessName ?? ''),
+      websiteDomain: String(body.websiteDomain ?? ''),
+      localMarket: String(body.localMarket ?? ''),
+      state: String(body.state ?? ''),
+      primaryCategory: String(body.primaryCategory ?? ''),
+      serviceTags: Array.isArray(body.serviceTags)
+        ? body.serviceTags.map(String)
+        : [],
+      directoryName: String(body.directoryName ?? ''),
+      expectedDirectoryDomain: String(body.expectedDirectoryDomain ?? ''),
+      directoryType: body.directoryType ?? 'Other',
+      checkMethod: body.checkMethod ?? 'Manual verification only',
+      existingDirectoryUrls: String(body.existingDirectoryUrls ?? ''),
+    })
+
+    response.json(result)
+  } catch (error) {
+    response.status(500).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Directory candidate lookup failed.',
     })
   }
 })
