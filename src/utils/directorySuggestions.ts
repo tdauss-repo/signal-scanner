@@ -173,6 +173,7 @@ export const directorySuggestionToRow = (
   publicEvidenceNotes: '',
   evidenceNotes: '',
   pastedVisiblePageText: '',
+  observedLinksText: '',
   recommendedAction:
     'Verify the public listing, correct inaccurate details, and document whether owner/admin access needs to be requested during onboarding.',
   ownerAdminAccessStatus: 'Unverified - public listing only',
@@ -224,6 +225,7 @@ export const emptyDirectoryRow = (businessId = 'current-business'): DirectoryAud
   publicEvidenceNotes: '',
   evidenceNotes: '',
   pastedVisiblePageText: '',
+  observedLinksText: '',
   recommendedAction: '',
   ownerAdminAccessStatus: 'Unverified - public listing only',
   ownerAccessStatus: 'Unverified - public listing only',

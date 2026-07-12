@@ -26,6 +26,11 @@ export const evidenceConfidenceOptions: Array<{
     customerLabel: 'Operator-provided public page text',
   },
   {
+    value: 'operator_observation',
+    label: 'Operator observation',
+    customerLabel: 'Operator-observed public listing evidence',
+  },
+  {
     value: 'public_search_observed',
     label: 'Public search observed',
     customerLabel: 'Observed in public search results',

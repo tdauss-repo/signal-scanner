@@ -9,6 +9,7 @@ export type EvidenceConfidence =
   | 'public_page_observed'
   | 'scanner_detected_public_page'
   | 'operator_provided_page_text'
+  | 'operator_observation'
   | 'public_search_observed'
   | 'ai_answer_response'
   | 'derived_readiness_signal'
@@ -69,12 +70,33 @@ export interface AuditState {
   evidenceConfidence: Record<string, EvidenceConfidence>
   profile: BusinessProfile
   lastUpdated: string
+  reportSummary: string
   selectedAIPlatform: AIAnswerPlatform
   aiAnswerTests: Record<AIAnswerPlatform, AIAnswerTestState>
   searchVisibilityTests: Record<string, SearchVisibilityTestState>
   voicePromptTests: Record<string, VoicePromptTestState>
   directories: DirectoryAuditState
   manualFixes: FixItem[]
+}
+
+export interface SavedScanRecord {
+  id: string
+  businessName: string
+  website: string
+  localMarket: string
+  createdAt: string
+  updatedAt: string
+  scanDate: string
+  notes: string
+  payload: AuditState
+}
+
+export interface SavedScanFile {
+  app: 'Found Local Business Scanner Tool'
+  fileType: 'found-local-scan'
+  version: 1
+  exportedAt: string
+  scan: SavedScanRecord
 }
 
 export interface ScoreResult {
@@ -343,6 +365,7 @@ export interface DirectoryAuditRow {
   publicEvidenceNotes: string
   evidenceNotes: string
   pastedVisiblePageText: string
+  observedLinksText: string
   recommendedAction: string
   ownerAdminAccessStatus: OwnerAccessStatus
   ownerAccessStatus: OwnerAccessStatus

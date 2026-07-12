@@ -474,6 +474,74 @@ const websiteSignalFromText = (
   return cleanComparableText(text).includes(domain) ? 'Yes' : 'No'
 }
 
+const extractObservedLinks = (observedLinksText: string) =>
+  observedLinksText
+    .split(/[\s,]+/)
+    .map((value) => value.trim().replace(/[),.;]+$/g, ''))
+    .filter((value) => value.includes('.'))
+    .map((value) => {
+      const withProtocol = /^https?:\/\//i.test(value)
+        ? value
+        : `https://${value}`
+      try {
+        const url = new URL(withProtocol)
+        return {
+          raw: value,
+          href: url.href,
+          host: url.hostname.replace(/^www\./i, '').toLowerCase(),
+        }
+      } catch {
+        return {
+          raw: value,
+          href: value,
+          host: value
+            .replace(/^https?:\/\//i, '')
+            .replace(/^www\./i, '')
+            .split('/')[0]
+            .toLowerCase(),
+        }
+      }
+    })
+
+const socialOrProfileLinksFromObservedLinks = (observedLinksText: string) =>
+  extractObservedLinks(observedLinksText).filter((link) =>
+    /facebook|instagram|linkedin|calendly|acuity|square|book|booking|zola|theknot|weddingwire|vagaro|fresha|styleseat/i.test(
+      `${link.host} ${link.raw}`,
+    ),
+  )
+
+const websiteSignalFromOperatorObservation = (
+  visibleText: string,
+  observedLinksText: string,
+  website: string,
+): DirectoryFoundSignal => {
+  if (!website.trim()) return 'No'
+  const expectedDomain = websiteDomain(website).toLowerCase()
+  const observedLinks = extractObservedLinks(observedLinksText)
+  const expectedDomainFoundInLinks = observedLinks.some(
+    (link) =>
+      link.host === expectedDomain ||
+      link.host.endsWith(`.${expectedDomain}`) ||
+      link.raw.toLowerCase().includes(expectedDomain),
+  )
+
+  if (
+    expectedDomainFoundInLinks ||
+    cleanComparableText(visibleText).includes(expectedDomain)
+  ) {
+    return 'Yes'
+  }
+
+  const possibleWebsiteLinks = observedLinks.filter(
+    (link) =>
+      !/facebook|instagram|linkedin|zola|theknot|weddingwire|booksy|vagaro|fresha|styleseat|yelp|google|apple|bing/i.test(
+        link.host,
+      ),
+  )
+
+  return possibleWebsiteLinks.length > 0 ? 'Partial' : 'No'
+}
+
 const visibilitySignalFromText = (
   text: string,
   terms: string[],
@@ -546,6 +614,19 @@ const analyzeVisiblePageText = (
   }
 }
 
+const analyzeOperatorObservation = (
+  profile: BusinessProfile,
+  visibleText: string,
+  observedLinksText: string,
+): DirectoryFoundData => ({
+  ...analyzeVisiblePageText(profile, visibleText),
+  websiteFound: websiteSignalFromOperatorObservation(
+    visibleText,
+    observedLinksText,
+    profile.website,
+  ),
+})
+
 const listingResultFromFoundData = (
   foundData: DirectoryFoundData,
 ): DirectoryListingStatus => {
@@ -565,6 +646,8 @@ const listingResultFromFoundData = (
 const evidenceNoteFromFoundData = (
   foundData: DirectoryFoundData,
   sourceLabel: string,
+  observedLinksText = '',
+  expectedWebsite = '',
 ) => {
   const found: string[] = []
   const missing: string[] = []
@@ -586,11 +669,39 @@ const evidenceNoteFromFoundData = (
     if (foundData[key] === 'Partial') partial.push(label)
   })
 
+  const observedLinks = extractObservedLinks(observedLinksText)
+  const socialOrProfileLinks = socialOrProfileLinksFromObservedLinks(
+    observedLinksText,
+  )
+  const expectedDomain = expectedWebsite ? websiteDomain(expectedWebsite) : ''
+  const expectedWebsiteLinkFound =
+    expectedDomain &&
+    observedLinks.some(
+      (link) =>
+        link.host === expectedDomain ||
+        link.host.endsWith(`.${expectedDomain}`) ||
+        link.raw.toLowerCase().includes(expectedDomain),
+    )
+
   return [
     `${sourceLabel} confirms the listing was reviewed from visible public content.`,
     found.length ? `Found: ${found.join(', ')}.` : '',
     partial.length ? `Partially found or needs operator review: ${partial.join(', ')}.` : '',
     missing.length ? `Not found in the reviewed text: ${missing.join(', ')}.` : '',
+    observedLinks.length
+      ? `Observed links reviewed: ${observedLinks
+          .map((link) => link.host)
+          .filter(Boolean)
+          .join(', ')}.`
+      : '',
+    socialOrProfileLinks.length
+      ? `Observed social/profile/booking links: ${socialOrProfileLinks
+          .map((link) => link.raw)
+          .join(', ')}.`
+      : '',
+    expectedWebsiteLinkFound
+      ? 'Observed links included the expected business website domain.'
+      : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -893,22 +1004,34 @@ export function DirectoryAuditPanel({
     }))
   }
 
-  const analyzePastedTextForRow = (row: DirectoryAuditRow) => {
+  const analyzeOperatorObservationForRow = (row: DirectoryAuditRow) => {
     const pastedText = row.pastedVisiblePageText.trim()
-    if (!pastedText) {
+    const observedLinksText = row.observedLinksText.trim()
+    if (!pastedText && !observedLinksText) {
       setCheckMessages((messages) => ({
         ...messages,
-        [row.id]: 'Paste visible page text before running assisted analysis.',
+        [row.id]:
+          'Paste visible page text or observed links before running assisted analysis.',
       }))
       return
     }
 
-    const foundData = analyzeVisiblePageText(profile, pastedText)
+    const foundData = analyzeOperatorObservation(
+      profile,
+      pastedText,
+      observedLinksText,
+    )
     const listingResult = listingResultFromFoundData(foundData)
     const evidenceNote = evidenceNoteFromFoundData(
       foundData,
-      'Operator-provided public page text',
+      'Operator-observed public listing content',
+      observedLinksText,
+      profile.website,
     )
+    const hasObservedLinks = extractObservedLinks(observedLinksText).length > 0
+    const missingPhoneOrAddress =
+      foundData.phoneFound === 'No' ||
+      foundData.addressOrServiceAreaFound === 'No'
     updateRow(row.id, {
       ...row,
       foundData,
@@ -916,19 +1039,21 @@ export function DirectoryAuditPanel({
       listingResult,
       directoryStatus: listingResult,
       lastCheckedAt: new Date().toISOString(),
-      evidenceConfidence: 'operator_provided_page_text',
+      evidenceConfidence: 'operator_observation',
       publicEvidenceNotes: evidenceNote,
       evidenceNotes: evidenceNote,
       recommendedAction:
         listingResult === 'found_accurate'
           ? 'Review the observed public listing details and keep this directory record as supporting evidence.'
-          : 'Review the observed public listing and update missing or unclear contact, service, category, website, or service-area details where the directory allows edits.',
+          : hasObservedLinks && missingPhoneOrAddress
+            ? 'Confirm whether the directory supports adding phone, address/service area, and website details. If available, complete those fields to improve listing clarity.'
+            : 'Review the observed public listing and update missing or unclear contact, website, service, category, or service-area details where the directory allows edits.',
       listingUrlStatus: 'url_saved',
     })
     setCheckMessages((messages) => ({
       ...messages,
       [row.id]:
-        'Pasted page text analyzed. Review and correct the detected fields before using this in the report or Action Plan.',
+        'Operator observation analyzed. Review and correct the detected fields before using this in the report or Action Plan.',
     }))
   }
 
@@ -1293,8 +1418,8 @@ export function DirectoryAuditPanel({
                 <span>
                   Some public pages are visible in a browser but unavailable to
                   scanner fetch. If that happens, open the saved URL manually,
-                  mark the page as Public Page Observed, or paste visible page
-                  text for assisted analysis.
+                  mark the page as Public Page Observed, or record visible text
+                  and observed links for assisted analysis.
                 </span>
               ) : null}
             </div>
@@ -1467,11 +1592,12 @@ export function DirectoryAuditPanel({
             {row.listingUrlStatus === 'url_saved' ? (
               <div className="operator-observed-panel">
                 <div>
-                  <strong>Operator-observed fallback</strong>
+                  <strong>Operator Observation</strong>
                   <p>
-                    If the page is visible in your browser but blocked from
-                    scanner fetch, mark it observed or paste visible text from
-                    the listing page for assisted analysis.
+                    If the page is visible in your browser but blocked from scanner
+                    fetch, record what you observed here. You can paste visible page
+                    text and any observed links from the listing page for assisted
+                    analysis.
                   </p>
                 </div>
                 <div className="directory-actions">
@@ -1484,14 +1610,17 @@ export function DirectoryAuditPanel({
                   </button>
                   <button
                     type="button"
-                    onClick={() => analyzePastedTextForRow(row)}
-                    disabled={!row.pastedVisiblePageText.trim()}
+                    onClick={() => analyzeOperatorObservationForRow(row)}
+                    disabled={
+                      !row.pastedVisiblePageText.trim() &&
+                      !row.observedLinksText.trim()
+                    }
                   >
-                    Analyze Pasted Page Text
+                    Analyze Operator Observation
                   </button>
                 </div>
                 <label>
-                  Pasted visible page text
+                  Visible page text
                   <textarea
                     className="large-textarea"
                     value={row.pastedVisiblePageText}
@@ -1504,10 +1633,24 @@ export function DirectoryAuditPanel({
                     placeholder="Paste visible business name, services, packages, location, contact, reviews, or profile text from the public listing page."
                   />
                   <span className="helper-text">
-                    If the page is visible in your browser but blocked from
-                    scanner fetch, copy relevant visible text from the listing
-                    page and paste it here. The scanner can compare this pasted
-                    text against the business profile.
+                    Paste visible text copied from the public listing page.
+                  </span>
+                </label>
+                <label>
+                  Observed links / URLs
+                  <textarea
+                    value={row.observedLinksText}
+                    onChange={(event) =>
+                      updateRow(row.id, {
+                        ...row,
+                        observedLinksText: event.target.value,
+                      })
+                    }
+                    placeholder="Paste website, social, booking, profile, or contact links observed on the page. One URL per line is best."
+                  />
+                  <span className="helper-text">
+                    Paste any website, social, booking, profile, or contact links
+                    observed on the page. Add one URL per line when possible.
                   </span>
                 </label>
               </div>

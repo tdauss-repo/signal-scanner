@@ -11,12 +11,13 @@ import {
 import { FixPlan } from './components/FixPlan'
 import { IntakeForm } from './components/IntakeForm'
 import { ReportView } from './components/ReportView'
+import { SavedScansPanel } from './components/SavedScansPanel'
 import { ScoreCard } from './components/ScoreCard'
 import { SearchVisibilityPanel } from './components/SearchVisibilityPanel'
 import { VoiceReadinessPanel } from './components/VoiceReadinessPanel'
 import { buildAuditItems } from './data/auditCatalog'
 import { defaultProfile } from './data/demoProfile'
-import type { AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem, SearchVisibilityQuery, SearchVisibilityTestState, VoicePromptTestState } from './types/audit'
+import type { AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem, SavedScanFile, SavedScanRecord, SearchVisibilityQuery, SearchVisibilityTestState, VoicePromptTestState } from './types/audit'
 import type { WebsiteAuditResponse } from './types/websiteAudit'
 import { aiAnswerPlatforms, buildFixPlan, scoreAIAnswerPlatform, scoreAIAnswers, scoreItems, trafficStatusForScore, weightedAverage } from './utils/scoring'
 import { mapAutoAuditToWebsiteChecks, runWebsiteAutoAudit } from './utils/websiteAutoAudit'
@@ -43,6 +44,8 @@ import {
 
 const storageKey = 'local-signal-scanner-state'
 const activeViewStorageKey = 'business-scanner-active-view'
+const savedScansStorageKey = 'found-local-saved-scans'
+const currentScanIdStorageKey = 'found-local-current-scan-id'
 const aiActionPlanId = 'manual-ai-answer-visibility-test'
 
 const aiResultToCheckStatus = (status: AIAnswerTestState['resultStatus']) =>
@@ -53,6 +56,24 @@ const aiResultLabel = (status: AIAnswerTestState['resultStatus']) => {
   if (status === 'unknown') return 'Not tested'
   return status
 }
+
+const createId = (prefix: string) =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? `${prefix}-${crypto.randomUUID()}`
+    : `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+const slugify = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') || 'untitled-business'
+
+const dateSlug = (value: string) =>
+  new Date(value).toISOString().slice(0, 10)
+
+const cloneAuditState = (state: AuditState): AuditState =>
+  JSON.parse(JSON.stringify(state)) as AuditState
 
 const phoneRecordId = (index: number, number?: string, label?: string) =>
   `phone-${index}-${(label || 'contact').replace(/\W+/g, '-').toLowerCase()}-${(number || 'new')
@@ -116,6 +137,7 @@ const migrateDirectories = (
     publicEvidenceNotes: row.publicEvidenceNotes ?? row.evidenceNotes ?? '',
     evidenceNotes: row.evidenceNotes ?? row.publicEvidenceNotes ?? '',
     pastedVisiblePageText: row.pastedVisiblePageText ?? '',
+    observedLinksText: row.observedLinksText ?? '',
     ownerAdminAccessStatus:
       row.ownerAdminAccessStatus ?? row.ownerAccessStatus ?? 'Unverified - public listing only',
     ownerAccessStatus:
@@ -289,15 +311,44 @@ const initialState: AuditState = {
   voicePromptTests: {},
   directories: { activeRows: [], ignoredSuggestionIds: [] },
   manualFixes: [],
+  reportSummary: '',
   lastUpdated: new Date().toISOString(),
 }
 
-const loadState = (): AuditState => {
-  try {
-    const stored = localStorage.getItem(storageKey)
-    if (!stored) return initialState
+const blankProfile: BusinessProfile = {
+  businessName: '',
+  website: '',
+  phone: '',
+  phoneNumbers: [],
+  contactStructureNote: '',
+  primaryCategory: '',
+  secondaryCategories: '',
+  industryTags: '',
+  localMarket: '',
+  existingDirectoryUrls: '',
+  serviceArea: '',
+  primaryServices: '',
+  targetLocation: '',
+  keywords: '',
+}
 
-    const parsed = JSON.parse(stored) as Partial<AuditState>
+const createBlankAuditState = (): AuditState => ({
+  ...initialState,
+  profile: blankProfile,
+  checks: {},
+  notes: {},
+  evidenceConfidence: {},
+  selectedAIPlatform: 'Gemini',
+  aiAnswerTests: buildDefaultAIAnswerTests(),
+  searchVisibilityTests: {},
+  voicePromptTests: {},
+  directories: { activeRows: [], ignoredSuggestionIds: [] },
+  manualFixes: [],
+  reportSummary: '',
+  lastUpdated: new Date().toISOString(),
+})
+
+const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
     const defaultTests = buildDefaultAIAnswerTests()
     const legacyParsed = parsed as Partial<AuditState> & {
       aiAnswerTest?: AIAnswerTestState & { platform?: AIAnswerPlatform }
@@ -350,15 +401,111 @@ const loadState = (): AuditState => {
         ...parsed.profile,
       }),
       evidenceConfidence: parsed.evidenceConfidence ?? {},
+      reportSummary: parsed.reportSummary ?? '',
       manualFixes: (parsed.manualFixes ?? []).map((fix) => ({
         ...fix,
         evidenceConfidence:
           fix.evidenceConfidence ?? 'manual_needs_confirmation',
       })),
     }
+}
+
+const loadState = (): AuditState => {
+  try {
+    const stored = localStorage.getItem(storageKey)
+    if (!stored) return initialState
+
+    return normalizeAuditState(JSON.parse(stored) as Partial<AuditState>)
   } catch {
     return initialState
   }
+}
+
+const savedScanFromWorkspace = (
+  auditState: AuditState,
+  existing?: SavedScanRecord,
+): SavedScanRecord => {
+  const now = new Date().toISOString()
+  const payload = cloneAuditState({
+    ...auditState,
+    lastUpdated: now,
+  })
+
+  return {
+    id: existing?.id ?? createId('scan'),
+    businessName: payload.profile.businessName || 'Untitled business',
+    website: payload.profile.website,
+    localMarket: payload.profile.localMarket || payload.profile.targetLocation,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+    scanDate: payload.lastUpdated,
+    notes: existing?.notes ?? '',
+    payload,
+  }
+}
+
+const normalizeSavedScan = (scan: Partial<SavedScanRecord>): SavedScanRecord => {
+  const payload = normalizeAuditState(scan.payload ?? initialState)
+  const now = new Date().toISOString()
+
+  return {
+    id: scan.id ?? createId('scan'),
+    businessName: scan.businessName ?? payload.profile.businessName,
+    website: scan.website ?? payload.profile.website,
+    localMarket:
+      scan.localMarket ??
+      payload.profile.localMarket ??
+      payload.profile.targetLocation,
+    createdAt: scan.createdAt ?? now,
+    updatedAt: scan.updatedAt ?? payload.lastUpdated ?? now,
+    scanDate: scan.scanDate ?? payload.lastUpdated ?? now,
+    notes: scan.notes ?? '',
+    payload,
+  }
+}
+
+const loadSavedScans = (): SavedScanRecord[] => {
+  try {
+    const stored = localStorage.getItem(savedScansStorageKey)
+    if (!stored) return []
+    const parsed = JSON.parse(stored) as Partial<SavedScanRecord>[]
+    return Array.isArray(parsed) ? parsed.map(normalizeSavedScan) : []
+  } catch {
+    return []
+  }
+}
+
+const loadCurrentScanId = () =>
+  localStorage.getItem(currentScanIdStorageKey) ?? ''
+
+const buildSavedScanFile = (scan: SavedScanRecord): SavedScanFile => ({
+  app: 'Found Local Business Scanner Tool',
+  fileType: 'found-local-scan',
+  version: 1,
+  exportedAt: new Date().toISOString(),
+  scan,
+})
+
+const parseImportedScanFile = (text: string): SavedScanRecord | null => {
+  try {
+    const parsed = JSON.parse(text) as Partial<SavedScanFile> | Partial<SavedScanRecord>
+    if (
+      'fileType' in parsed &&
+      parsed.fileType === 'found-local-scan' &&
+      parsed.scan
+    ) {
+      return normalizeSavedScan({
+        ...parsed.scan,
+        id: createId('scan'),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+    }
+  } catch {
+    return null
+  }
+
+  return null
 }
 
 function App() {
@@ -369,6 +516,8 @@ function App() {
   const [websiteAuditLoading, setWebsiteAuditLoading] = useState(false)
   const [websiteAuditError, setWebsiteAuditError] = useState('')
   const [activeView, setActiveView] = useState<ActiveView>(loadActiveView)
+  const [savedScans, setSavedScans] = useState<SavedScanRecord[]>(loadSavedScans)
+  const [currentScanId, setCurrentScanId] = useState(loadCurrentScanId)
 
   const auditItems = useMemo(
     () => buildAuditItems(auditState.profile),
@@ -470,6 +619,12 @@ function App() {
     [auditItems, auditState.checks, auditState.manualFixes],
   )
 
+  const currentSavedScan = savedScans.find((scan) => scan.id === currentScanId)
+  const hasUnsavedChanges = currentSavedScan
+    ? JSON.stringify(normalizeAuditState(currentSavedScan.payload)) !==
+      JSON.stringify(auditState)
+    : true
+
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(auditState))
   }, [auditState])
@@ -477,6 +632,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem(activeViewStorageKey, activeView)
   }, [activeView])
+
+  useEffect(() => {
+    localStorage.setItem(savedScansStorageKey, JSON.stringify(savedScans))
+  }, [savedScans])
+
+  useEffect(() => {
+    localStorage.setItem(currentScanIdStorageKey, currentScanId)
+  }, [currentScanId])
 
   const updateState = (next: Partial<AuditState>) => {
     setAuditState((current) => ({
@@ -874,17 +1037,149 @@ function App() {
     if (confirmed) updateState({ checks: {}, notes: {} })
   }
 
-  const exportJson = () => {
-    const blob = new Blob([JSON.stringify(auditState, null, 2)], {
+  const downloadScanJson = (scan: SavedScanRecord) => {
+    const file = buildSavedScanFile(scan)
+    const blob = new Blob([JSON.stringify(file, null, 2)], {
       type: 'application/json',
     })
     const anchor = document.createElement('a')
     anchor.href = URL.createObjectURL(blob)
-    anchor.download = `local-signal-scan-${auditState.profile.businessName
-      .replace(/\W+/g, '-')
-      .toLowerCase()}.json`
+    anchor.download = `found-local-scan-${slugify(scan.businessName)}-${dateSlug(
+      scan.scanDate,
+    )}.json`
     anchor.click()
     URL.revokeObjectURL(anchor.href)
+  }
+
+  const saveScanRecord = (record: SavedScanRecord) => {
+    setSavedScans((current) => {
+      const withoutCurrent = current.filter((scan) => scan.id !== record.id)
+      return [record, ...withoutCurrent].sort((a, b) =>
+        b.updatedAt.localeCompare(a.updatedAt),
+      )
+    })
+    setCurrentScanId(record.id)
+    setAuditState(record.payload)
+    return record
+  }
+
+  const saveCurrentScan = () => {
+    const existing = savedScans.find((scan) => scan.id === currentScanId)
+    const record = savedScanFromWorkspace(auditState, existing)
+    saveScanRecord(record)
+  }
+
+  const saveAsNewScan = () => {
+    const notes = window.prompt('Optional notes for this saved scan:', '') ?? ''
+    const record = savedScanFromWorkspace(auditState)
+    saveScanRecord({ ...record, notes })
+  }
+
+  const saveBeforeReplacingWorkspace = () => {
+    if (!hasUnsavedChanges) return true
+    const shouldSave = window.confirm(
+      'Loading another scan will replace the current workspace. Save the current scan first?',
+    )
+    if (!shouldSave) return false
+    saveCurrentScan()
+    return true
+  }
+
+  const loadSavedScan = (id: string) => {
+    if (id === currentScanId && hasUnsavedChanges) {
+      saveCurrentScan()
+      return
+    }
+    if (!saveBeforeReplacingWorkspace()) return
+    const scan = savedScans.find((item) => item.id === id)
+    if (!scan) return
+    setCurrentScanId(scan.id)
+    setAuditState(normalizeAuditState(scan.payload))
+    setWebsiteAudit(null)
+    setWebsiteAuditError('')
+  }
+
+  const duplicateSavedScan = (id: string) => {
+    const scan = savedScans.find((item) => item.id === id)
+    if (!scan) return
+    const now = new Date().toISOString()
+    const duplicate = normalizeSavedScan({
+      ...scan,
+      id: createId('scan'),
+      businessName: `${scan.businessName} copy`,
+      createdAt: now,
+      updatedAt: now,
+      scanDate: now,
+      payload: {
+        ...cloneAuditState(scan.payload),
+        lastUpdated: now,
+      },
+    })
+    setSavedScans((current) => [duplicate, ...current])
+  }
+
+  const renameSavedScan = (id: string) => {
+    const scan = savedScans.find((item) => item.id === id)
+    if (!scan) return
+    const nextName = window.prompt('Saved scan name:', scan.businessName)
+    if (!nextName?.trim()) return
+    setSavedScans((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              businessName: nextName.trim(),
+              updatedAt: new Date().toISOString(),
+            }
+          : item,
+      ),
+    )
+  }
+
+  const deleteSavedScan = (id: string) => {
+    const scan = savedScans.find((item) => item.id === id)
+    if (!scan) return
+    const confirmed = window.confirm(
+      `Delete saved scan "${scan.businessName}"? This does not clear the current workspace unless this scan is loaded.`,
+    )
+    if (!confirmed) return
+    setSavedScans((current) => current.filter((item) => item.id !== id))
+    if (currentScanId === id) setCurrentScanId('')
+  }
+
+  const exportSavedScan = (id: string) => {
+    const scan = savedScans.find((item) => item.id === id)
+    if (scan) downloadScanJson(scan)
+  }
+
+  const exportJson = () => {
+    const existing = savedScans.find((scan) => scan.id === currentScanId)
+    downloadScanJson(savedScanFromWorkspace(auditState, existing))
+  }
+
+  const importSavedScan = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const imported = parseImportedScanFile(String(reader.result ?? ''))
+      if (!imported) {
+        window.alert('This does not look like a Found Local scan JSON file.')
+        return
+      }
+      setSavedScans((current) => [imported, ...current])
+      window.alert(
+        `Imported "${imported.businessName}". It was added to Saved Scans but was not loaded into the current workspace.`,
+      )
+    }
+    reader.readAsText(file)
+  }
+
+  const startBlankScan = () => {
+    if (!saveBeforeReplacingWorkspace()) return
+    setCurrentScanId('')
+    setAuditState(createBlankAuditState())
+    setWebsiteAudit(null)
+    setWebsiteAuditError('')
+    setActiveView('Settings')
   }
 
   const runAutoAudit = async () => {
@@ -1142,7 +1437,7 @@ function App() {
               <article className="panel recommended-card recommended-card-primary">
                 <span className="offer-badge">Recommended</span>
                 <h3>Starter Visibility Cleanup</h3>
-                <strong className="price-placeholder">$299-$599 one-time</strong>
+                <strong className="price-placeholder">$299 one-time</strong>
                 <ul className="package-list compact-package-list">
                   <li>Correct/standardize business listing signals</li>
                   <li>Improve website SEO clarity signals</li>
@@ -1153,9 +1448,9 @@ function App() {
               </article>
 
               <article className="panel recommended-card">
-                <span className="offer-badge offer-badge-muted">Future Add</span>
+                <span className="offer-badge offer-badge-muted">Future option</span>
                 <h3>Future Monthly Monitoring</h3>
-                <strong className="price-placeholder">$49-$199/month</strong>
+                <strong className="price-placeholder">$70/month</strong>
                 <p>
                   Monthly monitoring can re-check visibility gaps, listing
                   consistency, search visibility, AI answer accuracy, reviews,
@@ -1164,7 +1459,7 @@ function App() {
               </article>
 
               <article className="panel recommended-card">
-                <span className="offer-badge offer-badge-muted">Future Upsell</span>
+                <span className="offer-badge offer-badge-muted">Future option</span>
                 <h3>Website SEO Implementation</h3>
                 <strong className="price-placeholder">$500-$2,500+</strong>
                 <p>
@@ -1333,6 +1628,12 @@ function App() {
           scores={scores}
           checks={auditState.checks}
           notes={auditState.notes}
+          fixes={fixes}
+          lastUpdated={auditState.lastUpdated}
+          reportSummary={auditState.reportSummary}
+          onReportSummaryChange={(reportSummary) =>
+            updateState({ reportSummary })
+          }
           evidenceConfidence={auditState.evidenceConfidence}
         />
       )
@@ -1344,13 +1645,27 @@ function App() {
           <section className="panel placeholder-panel">
             <div className="panel-header">
               <p className="eyebrow">Settings</p>
-              <h2>Prototype settings</h2>
+              <h2>Workspace settings</h2>
               <p>
-                Settings are a placeholder in v02. Use the pre-call profile
-                form below to prepare a business before a sales conversation.
+                Save, reopen, export, and import complete scan workspaces
+                before testing another business.
               </p>
             </div>
           </section>
+          <SavedScansPanel
+            currentScanId={currentScanId}
+            dirty={hasUnsavedChanges}
+            scans={savedScans}
+            onSaveCurrent={saveCurrentScan}
+            onSaveAsNew={saveAsNewScan}
+            onLoad={loadSavedScan}
+            onDuplicate={duplicateSavedScan}
+            onRename={renameSavedScan}
+            onDelete={deleteSavedScan}
+            onExport={exportSavedScan}
+            onImport={importSavedScan}
+            onStartBlank={startBlankScan}
+          />
           <IntakeForm
             profile={auditState.profile}
             onChange={(profile) => updateState({ profile })}
@@ -1445,6 +1760,9 @@ function App() {
             <p>
               {auditState.profile.businessName} | scanned{' '}
               {new Date(auditState.lastUpdated).toLocaleString()}
+              {currentSavedScan
+                ? ` | ${hasUnsavedChanges ? 'unsaved changes' : 'saved scan'}`
+                : ' | unsaved workspace'}
             </p>
           </div>
         </header>
