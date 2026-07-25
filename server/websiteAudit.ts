@@ -10,6 +10,8 @@ export interface WebsiteAuditResult {
   ok: true
   normalizedUrl: string
   fetchedUrl: string
+  fetchStrategyUsed: string
+  redirectCount: number
   title: string
   metaDescription: string
   canonicalUrl: string
@@ -36,12 +38,21 @@ export interface WebsiteAuditResult {
 
 export interface WebsiteAuditBlockedResult {
   ok: false
-  status: 403
+  status: number
+  statusText?: string
   error: string
+  errorType: string
   details: string
   recommendedNextStep: string
   requestedUrl: string
+  normalizedUrl?: string
   redirectUrl: string
+  finalUrl?: string
+  redirectOccurred: boolean
+  redirectCount: number
+  blocked: boolean
+  fetchStrategyUsed: string
+  httpsFallbackTried: boolean
   timestamp: string
 }
 
@@ -54,9 +65,18 @@ const defaultHeaders = {
 }
 
 const browserLikeHeaders = {
+  'user-agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+  accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'accept-language': 'en-US,en;q=0.9',
+  'cache-control': 'no-cache',
+}
+
+const compatibleScannerHeaders = {
   'user-agent': 'Mozilla/5.0 compatible LocalSignalScanner/0.1',
   accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'accept-language': 'en-US,en;q=0.9',
+  'cache-control': 'no-cache',
 }
 
 export class WebsiteAuditError extends Error {
@@ -89,8 +109,78 @@ const normalizeWebsiteUrl = (website: string) => {
     throw new WebsiteAuditError('Website URL must use http or https.')
   }
 
+  if (url.protocol === 'http:') {
+    url.protocol = 'https:'
+  }
   url.hash = ''
   return url
+}
+
+const failureResult = (
+  requestedUrl: string,
+  normalizedUrl: URL,
+  response: Response | null,
+  errorType: string,
+  details: string,
+  fetchStrategyUsed: string,
+  redirectCount: number,
+  httpsFallbackTried: boolean,
+): WebsiteAuditBlockedResult => {
+  const finalUrl = response?.url || normalizedUrl.toString()
+  const status = response?.status ?? 0
+  const blocked = status === 403 || /blocked|forbidden|timed out|unable/i.test(details)
+
+  return {
+    ok: false,
+    status,
+    statusText: response?.statusText,
+    error: blocked
+      ? 'Automated homepage access blocked'
+      : 'Website automated scan failed.',
+    errorType,
+    details,
+    recommendedNextStep: blocked
+      ? 'The website opens in a browser, but the automated scanner could not fetch the homepage. This is usually caused by hosting/CDN protection, platform security rules, firewall settings, or server-side request blocking. Use Browser Observation Review for this site.'
+      : 'Retry later or complete a manual website review.',
+    requestedUrl,
+    normalizedUrl: normalizedUrl.toString(),
+    redirectUrl: finalUrl,
+    finalUrl,
+    redirectOccurred: finalUrl !== normalizedUrl.toString(),
+    redirectCount,
+    blocked,
+    fetchStrategyUsed,
+    httpsFallbackTried,
+    timestamp: new Date().toISOString(),
+  }
+}
+
+const relevantResponseHeaders = (response: Response) => {
+  const headerNames = [
+    'server',
+    'cf-ray',
+    'x-cache',
+    'x-servedby',
+    'x-timer',
+    'content-type',
+    'location',
+    'via',
+  ]
+
+  return headerNames.reduce(
+    (headers, name) => {
+      const value = response.headers.get(name)
+      return value ? { ...headers, [name]: value } : headers
+    },
+    {} as Record<string, string>,
+  )
+}
+
+const logWebsiteAuditAttempt = (
+  label: string,
+  data: Record<string, unknown>,
+) => {
+  console.info(`[website-audit] ${label}`, data)
 }
 
 const fetchWithLimit = async (
@@ -140,11 +230,47 @@ const fetchWithLimit = async (
     if (error instanceof Error && error.name === 'AbortError') {
       throw new WebsiteAuditError('Website fetch timed out.', 504)
     }
-    throw new WebsiteAuditError('Unable to fetch the website homepage.', 502)
+    const cause = (error as Error & { cause?: { code?: string; message?: string } })
+      .cause
+    if (
+      cause?.code &&
+      /CERT|TLS|VERIFY|SIGNATURE/i.test(cause.code)
+    ) {
+      throw new WebsiteAuditError(
+        `Website TLS certificate chain could not be verified by the backend fetch runtime. ${cause.message ?? ''}`.trim(),
+        526,
+      )
+    }
+    throw new WebsiteAuditError(
+      cause?.message
+        ? `Unable to fetch the website homepage. ${cause.message}`
+        : 'Unable to fetch the website homepage.',
+      502,
+    )
   } finally {
     clearTimeout(timeout)
   }
 }
+
+const urlVariants = (url: URL) => {
+  const variants: URL[] = [url]
+  const pathIsRoot = url.pathname === '' || url.pathname === '/'
+  const alternate = new URL(url.toString())
+
+  if (pathIsRoot) {
+    alternate.pathname = url.pathname === '/' ? '' : '/'
+  } else if (url.pathname.endsWith('/')) {
+    alternate.pathname = url.pathname.replace(/\/+$/, '')
+  } else {
+    alternate.pathname = `${url.pathname}/`
+  }
+
+  if (alternate.toString() !== url.toString()) variants.push(alternate)
+  return variants
+}
+
+const originalRequestedHttp = (website: string) =>
+  /^http:\/\//i.test(website.trim())
 
 const concatChunks = (chunks: Uint8Array[], totalLength: number) => {
   const combined = new Uint8Array(totalLength)
@@ -294,34 +420,129 @@ const checkAvailability = async (baseUrl: URL, path: string) => {
 export const auditWebsite = async (
   request: WebsiteAuditRequest,
 ): Promise<WebsiteAuditResult | WebsiteAuditBlockedResult> => {
+  const requestedUrl = request.website.trim()
   const url = normalizeWebsiteUrl(request.website)
-  let { response, body } = await fetchWithLimit(url)
+  const httpsFallbackTried = originalRequestedHttp(request.website)
+  const strategies = [
+    { name: 'normal fetch', headers: defaultHeaders },
+    { name: 'compatible scanner browser-like headers', headers: compatibleScannerHeaders },
+    { name: 'browser-like headers', headers: browserLikeHeaders },
+    {
+      name: 'browser-like headers with referer',
+      headers: { ...browserLikeHeaders, referer: url.origin },
+    },
+  ]
+  const attempts: WebsiteAuditBlockedResult[] = []
+  let response: Response | null = null
+  let body = ''
+  let fetchStrategyUsed = ''
+  let redirectCount = 0
 
-  if (response.status === 403) {
-    const retry = await fetchWithLimit(url, 'GET', browserLikeHeaders)
-    response = retry.response
-    body = retry.body
-  }
+  logWebsiteAuditAttempt('start', {
+    requestedUrl,
+    normalizedUrl: url.toString(),
+    httpsFallbackTried,
+    variants: urlVariants(url).map((variant) => variant.toString()),
+  })
 
-  if (response.status === 403) {
-    return {
-      ok: false,
-      status: 403,
-      error: 'Website blocked the automated scan.',
-      details:
-        'The homepage returned HTTP 403 Forbidden. This may be caused by bot protection, hosting security, missing browser headers, or website firewall settings.',
-      recommendedNextStep:
-        'Retry with browser-like headers or complete a manual website review.',
-      requestedUrl: url.toString(),
-      redirectUrl: response.url || url.toString(),
-      timestamp: new Date().toISOString(),
+  for (const variant of urlVariants(url)) {
+    for (const strategy of strategies) {
+      try {
+        const result = await fetchWithLimit(variant, 'GET', strategy.headers)
+        response = result.response
+        body = result.body
+        fetchStrategyUsed = `${strategy.name} (${variant.toString()})`
+        redirectCount = response.redirected ? 1 : 0
+
+        logWebsiteAuditAttempt('attempt result', {
+          requestedUrl,
+          normalizedUrl: url.toString(),
+          attemptUrl: variant.toString(),
+          finalUrl: response.url || variant.toString(),
+          status: response.status,
+          statusText: response.statusText,
+          responseHeaders: relevantResponseHeaders(response),
+          userAgent: strategy.headers['user-agent'],
+          fetchStrategyUsed,
+          redirectCount,
+          httpsFallbackTried,
+        })
+
+        if (response.ok && body.trim()) {
+          break
+        }
+
+        attempts.push(
+          failureResult(
+            requestedUrl,
+            url,
+            response,
+            response.status === 403 ? 'http_forbidden' : 'http_error',
+            response.status === 403
+              ? 'HTTP 403 Forbidden. The website may block server-side scans even though it opens in a browser.'
+              : `Homepage returned HTTP ${response.status} ${response.statusText || ''}.`.trim(),
+            fetchStrategyUsed,
+            redirectCount,
+            httpsFallbackTried,
+          ),
+        )
+      } catch (error) {
+        if (error instanceof WebsiteAuditError && error.statusCode !== 400) {
+          const errorType =
+            error.statusCode === 504
+              ? 'timeout'
+              : error.statusCode === 526
+                ? 'tls_certificate'
+                : 'fetch_error'
+          const fetchStrategy = `${strategy.name} (${variant.toString()})`
+          logWebsiteAuditAttempt('attempt error', {
+            requestedUrl,
+            normalizedUrl: url.toString(),
+            attemptUrl: variant.toString(),
+            userAgent: strategy.headers['user-agent'],
+            fetchStrategyUsed: fetchStrategy,
+            errorType,
+            message: error.message,
+            stack: error.stack,
+            httpsFallbackTried,
+          })
+          attempts.push(
+            failureResult(
+              requestedUrl,
+              url,
+              null,
+              errorType,
+              error.message,
+              fetchStrategy,
+              0,
+              httpsFallbackTried,
+            ),
+          )
+          continue
+        }
+        throw error
+      }
+
+      if (response.ok && body.trim()) break
     }
+
+    if (response && response.ok && body.trim()) break
   }
 
-  if (!response.ok) {
-    throw new WebsiteAuditError(
-      `Homepage returned HTTP ${response.status}.`,
-      502,
+  if (!response || !response.ok || !body.trim()) {
+    const lastAttempt = attempts.at(-1)
+    return (
+      lastAttempt ??
+      failureResult(
+        requestedUrl,
+        url,
+        null,
+        'fetch_error',
+        'Unable to fetch usable homepage HTML with safe request strategies.',
+        'No strategy completed',
+        0,
+        httpsFallbackTried,
+      )
     )
   }
 
@@ -386,6 +607,8 @@ export const auditWebsite = async (
     ok: true,
     normalizedUrl: url.toString(),
     fetchedUrl,
+    fetchStrategyUsed,
+    redirectCount,
     title,
     metaDescription,
     canonicalUrl,

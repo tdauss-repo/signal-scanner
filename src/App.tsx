@@ -18,9 +18,9 @@ import { VoiceReadinessPanel } from './components/VoiceReadinessPanel'
 import { buildAuditItems } from './data/auditCatalog'
 import { defaultProfile } from './data/demoProfile'
 import type { AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem, SavedScanFile, SavedScanRecord, SearchVisibilityQuery, SearchVisibilityTestState, VoicePromptTestState } from './types/audit'
-import type { WebsiteAuditResponse } from './types/websiteAudit'
+import type { ManualWebsiteObservation } from './types/websiteAudit'
 import { aiAnswerPlatforms, buildFixPlan, scoreAIAnswerPlatform, scoreAIAnswers, scoreItems, trafficStatusForScore, weightedAverage } from './utils/scoring'
-import { mapAutoAuditToWebsiteChecks, runWebsiteAutoAudit } from './utils/websiteAutoAudit'
+import { analyzeManualWebsiteObservation, mapAutoAuditToWebsiteChecks, runWebsiteAutoAudit } from './utils/websiteAutoAudit'
 import { bingSearch, googleMapsSearch, googleSearch } from './utils/links'
 import {
   businessDirectoryKey,
@@ -300,6 +300,16 @@ const buildDefaultAIAnswerTests = () =>
     {} as Record<AIAnswerPlatform, AIAnswerTestState>,
   )
 
+const defaultManualWebsiteObservation = (): ManualWebsiteObservation => ({
+  observedTitle: '',
+  observedMetaDescription: '',
+  visibleHomepageText: '',
+  observedLinks: '',
+  observedSchemaSnippet: '',
+  notes: '',
+  analyzedAt: '',
+})
+
 const initialState: AuditState = {
   profile: defaultProfile,
   checks: {},
@@ -312,6 +322,11 @@ const initialState: AuditState = {
   directories: { activeRows: [], ignoredSuggestionIds: [] },
   manualFixes: [],
   reportSummary: '',
+  websiteAudit: {
+    lastSuccessful: null,
+    latestAttempt: null,
+    manualObservation: defaultManualWebsiteObservation(),
+  },
   lastUpdated: new Date().toISOString(),
 }
 
@@ -345,6 +360,11 @@ const createBlankAuditState = (): AuditState => ({
   directories: { activeRows: [], ignoredSuggestionIds: [] },
   manualFixes: [],
   reportSummary: '',
+  websiteAudit: {
+    lastSuccessful: null,
+    latestAttempt: null,
+    manualObservation: defaultManualWebsiteObservation(),
+  },
   lastUpdated: new Date().toISOString(),
 })
 
@@ -402,6 +422,14 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
       }),
       evidenceConfidence: parsed.evidenceConfidence ?? {},
       reportSummary: parsed.reportSummary ?? '',
+      websiteAudit: {
+        lastSuccessful: parsed.websiteAudit?.lastSuccessful ?? null,
+        latestAttempt: parsed.websiteAudit?.latestAttempt ?? null,
+        manualObservation: {
+          ...defaultManualWebsiteObservation(),
+          ...parsed.websiteAudit?.manualObservation,
+        },
+      },
       manualFixes: (parsed.manualFixes ?? []).map((fix) => ({
         ...fix,
         evidenceConfidence:
@@ -510,9 +538,6 @@ const parseImportedScanFile = (text: string): SavedScanRecord | null => {
 
 function App() {
   const [auditState, setAuditState] = useState<AuditState>(loadState)
-  const [websiteAudit, setWebsiteAudit] = useState<WebsiteAuditResponse | null>(
-    null,
-  )
   const [websiteAuditLoading, setWebsiteAuditLoading] = useState(false)
   const [websiteAuditError, setWebsiteAuditError] = useState('')
   const [activeView, setActiveView] = useState<ActiveView>(loadActiveView)
@@ -1095,7 +1120,6 @@ function App() {
     if (!scan) return
     setCurrentScanId(scan.id)
     setAuditState(normalizeAuditState(scan.payload))
-    setWebsiteAudit(null)
     setWebsiteAuditError('')
   }
 
@@ -1177,7 +1201,6 @@ function App() {
     if (!saveBeforeReplacingWorkspace()) return
     setCurrentScanId('')
     setAuditState(createBlankAuditState())
-    setWebsiteAudit(null)
     setWebsiteAuditError('')
     setActiveView('Settings')
   }
@@ -1188,13 +1211,17 @@ function App() {
 
     try {
       const result = await runWebsiteAutoAudit(auditState.profile)
-      setWebsiteAudit(result)
 
       if (!result.ok) {
         const blockedNote = [
-          'Website blocked automated scan - manual review required.',
+          'Automated homepage access blocked.',
+          'The website opens in a browser, but the automated scanner could not fetch the homepage. This is usually caused by hosting/CDN protection, platform security rules, firewall settings, or server-side request blocking. Use Browser Observation Review for this site.',
           `Requested URL: ${result.requestedUrl}`,
+          `Final URL: ${result.finalUrl || result.redirectUrl}`,
           `HTTP status: ${result.status}`,
+          `Error type: ${result.errorType}`,
+          `Redirect occurred: ${result.redirectOccurred ? 'Yes' : 'No'}`,
+          `Blocked/forbidden: ${result.blocked ? 'Yes' : 'No'}`,
           `Redirect URL: ${result.redirectUrl}`,
           `Timestamp: ${result.timestamp}`,
           `Recommended next step: ${result.recommendedNextStep}`,
@@ -1202,6 +1229,10 @@ function App() {
 
         setAuditState((current) => ({
           ...current,
+          websiteAudit: {
+            ...current.websiteAudit,
+            latestAttempt: result,
+          },
           notes: {
             ...current.notes,
             'website-homepage-clarity': blockedNote,
@@ -1214,8 +1245,23 @@ function App() {
       const mapping = mapAutoAuditToWebsiteChecks(result, auditState.profile)
       setAuditState((current) => ({
         ...current,
+        websiteAudit: {
+          ...current.websiteAudit,
+          lastSuccessful: result,
+          latestAttempt: result,
+        },
         checks: { ...current.checks, ...mapping.statuses },
         notes: { ...current.notes, ...mapping.notes },
+        evidenceConfidence: {
+          ...current.evidenceConfidence,
+          ...Object.keys(mapping.statuses).reduce(
+            (confidence, id) => ({
+              ...confidence,
+              [id]: 'scanner_detected_public_page',
+            }),
+            {} as Record<string, EvidenceConfidence>,
+          ),
+        },
         lastUpdated: new Date().toISOString(),
       }))
     } catch (error) {
@@ -1227,8 +1273,55 @@ function App() {
     }
   }
 
+  const setManualWebsiteObservation = (
+    nextObservation: Partial<ManualWebsiteObservation>,
+  ) => {
+    updateState({
+      websiteAudit: {
+        ...auditState.websiteAudit,
+        manualObservation: {
+          ...auditState.websiteAudit.manualObservation,
+          ...nextObservation,
+        },
+      },
+    })
+  }
+
+  const analyzeManualObservation = () => {
+    const observation = {
+      ...auditState.websiteAudit.manualObservation,
+      analyzedAt: new Date().toISOString(),
+    }
+    const mapping = analyzeManualWebsiteObservation(
+      observation,
+      auditState.profile,
+    )
+    updateState({
+      websiteAudit: {
+        ...auditState.websiteAudit,
+        manualObservation: observation,
+      },
+      checks: { ...auditState.checks, ...mapping.statuses },
+      notes: { ...auditState.notes, ...mapping.notes },
+      evidenceConfidence: {
+        ...auditState.evidenceConfidence,
+        ...Object.keys(mapping.statuses).reduce(
+          (confidence, id) => ({
+            ...confidence,
+            [id]: 'operator_observation',
+          }),
+          {} as Record<string, EvidenceConfidence>,
+        ),
+      },
+    })
+  }
+
+  const latestWebsiteAttempt = auditState.websiteAudit.latestAttempt
+  const lastSuccessfulWebsiteAudit = auditState.websiteAudit.lastSuccessful
+
   const websiteScanAccess =
-    websiteAudit?.ok && (!websiteAudit.title || websiteAudit.contentLength < 500)
+    latestWebsiteAttempt?.ok &&
+    (!latestWebsiteAttempt.title || latestWebsiteAttempt.contentLength < 500)
       ? {
           className: 'scan-status scan-status-yellow',
           label: 'Scan access: Yellow - homepage fetched but limited/incomplete',
@@ -1556,39 +1649,182 @@ function App() {
                 users. {websiteAuditError}
               </p>
             ) : null}
-            {websiteAudit ? (
+            {latestWebsiteAttempt ? (
               <div className="auto-audit-result">
-                <strong>Last auto-audit</strong>
-                {websiteAudit.ok ? (
+                <strong>Latest scan attempt</strong>
+                {latestWebsiteAttempt.ok ? (
                   <>
                     <span className={websiteScanAccess.className}>
                       {websiteScanAccess.label}
                     </span>
-                    <span>{new Date(websiteAudit.analyzedAt).toLocaleString()}</span>
-                    <span>Fetched: {websiteAudit.fetchedUrl}</span>
+                    <span>{new Date(latestWebsiteAttempt.analyzedAt).toLocaleString()}</span>
+                    <span>Requested: {latestWebsiteAttempt.normalizedUrl}</span>
+                    <span>Final URL: {latestWebsiteAttempt.fetchedUrl}</span>
                     <span>
-                      Found {websiteAudit.detectedSchemaTypes.length} schema type(s),{' '}
-                      {websiteAudit.servicePhraseMatches.length} service phrase(s),{' '}
-                      {websiteAudit.serviceAreaPhraseMatches.length} area phrase(s)
+                      Fetch strategy:{' '}
+                      {latestWebsiteAttempt.fetchStrategyUsed?.trim() || 'not recorded'}
+                    </span>
+                    <span>Redirect count: {latestWebsiteAttempt.redirectCount}</span>
+                    <span>
+                      Found {latestWebsiteAttempt.detectedSchemaTypes.length} schema type(s),{' '}
+                      {latestWebsiteAttempt.servicePhraseMatches.length} service phrase(s),{' '}
+                      {latestWebsiteAttempt.serviceAreaPhraseMatches.length} area phrase(s)
                     </span>
                   </>
                 ) : (
                   <>
                     <span className="scan-status scan-status-gray">
-                      Scan access: Gray - automated scan blocked or unavailable
+                      Scan access: Gray - needs manual review
                     </span>
                     <span className="blocked-message">
-                      Website blocked automated scan — manual review required.
+                      Automated homepage access blocked
                     </span>
-                    <span>{websiteAudit.details}</span>
-                    <span>Requested: {websiteAudit.requestedUrl}</span>
-                    <span>Redirect: {websiteAudit.redirectUrl}</span>
-                    <span>{websiteAudit.recommendedNextStep}</span>
+                    <span>
+                      The website opens in a browser, but the automated scanner
+                      could not fetch the homepage. This is usually caused by
+                      hosting/CDN protection, platform security rules, or
+                      firewall settings, or server-side request blocking. Use
+                      Browser Observation Review for this site.
+                    </span>
+                    <span>Diagnostic detail: {latestWebsiteAttempt.details}</span>
+                    <span>Requested URL: {latestWebsiteAttempt.requestedUrl}</span>
+                    <span>Final URL: {latestWebsiteAttempt.finalUrl || latestWebsiteAttempt.redirectUrl}</span>
+                    <span>HTTP status: {latestWebsiteAttempt.status || 'Unavailable'}</span>
+                    <span>Error type: {latestWebsiteAttempt.errorType}</span>
+                    <span>
+                      Fetch strategy:{' '}
+                      {latestWebsiteAttempt.fetchStrategyUsed?.trim() || 'not recorded'}
+                    </span>
+                    <span>Redirect occurred: {latestWebsiteAttempt.redirectOccurred ? 'Yes' : 'No'}</span>
+                    <span>Redirect count: {latestWebsiteAttempt.redirectCount}</span>
+                    <span>HTTPS fallback tried: {latestWebsiteAttempt.httpsFallbackTried ? 'Yes' : 'No'}</span>
+                    <span>Blocked/forbidden: {latestWebsiteAttempt.blocked ? 'Yes' : 'No'}</span>
+                    <span>Timestamp: {new Date(latestWebsiteAttempt.timestamp).toLocaleString()}</span>
+                    <span>{latestWebsiteAttempt.recommendedNextStep}</span>
                   </>
                 )}
               </div>
             ) : null}
+            {lastSuccessfulWebsiteAudit && !latestWebsiteAttempt?.ok ? (
+              <div className="auto-audit-result successful-audit-result">
+                <strong>Last successful audit</strong>
+                <span>{new Date(lastSuccessfulWebsiteAudit.analyzedAt).toLocaleString()}</span>
+                <span>Final URL: {lastSuccessfulWebsiteAudit.fetchedUrl}</span>
+                <span>
+                  Previous successful Website SEO findings are still preserved
+                  and are not reduced solely because the latest scan was blocked.
+                </span>
+              </div>
+            ) : null}
           </div>
+          {!latestWebsiteAttempt?.ok ? (
+            <div className="manual-website-observation">
+              <div>
+                <p className="eyebrow">Manual Website Observation</p>
+                <h3>Browser Observation Review</h3>
+                <p>
+                  If the website opens in your browser but blocks automated
+                  scanning, paste visible homepage text, page title/meta details,
+                  links, or page source snippets here for assisted review.
+                </p>
+                <p>
+                  Future note: an Enhanced Browser Check could support
+                  operator-opened or browser-rendered page analysis, but this
+                  version keeps review manual and authorized.
+                </p>
+              </div>
+              <div className="manual-website-grid">
+                <label>
+                  Observed page title
+                  <input
+                    value={auditState.websiteAudit.manualObservation.observedTitle}
+                    onChange={(event) =>
+                      setManualWebsiteObservation({
+                        observedTitle: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  Observed meta description
+                  <textarea
+                    value={
+                      auditState.websiteAudit.manualObservation
+                        .observedMetaDescription
+                    }
+                    onChange={(event) =>
+                      setManualWebsiteObservation({
+                        observedMetaDescription: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+                <label className="full-width-label">
+                  Visible homepage text
+                  <textarea
+                    className="large-textarea"
+                    value={
+                      auditState.websiteAudit.manualObservation
+                        .visibleHomepageText
+                    }
+                    onChange={(event) =>
+                      setManualWebsiteObservation({
+                        visibleHomepageText: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+                <label className="full-width-label">
+                  Observed links / URLs
+                  <textarea
+                    value={auditState.websiteAudit.manualObservation.observedLinks}
+                    onChange={(event) =>
+                      setManualWebsiteObservation({
+                        observedLinks: event.target.value,
+                      })
+                    }
+                    placeholder="Paste visible navigation, contact, service, social, or booking URLs."
+                  />
+                </label>
+                <label className="full-width-label">
+                  Observed schema/source snippet, optional
+                  <textarea
+                    value={
+                      auditState.websiteAudit.manualObservation
+                        .observedSchemaSnippet
+                    }
+                    onChange={(event) =>
+                      setManualWebsiteObservation({
+                        observedSchemaSnippet: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+                <label className="full-width-label">
+                  Notes
+                  <textarea
+                    value={auditState.websiteAudit.manualObservation.notes}
+                    onChange={(event) =>
+                      setManualWebsiteObservation({ notes: event.target.value })
+                    }
+                  />
+                </label>
+              </div>
+              <button type="button" onClick={analyzeManualObservation}>
+                Analyze Manual Website Observation
+              </button>
+              {auditState.websiteAudit.manualObservation.analyzedAt ? (
+                <p className="method-guidance">
+                  Manual observation analyzed{' '}
+                  {new Date(
+                    auditState.websiteAudit.manualObservation.analyzedAt,
+                  ).toLocaleString()}
+                  . Findings are labeled as based on operator-provided website
+                  observation.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </AuditSection>
       )
     }

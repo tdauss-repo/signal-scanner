@@ -1,3 +1,9 @@
+import type {
+  ManualWebsiteObservation,
+  WebsiteAuditResponse,
+  WebsiteAuditResult,
+} from './websiteAudit.js'
+
 export type TrafficStatus = 'Green' | 'Yellow' | 'Red' | 'Gray'
 
 export type CheckStatus = 'pass' | 'partial' | 'fail' | 'unknown'
@@ -71,12 +77,19 @@ export interface AuditState {
   profile: BusinessProfile
   lastUpdated: string
   reportSummary: string
+  websiteAudit: WebsiteAuditWorkspaceState
   selectedAIPlatform: AIAnswerPlatform
   aiAnswerTests: Record<AIAnswerPlatform, AIAnswerTestState>
   searchVisibilityTests: Record<string, SearchVisibilityTestState>
   voicePromptTests: Record<string, VoicePromptTestState>
   directories: DirectoryAuditState
   manualFixes: FixItem[]
+}
+
+export interface WebsiteAuditWorkspaceState {
+  lastSuccessful: WebsiteAuditResult | null
+  latestAttempt: WebsiteAuditResponse | null
+  manualObservation: ManualWebsiteObservation
 }
 
 export interface SavedScanRecord {

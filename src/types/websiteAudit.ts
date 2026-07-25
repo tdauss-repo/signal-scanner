@@ -2,6 +2,8 @@ export interface WebsiteAuditResult {
   ok: true
   normalizedUrl: string
   fetchedUrl: string
+  fetchStrategyUsed: string
+  redirectCount: number
   title: string
   metaDescription: string
   canonicalUrl: string
@@ -28,16 +30,35 @@ export interface WebsiteAuditResult {
 
 export interface WebsiteAuditBlockedResult {
   ok: false
-  status: 403
+  status: number
+  statusText?: string
   error: string
+  errorType: string
   details: string
   recommendedNextStep: string
   requestedUrl: string
+  normalizedUrl?: string
   redirectUrl: string
+  finalUrl?: string
+  redirectOccurred: boolean
+  redirectCount: number
+  blocked: boolean
+  fetchStrategyUsed: string
+  httpsFallbackTried: boolean
   timestamp: string
 }
 
 export type WebsiteAuditResponse = WebsiteAuditResult | WebsiteAuditBlockedResult
+
+export interface ManualWebsiteObservation {
+  observedTitle: string
+  observedMetaDescription: string
+  visibleHomepageText: string
+  observedLinks: string
+  observedSchemaSnippet: string
+  notes: string
+  analyzedAt: string
+}
 
 export interface AutoAuditMapping {
   statuses: Record<string, 'pass' | 'partial' | 'fail'>

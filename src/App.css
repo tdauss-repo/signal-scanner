@@ -1006,6 +1006,37 @@ button.ghost {
   font-size: 13px;
 }
 
+.successful-audit-result {
+  background: #f4fbf6;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.manual-website-observation {
+  background: #fffaf0;
+  border: 1px solid #f4d79b;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+}
+
+.manual-website-observation h3 {
+  margin: 4px 0 0;
+}
+
+.manual-website-observation p {
+  color: var(--muted);
+  margin: 6px 0 0;
+}
+
+.manual-website-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .scan-status,
 .blocked-message {
   border-radius: 999px;
@@ -1983,6 +2014,7 @@ button.ghost {
   .ai-classification-grid,
   .ai-platform-coverage-list,
   .listings-overview-panel,
+  .manual-website-grid,
   .core-listing-grid,
   .search-observation-grid,
   .voice-source-grid,

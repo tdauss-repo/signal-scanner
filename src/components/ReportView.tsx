@@ -88,7 +88,15 @@ const customerFindingSummaryForFix = (
   notes: Record<string, string>,
 ) => {
   if (isHomepageSeoClarityFix(fix)) {
+    const homepageNote = notes['website-homepage-clarity'] ?? fix.evidenceNote ?? ''
+    const observationPrefix = /operator-provided website observation/i.test(
+      homepageNote,
+    )
+      ? 'Based on operator-provided website observation. '
+      : ''
+
     return `The website is live and clearly connected to ${profile.businessName}, but the homepage could communicate services, service areas, contact paths, FAQ content, and structured local business information more clearly. The detailed scan also found supporting technical evidence that should remain in the internal appendix.`
+      .replace(/^/, observationPrefix)
   }
 
   const raw = fix.evidenceNote || notes[fix.id] || ''
