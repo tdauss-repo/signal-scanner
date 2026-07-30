@@ -1707,6 +1707,7 @@ button.ghost {
 .fix-table-cell {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
 .fix-table-cell strong {
@@ -1721,7 +1722,9 @@ button.ghost {
   font-size: 12px;
   line-height: 1.45;
   margin: 0;
+  overflow-wrap: anywhere;
   white-space: pre-line;
+  word-break: break-word;
 }
 
 .empty-state {
@@ -2122,4 +2125,28 @@ button.ghost {
     min-height: auto;
     resize: none;
   }
+}
+
+.scanner-diagnostics {
+  margin-top: 0.35rem;
+  max-width: 100%;
+  font-size: 0.78rem;
+}
+
+.scanner-diagnostics summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.scanner-diagnostics p,
+.scanner-diagnostics li,
+.scanner-diagnostics span,
+.scanner-diagnostics em {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.scanner-diagnostics ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
 }

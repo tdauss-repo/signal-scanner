@@ -50,7 +50,7 @@ const contactStructureEvidence = (
   profile: BusinessProfile,
 ) => {
   if (!hasDocumentedMultiContactSetup(profile)) {
-    return note('Phone/contact interpretation', result.phoneNumberMatches)
+    return note('Direct phone matches detected on homepage', result.phoneNumberMatches)
   }
 
   return [
@@ -153,6 +153,11 @@ export const mapAutoAuditToWebsiteChecks = (
   const hasMeta = result.metaDescription.length >= 70
   const hasFaq = result.faqIndicators.length > 0
   const statuses: AutoAuditMapping['statuses'] = {
+    'website-https': result.httpsAvailable
+      ? result.httpRedirectsToHttps
+        ? 'pass'
+        : 'partial'
+      : 'fail',
     'website-title': titleStatus(result, profile),
     'website-meta-description': hasMeta
       ? 'pass'
@@ -194,6 +199,14 @@ export const mapAutoAuditToWebsiteChecks = (
   }
 
   const notes: AutoAuditMapping['notes'] = {
+    'website-https': [
+      note('Fetched homepage URL', result.fetchedUrl),
+      note('HTTPS available', result.httpsAvailable),
+      note('HTTPS status', result.httpsStatus ?? 'Unavailable'),
+      note('HTTP available', result.httpAvailable),
+      note('HTTP status', result.httpStatus ?? 'Unavailable'),
+      note('HTTP redirects to HTTPS', result.httpRedirectsToHttps),
+    ].join('\n'),
     'website-title': [
       note('Title', result.title),
       note('Canonical', result.canonicalUrl),
@@ -230,7 +243,7 @@ export const mapAutoAuditToWebsiteChecks = (
     'website-faq': note('FAQ indicators', result.faqIndicators),
     'website-mobile-conversion': [
       contactStructureEvidence(result, profile),
-      note('Contact or booking links', result.contactLinks),
+      `Contact/registration paths detected: ${formatLinkEvidence(result.contactLinkEvidence)}`,
     ].join('\n'),
     'website-social-links': note(
       'Social profile links',
@@ -251,10 +264,35 @@ export const mapAutoAuditToWebsiteChecks = (
   return { statuses, notes }
 }
 
+const formatLinkEvidence = (links: WebsiteAuditResult['contactLinkEvidence']) => {
+  if (!links.length) return 'None found'
+  return links
+    .map((link) => {
+      const label = link.anchorText ? `“${link.anchorText}”` : '(no anchor text)'
+      return `${label} → ${link.url} [${link.sourceRegion}; ${link.internal ? 'internal' : 'external'}; ${link.reason}]`
+    })
+    .join('\n')
+}
+
 const normalizeDigits = (value: string) => value.replace(/\D/g, '')
 
 const containsAny = (haystack: string, needles: string[]) =>
   needles.some((needle) => needle && haystack.includes(needle.toLowerCase()))
+
+const manualObservedLinkHasContactIntent = (link: string) => {
+  const trimmed = link.trim()
+  if (/^(tel:|mailto:)/i.test(trimmed)) return true
+  try {
+    const url = new URL(trimmed, 'https://manual-observation.invalid')
+    return /(?:^|[-_/])(contact(?:-us)?|book(?:ing)?|schedule|appointment|inquir(?:e|y)|call|register|registration)(?:[-_/]|$)/i.test(
+      url.pathname,
+    )
+  } catch {
+    return /(?:^|[-_/])(contact(?:-us)?|book(?:ing)?|schedule|appointment|inquir(?:e|y)|call|register|registration)(?:[-_/]|$)/i.test(
+      trimmed.split(/[?#]/, 1)[0] ?? '',
+    )
+  }
+}
 
 const manualNote = (label: string, value: string | string[] | boolean) =>
   note(
@@ -330,9 +368,7 @@ export const analyzeManualWebsiteObservation = (
   })().toLowerCase()
   const websiteDomainFound =
     Boolean(websiteDomain) && visibleCombined.includes(websiteDomain)
-  const contactLinkFound = links.some((link) =>
-    /contact|booking|inquire|call|tel:/i.test(link),
-  )
+  const contactLinkFound = links.some(manualObservedLinkHasContactIntent)
   const serviceLinkMatches = links.filter((link) =>
     services.some((service) => {
       const normalizedService = service.toLowerCase().replace(/\s+/g, '-')
@@ -508,7 +544,19 @@ export const runWebsiteAutoAudit = async (profile: BusinessProfile) => {
     }),
   })
 
-  const payload = (await response.json()) as WebsiteAuditResponse | { error: string }
+  const responseText = await response.text()
+  let payload: WebsiteAuditResponse | { error: string }
+
+  try {
+    payload = responseText
+      ? (JSON.parse(responseText) as WebsiteAuditResponse | { error: string })
+      : { error: 'Website scanner API returned an empty response.' }
+  } catch {
+    throw new Error(
+      `Website scanner API returned an unreadable response (HTTP ${response.status}).`,
+    )
+  }
+
   if (!response.ok) {
     throw new Error('error' in payload ? payload.error : 'Website audit failed.')
   }

@@ -6,6 +6,16 @@ export interface WebsiteAuditRequest {
   serviceAreas: string[]
 }
 
+
+export interface LinkEvidence {
+  url: string
+  anchorText: string
+  sourceRegion: 'header' | 'navigation' | 'footer' | 'body'
+  internal: boolean
+  classification: 'contact' | 'rejected-contact-candidate' | 'other'
+  reason: string
+}
+
 export interface WebsiteAuditResult {
   ok: true
   normalizedUrl: string
@@ -28,11 +38,18 @@ export interface WebsiteAuditResult {
   faqIndicators: string[]
   hasContactLink: boolean
   contactLinks: string[]
+  contactLinkEvidence: LinkEvidence[]
+  rejectedContactCandidates: LinkEvidence[]
   socialProfileLinks: string[]
   sitemapAvailable: boolean
   robotsAvailable: boolean
   homepageStatus: number
   contentLength: number
+  httpsAvailable: boolean
+  httpsStatus: number | null
+  httpAvailable: boolean
+  httpStatus: number | null
+  httpRedirectsToHttps: boolean
   analyzedAt: string
 }
 
@@ -53,6 +70,8 @@ export interface WebsiteAuditBlockedResult {
   blocked: boolean
   fetchStrategyUsed: string
   httpsFallbackTried: boolean
+  protocolFallbackTried: boolean
+  wwwFallbackTried: boolean
   timestamp: string
 }
 
@@ -81,10 +100,12 @@ const compatibleScannerHeaders = {
 
 export class WebsiteAuditError extends Error {
   statusCode: number
+  errorType: string
 
-  constructor(message: string, statusCode = 400) {
+  constructor(message: string, statusCode = 400, errorType = 'request_error') {
     super(message)
     this.statusCode = statusCode
+    this.errorType = errorType
   }
 }
 
@@ -109,48 +130,121 @@ const normalizeWebsiteUrl = (website: string) => {
     throw new WebsiteAuditError('Website URL must use http or https.')
   }
 
-  if (url.protocol === 'http:') {
-    url.protocol = 'https:'
-  }
   url.hash = ''
   return url
+}
+
+const toggleWww = (url: URL) => {
+  const toggled = new URL(url.toString())
+  toggled.hostname = /^www\./i.test(toggled.hostname)
+    ? toggled.hostname.replace(/^www\./i, '')
+    : `www.${toggled.hostname}`
+  return toggled
+}
+
+const toggleProtocol = (url: URL) => {
+  const toggled = new URL(url.toString())
+  toggled.protocol = url.protocol === 'https:' ? 'http:' : 'https:'
+  return toggled
+}
+
+const pathVariants = (url: URL) => {
+  const variants = [new URL(url.toString())]
+  const alternate = new URL(url.toString())
+
+  if (url.pathname === '' || url.pathname === '/') {
+    alternate.pathname = url.pathname === '/' ? '' : '/'
+  } else if (url.pathname.endsWith('/')) {
+    alternate.pathname = url.pathname.replace(/\/+$/, '')
+  } else {
+    alternate.pathname = `${url.pathname}/`
+  }
+
+  if (alternate.toString() !== url.toString()) variants.push(alternate)
+  return variants
+}
+
+export const buildWebsiteUrlVariants = (website: string) => {
+  const normalized = normalizeWebsiteUrl(website)
+  const bases = [
+    normalized,
+    toggleProtocol(normalized),
+    toggleWww(normalized),
+    toggleProtocol(toggleWww(normalized)),
+  ]
+  const seen = new Set<string>()
+  const variants: URL[] = []
+
+  for (const base of bases) {
+    for (const variant of pathVariants(base)) {
+      const key = variant.toString()
+      if (!seen.has(key)) {
+        seen.add(key)
+        variants.push(variant)
+      }
+    }
+  }
+
+  return variants
 }
 
 const failureResult = (
   requestedUrl: string,
   normalizedUrl: URL,
+  attemptedUrl: URL,
   response: Response | null,
   errorType: string,
   details: string,
   fetchStrategyUsed: string,
   redirectCount: number,
-  httpsFallbackTried: boolean,
+  protocolFallbackTried: boolean,
+  wwwFallbackTried: boolean,
 ): WebsiteAuditBlockedResult => {
-  const finalUrl = response?.url || normalizedUrl.toString()
+  const finalUrl = response?.url || attemptedUrl.toString()
   const status = response?.status ?? 0
-  const blocked = status === 403 || /blocked|forbidden|timed out|unable/i.test(details)
+  const blocked = status === 403 || errorType === 'http_forbidden'
+  const error =
+    errorType === 'dns_resolution'
+      ? 'Website hostname could not be resolved'
+      : errorType === 'tls_certificate'
+        ? 'Website HTTPS certificate could not be verified'
+        : errorType === 'timeout'
+          ? 'Website did not respond before the scan timed out'
+          : errorType === 'connection_error'
+            ? 'Automated website check could not connect'
+            : blocked
+              ? 'Automated homepage access blocked'
+              : 'Website automated scan failed.'
+  const recommendedNextStep =
+    errorType === 'dns_resolution'
+      ? 'The scanner could not resolve this hostname from the backend environment. Confirm the site in a browser, then use Browser Observation Review if it remains reachable there.'
+      : errorType === 'tls_certificate'
+        ? 'The HTTPS certificate could not be verified by the scanner. The scan also tests the HTTP variant when appropriate; if no safe automated path succeeds, verify the site in a browser and use Browser Observation Review.'
+        : errorType === 'timeout' || errorType === 'connection_error'
+          ? 'The automated scanner could not establish a usable connection. Confirm browser access and use Browser Observation Review if needed.'
+          : blocked
+            ? 'The website host refused the automated request even though the site may open normally in a browser. Use Browser Observation Review for this site.'
+            : 'Retry later or complete a manual website review.'
 
   return {
     ok: false,
     status,
     statusText: response?.statusText,
-    error: blocked
-      ? 'Automated homepage access blocked'
-      : 'Website automated scan failed.',
+    error,
     errorType,
     details,
-    recommendedNextStep: blocked
-      ? 'The website opens in a browser, but the automated scanner could not fetch the homepage. This is usually caused by hosting/CDN protection, platform security rules, firewall settings, or server-side request blocking. Use Browser Observation Review for this site.'
-      : 'Retry later or complete a manual website review.',
+    recommendedNextStep,
     requestedUrl,
     normalizedUrl: normalizedUrl.toString(),
     redirectUrl: finalUrl,
     finalUrl,
-    redirectOccurred: finalUrl !== normalizedUrl.toString(),
+    redirectOccurred: Boolean(response?.redirected),
     redirectCount,
     blocked,
     fetchStrategyUsed,
-    httpsFallbackTried,
+    httpsFallbackTried: protocolFallbackTried,
+    protocolFallbackTried,
+    wwwFallbackTried,
     timestamp: new Date().toISOString(),
   }
 }
@@ -228,7 +322,7 @@ const fetchWithLimit = async (
   } catch (error) {
     if (error instanceof WebsiteAuditError) throw error
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new WebsiteAuditError('Website fetch timed out.', 504)
+      throw new WebsiteAuditError('Website fetch timed out.', 504, 'timeout')
     }
     const cause = (error as Error & { cause?: { code?: string; message?: string } })
       .cause
@@ -239,6 +333,21 @@ const fetchWithLimit = async (
       throw new WebsiteAuditError(
         `Website TLS certificate chain could not be verified by the backend fetch runtime. ${cause.message ?? ''}`.trim(),
         526,
+        'tls_certificate',
+      )
+    }
+    if (cause?.code && /ENOTFOUND|EAI_AGAIN/i.test(cause.code)) {
+      throw new WebsiteAuditError(
+        `The scanner could not resolve the website hostname. ${cause.message ?? ''}`.trim(),
+        502,
+        'dns_resolution',
+      )
+    }
+    if (cause?.code && /ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH/i.test(cause.code)) {
+      throw new WebsiteAuditError(
+        `The scanner could not establish a connection to the website. ${cause.message ?? ''}`.trim(),
+        502,
+        'connection_error',
       )
     }
     throw new WebsiteAuditError(
@@ -246,31 +355,12 @@ const fetchWithLimit = async (
         ? `Unable to fetch the website homepage. ${cause.message}`
         : 'Unable to fetch the website homepage.',
       502,
+      'fetch_error',
     )
   } finally {
     clearTimeout(timeout)
   }
 }
-
-const urlVariants = (url: URL) => {
-  const variants: URL[] = [url]
-  const pathIsRoot = url.pathname === '' || url.pathname === '/'
-  const alternate = new URL(url.toString())
-
-  if (pathIsRoot) {
-    alternate.pathname = url.pathname === '/' ? '' : '/'
-  } else if (url.pathname.endsWith('/')) {
-    alternate.pathname = url.pathname.replace(/\/+$/, '')
-  } else {
-    alternate.pathname = `${url.pathname}/`
-  }
-
-  if (alternate.toString() !== url.toString()) variants.push(alternate)
-  return variants
-}
-
-const originalRequestedHttp = (website: string) =>
-  /^http:\/\//i.test(website.trim())
 
 const concatChunks = (chunks: Uint8Array[], totalLength: number) => {
   const combined = new Uint8Array(totalLength)
@@ -389,16 +479,83 @@ const collectSchemaTypes = (value: unknown, found = new Set<string>()) => {
   return found
 }
 
-const extractLinks = (html: string, baseUrl: URL) =>
-  [...html.matchAll(/<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>/gi)]
+const elementRanges = (html: string, tagName: string) =>
+  [...html.matchAll(new RegExp(`<${tagName}\\b[\\s\\S]*?<\\/${tagName}>`, 'gi'))].map(
+    (match) => ({ start: match.index ?? 0, end: (match.index ?? 0) + match[0].length }),
+  )
+
+const linkSourceRegion = (
+  index: number,
+  regions: Record<'header' | 'navigation' | 'footer', Array<{ start: number; end: number }>>,
+): LinkEvidence['sourceRegion'] => {
+  if (regions.navigation.some((range) => index >= range.start && index < range.end)) return 'navigation'
+  if (regions.header.some((range) => index >= range.start && index < range.end)) return 'header'
+  if (regions.footer.some((range) => index >= range.start && index < range.end)) return 'footer'
+  return 'body'
+}
+
+const contactIntentPattern = /\b(contact(?: us)?|book(?:ing)?|schedule|appointment|inquir(?:e|y)|call|register|registration)\b/i
+const contactPathSegmentPattern = /(?:^|[-_/])(contact(?:-us)?|book(?:ing)?|schedule|appointment|inquir(?:e|y)|call|register|registration)(?:[-_/]|$)/i
+const legacyLooseContactPattern = /contact|booking|inquire|call/i
+
+const classifyLink = (
+  url: URL,
+  anchorText: string,
+  baseUrl: URL,
+  sourceRegion: LinkEvidence['sourceRegion'],
+): LinkEvidence => {
+  const internal = url.hostname.replace(/^www\./i, '') === baseUrl.hostname.replace(/^www\./i, '')
+  const href = url.toString()
+  const protocolContact = ['tel:', 'mailto:'].includes(url.protocol)
+  const anchorContact = contactIntentPattern.test(anchorText)
+  const pathContact = contactPathSegmentPattern.test(url.pathname)
+
+  if (protocolContact) {
+    return { url: href, anchorText, sourceRegion, internal, classification: 'contact', reason: `${url.protocol.slice(0, -1)} link` }
+  }
+  if (anchorContact) {
+    return { url: href, anchorText, sourceRegion, internal, classification: 'contact', reason: 'anchor text expresses contact/booking intent' }
+  }
+  if (internal && pathContact) {
+    return { url: href, anchorText, sourceRegion, internal, classification: 'contact', reason: 'internal path expresses contact/booking intent' }
+  }
+
+  // Preserve diagnostics for URLs that the old loose substring matcher would have accepted.
+  // Example: `/Recalls?...` contains the letters "call" inside "recalls" but is not a call/contact link.
+  if (legacyLooseContactPattern.test(href)) {
+    return {
+      url: href,
+      anchorText,
+      sourceRegion,
+      internal,
+      classification: 'rejected-contact-candidate',
+      reason: 'contact-like text appears only as a loose URL substring; no supported contact intent was found',
+    }
+  }
+
+  return { url: href, anchorText, sourceRegion, internal, classification: 'other', reason: 'no contact intent detected' }
+}
+
+const extractLinkEvidence = (html: string, baseUrl: URL) => {
+  const regions = {
+    header: elementRanges(html, 'header'),
+    navigation: elementRanges(html, 'nav'),
+    footer: elementRanges(html, 'footer'),
+  }
+
+  return [...html.matchAll(/<a\b([^>]*)href\s*=\s*["']([^"']+)["']([^>]*)>([\s\S]*?)<\/a>/gi)]
     .map((match) => {
       try {
-        return new URL(match[1] ?? '', baseUrl).toString()
+        const url = new URL(match[2] ?? '', baseUrl)
+        const anchorText = cleanText(stripTags(match[4] ?? ''))
+        const sourceRegion = linkSourceRegion(match.index ?? 0, regions)
+        return classifyLink(url, anchorText, baseUrl, sourceRegion)
       } catch {
-        return ''
+        return null
       }
     })
-    .filter(Boolean)
+    .filter((value): value is LinkEvidence => value !== null)
+}
 
 const unique = <T>(items: T[]) => [...new Set(items)]
 
@@ -417,12 +574,67 @@ const checkAvailability = async (baseUrl: URL, path: string) => {
   }
 }
 
+
+const probeUrl = async (url: URL) => {
+  try {
+    const { response } = await fetchWithLimit(url, 'GET', browserLikeHeaders)
+    return {
+      available: response.ok,
+      status: response.status,
+      finalUrl: response.url || url.toString(),
+    }
+  } catch {
+    return { available: false, status: null, finalUrl: url.toString() }
+  }
+}
+
+const inspectTransportSecurity = async (fetchedBaseUrl: URL) => {
+  const httpsUrl = new URL(fetchedBaseUrl.toString())
+  httpsUrl.protocol = 'https:'
+  const httpUrl = new URL(fetchedBaseUrl.toString())
+  httpUrl.protocol = 'http:'
+
+  const [httpsProbe, httpProbe] = await Promise.all([
+    fetchedBaseUrl.protocol === 'https:'
+      ? Promise.resolve({ available: true, status: 200, finalUrl: fetchedBaseUrl.toString() })
+      : probeUrl(httpsUrl),
+    fetchedBaseUrl.protocol === 'http:'
+      ? Promise.resolve({ available: true, status: 200, finalUrl: fetchedBaseUrl.toString() })
+      : probeUrl(httpUrl),
+  ])
+
+  return {
+    httpsAvailable: httpsProbe.available,
+    httpsStatus: httpsProbe.status,
+    httpAvailable: httpProbe.available,
+    httpStatus: httpProbe.status,
+    httpRedirectsToHttps:
+      httpProbe.available && /^https:/i.test(httpProbe.finalUrl),
+  }
+}
+
+const failurePriority = (attempt: WebsiteAuditBlockedResult) => {
+  if (attempt.errorType === 'http_forbidden') return 100
+  if (attempt.errorType === 'http_error') return 90
+  if (attempt.errorType === 'tls_certificate') return 80
+  if (attempt.errorType === 'dns_resolution') return 70
+  if (attempt.errorType === 'timeout') return 60
+  if (attempt.errorType === 'connection_error') return 50
+  return 10
+}
+
+const bestFailureAttempt = (attempts: WebsiteAuditBlockedResult[]) =>
+  attempts.reduce<WebsiteAuditBlockedResult | undefined>((best, attempt) => {
+    if (!best || failurePriority(attempt) > failurePriority(best)) return attempt
+    return best
+  }, undefined)
+
 export const auditWebsite = async (
   request: WebsiteAuditRequest,
 ): Promise<WebsiteAuditResult | WebsiteAuditBlockedResult> => {
   const requestedUrl = request.website.trim()
   const url = normalizeWebsiteUrl(request.website)
-  const httpsFallbackTried = originalRequestedHttp(request.website)
+  const variants = buildWebsiteUrlVariants(request.website)
   const strategies = [
     { name: 'normal fetch', headers: defaultHeaders },
     { name: 'compatible scanner browser-like headers', headers: compatibleScannerHeaders },
@@ -441,11 +653,14 @@ export const auditWebsite = async (
   logWebsiteAuditAttempt('start', {
     requestedUrl,
     normalizedUrl: url.toString(),
-    httpsFallbackTried,
-    variants: urlVariants(url).map((variant) => variant.toString()),
+    variants: variants.map((variant) => variant.toString()),
   })
 
-  for (const variant of urlVariants(url)) {
+  let successfulAttemptUrl: URL | null = null
+  const originalHost = url.hostname
+  const originalProtocol = url.protocol
+
+  for (const variant of variants) {
     for (const strategy of strategies) {
       try {
         const result = await fetchWithLimit(variant, 'GET', strategy.headers)
@@ -465,10 +680,12 @@ export const auditWebsite = async (
           userAgent: strategy.headers['user-agent'],
           fetchStrategyUsed,
           redirectCount,
-          httpsFallbackTried,
+          protocolFallbackTried: variant.protocol !== originalProtocol,
+          wwwFallbackTried: variant.hostname !== originalHost,
         })
 
         if (response.ok && body.trim()) {
+          successfulAttemptUrl = variant
           break
         }
 
@@ -476,6 +693,7 @@ export const auditWebsite = async (
           failureResult(
             requestedUrl,
             url,
+            variant,
             response,
             response.status === 403 ? 'http_forbidden' : 'http_error',
             response.status === 403
@@ -483,17 +701,13 @@ export const auditWebsite = async (
               : `Homepage returned HTTP ${response.status} ${response.statusText || ''}.`.trim(),
             fetchStrategyUsed,
             redirectCount,
-            httpsFallbackTried,
+            variant.protocol !== originalProtocol,
+            variant.hostname !== originalHost,
           ),
         )
       } catch (error) {
         if (error instanceof WebsiteAuditError && error.statusCode !== 400) {
-          const errorType =
-            error.statusCode === 504
-              ? 'timeout'
-              : error.statusCode === 526
-                ? 'tls_certificate'
-                : 'fetch_error'
+          const errorType = error.errorType
           const fetchStrategy = `${strategy.name} (${variant.toString()})`
           logWebsiteAuditAttempt('attempt error', {
             requestedUrl,
@@ -504,20 +718,24 @@ export const auditWebsite = async (
             errorType,
             message: error.message,
             stack: error.stack,
-            httpsFallbackTried,
+            protocolFallbackTried: variant.protocol !== originalProtocol,
+            wwwFallbackTried: variant.hostname !== originalHost,
           })
           attempts.push(
             failureResult(
               requestedUrl,
               url,
+              variant,
               null,
               errorType,
               error.message,
               fetchStrategy,
               0,
-              httpsFallbackTried,
+              variant.protocol !== originalProtocol,
+              variant.hostname !== originalHost,
             ),
           )
+          if (errorType === 'dns_resolution' || errorType === 'tls_certificate') break
           continue
         }
         throw error
@@ -530,23 +748,37 @@ export const auditWebsite = async (
   }
 
   if (!response || !response.ok || !body.trim()) {
-    const lastAttempt = attempts.at(-1)
-    return (
-      lastAttempt ??
-      failureResult(
-        requestedUrl,
-        url,
-        null,
-        'fetch_error',
-        'Unable to fetch usable homepage HTML with safe request strategies.',
-        'No strategy completed',
-        0,
-        httpsFallbackTried,
-      )
+    const protocolFallbackTried = variants.some(
+      (variant) => variant.protocol !== originalProtocol,
+    )
+    const wwwFallbackTried = variants.some(
+      (variant) => variant.hostname !== originalHost,
+    )
+    const selectedAttempt = bestFailureAttempt(attempts)
+    if (selectedAttempt) {
+      return {
+        ...selectedAttempt,
+        protocolFallbackTried,
+        wwwFallbackTried,
+        httpsFallbackTried: protocolFallbackTried,
+      }
+    }
+
+    return failureResult(
+      requestedUrl,
+      url,
+      variants.at(-1) ?? url,
+      null,
+      'fetch_error',
+      'Unable to fetch usable homepage HTML with safe request strategies.',
+      'No strategy completed',
+      0,
+      protocolFallbackTried,
+      wwwFallbackTried,
     )
   }
 
-  const fetchedUrl = response.url || url.toString()
+  const fetchedUrl = response.url || successfulAttemptUrl?.toString() || url.toString()
   const fetchedBaseUrl = new URL(fetchedUrl)
   const title = firstMatch(body, /<title[^>]*>([\s\S]*?)<\/title>/i)
   const metaDescription = firstMatch(
@@ -560,7 +792,8 @@ export const auditWebsite = async (
   const h1Text = allMatches(body, /<h1\b[^>]*>([\s\S]*?)<\/h1>/gi)
   const h2Text = allMatches(body, /<h2\b[^>]*>([\s\S]*?)<\/h2>/gi)
   const visibleText = cleanText(stripTags(body))
-  const links = extractLinks(body, fetchedBaseUrl)
+  const linkEvidence = extractLinkEvidence(body, fetchedBaseUrl)
+  const links = linkEvidence.map((link) => link.url)
   const jsonLdSchemaBlocks = parseJsonLd(body)
   const detectedSchemaTypes = unique(
     jsonLdSchemaBlocks.flatMap((block) => [...collectSchemaTypes(block)]),
@@ -591,16 +824,21 @@ export const auditWebsite = async (
       return linkLower.includes(serviceSlug) || linkLower.includes(servicePlain)
     }),
   )
-  const contactLinks = links.filter((link) => /contact|booking|inquire|call/i.test(link))
+  const contactLinkEvidence = linkEvidence.filter((link) => link.classification === 'contact')
+  const rejectedContactCandidates = linkEvidence.filter(
+    (link) => link.classification === 'rejected-contact-candidate',
+  )
+  const contactLinks = contactLinkEvidence.map((link) => link.url)
   const socialProfileLinks = links.filter((link) =>
     /facebook\.com|instagram\.com|linkedin\.com|youtube\.com|tiktok\.com|pinterest\.com|x\.com|twitter\.com/i.test(
       link,
     ),
   )
 
-  const [sitemapAvailable, robotsAvailable] = await Promise.all([
+  const [sitemapAvailable, robotsAvailable, transportSecurity] = await Promise.all([
     checkAvailability(fetchedBaseUrl, '/sitemap.xml'),
     checkAvailability(fetchedBaseUrl, '/robots.txt'),
+    inspectTransportSecurity(fetchedBaseUrl),
   ])
 
   return {
@@ -625,11 +863,14 @@ export const auditWebsite = async (
     faqIndicators,
     hasContactLink: contactLinks.length > 0,
     contactLinks: unique(contactLinks).slice(0, 12),
+    contactLinkEvidence: contactLinkEvidence.slice(0, 12),
+    rejectedContactCandidates: rejectedContactCandidates.slice(0, 12),
     socialProfileLinks: unique(socialProfileLinks).slice(0, 12),
     sitemapAvailable,
     robotsAvailable,
     homepageStatus: response.status,
     contentLength: body.length,
+    ...transportSecurity,
     analyzedAt: new Date().toISOString(),
   }
 }

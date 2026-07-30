@@ -137,6 +137,16 @@ export const buildAuditItems = (profile: BusinessProfile): AuditItem[] => {
 
   const websiteItems: AuditItem[] = [
     {
+      id: 'website-https',
+      area: 'website',
+      label: 'HTTPS / secure website connection',
+      description: 'Authorized website scan. Verify that the public website is available over HTTPS and that HTTP traffic is redirected to the secure version.',
+      weight: 14,
+      access: 'public',
+      evidenceLinks: websiteLinks,
+      fix: 'Enable a valid TLS/SSL certificate, make HTTPS the canonical website version, redirect HTTP traffic to HTTPS, and update canonical/internal links where needed.',
+    },
+    {
       id: 'website-title',
       area: 'website',
       label: 'Homepage title quality',
@@ -210,11 +220,11 @@ export const buildAuditItems = (profile: BusinessProfile): AuditItem[] => {
       id: 'website-mobile-conversion',
       area: 'website',
       label: 'Contact info visibility',
-      description: 'Authorized website scan. Confirm phone matches and contact or booking links are visible in homepage HTML.',
+      description: 'Authorized website scan. Check whether direct contact details and clear contact, registration, or booking paths are visible from the homepage.',
       weight: 12,
       access: 'public',
       evidenceLinks: websiteLinks,
-      fix: 'Improve mobile calls to action, contact forms, tap-to-call links, and booking flow clarity.',
+      fix: 'Make direct contact options such as phone, email, or tap-to-call easy to find, and provide clear Contact, Registration, or Booking paths where applicable.',
     },
     {
       id: 'website-social-links',

@@ -12,6 +12,10 @@ const port = Number(process.env.PORT ?? 5174)
 
 app.use(express.json({ limit: '32kb' }))
 
+app.get('/api/health', (_request, response) => {
+  response.json({ ok: true, service: 'business-scanner-tool-api' })
+})
+
 app.post('/api/audit-website', async (request, response) => {
   try {
     const body = request.body as Partial<WebsiteAuditRequest>
@@ -103,6 +107,7 @@ app.use('/api', (_request, response) => {
 })
 
 const jsonErrorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
+  void _next
   if (response.headersSent) return
 
   if (error instanceof SyntaxError) {

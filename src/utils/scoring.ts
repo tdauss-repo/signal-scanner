@@ -34,8 +34,8 @@ export const scoreItems = (
     const status = checks[item.id] ?? 'unknown'
     const points = statusPoints[status]
 
-    possible += item.weight
     if (points !== null) {
+      possible += item.weight
       checked += 1
       earned += item.weight * points
     }
@@ -107,30 +107,32 @@ export const scoreAIAnswerPlatform = (test: AIAnswerTestState): number => {
 export const scoreAIAnswers = (
   tests: Record<AIAnswerPlatform, AIAnswerTestState>,
 ): ScoreResult => {
-  const platformScores = aiAnswerPlatforms.map((platform) =>
-    scoreAIAnswerPlatform(tests[platform]),
-  )
-  const checked = aiAnswerPlatforms.filter(
+  const testedPlatforms = aiAnswerPlatforms.filter(
     (platform) =>
       tests[platform].resultStatus !== 'unknown' &&
       tests[platform].resultStatus !== 'signin_required',
-  ).length
+  )
+  const platformScores = testedPlatforms.map((platform) =>
+    scoreAIAnswerPlatform(tests[platform]),
+  )
+  const checked = testedPlatforms.length
   const unchecked = aiAnswerPlatforms.length - checked
-  const score =
-    platformScores.reduce((sum, platformScore) => sum + platformScore, 0) /
-    aiAnswerPlatforms.length
 
   if (checked === 0) {
     return {
-      score,
+      score: null,
       status: 'Gray',
       statusLabel: 'Not tested',
-      earned: score,
-      possible: 100,
+      earned: 0,
+      possible: 0,
       checked,
       unchecked,
     }
   }
+
+  const score =
+    platformScores.reduce((sum, platformScore) => sum + platformScore, 0) /
+    checked
 
   if (checked < aiAnswerPlatforms.length) {
     return {

@@ -50,17 +50,6 @@ const secondService = (profile: BusinessProfile) =>
 const city = (profile: BusinessProfile) =>
   profile.localMarket || profile.targetLocation || splitList(profile.serviceArea)[0] || ''
 
-const hasContactClarity = (profile: BusinessProfile) =>
-  Boolean(profile.phone.trim()) ||
-  (profile.phoneNumbers ?? []).some(
-    (record) => record.isValidPublicContact && record.number.trim(),
-  )
-
-const hasMultiContactContext = (profile: BusinessProfile) =>
-  (profile.phoneNumbers ?? []).filter(
-    (record) => record.isValidPublicContact && record.number.trim(),
-  ).length <= 1 || Boolean(profile.contactStructureNote.trim())
-
 const aggregateSourceStatus = (
   primaryStatus: CheckStatus | undefined,
   supportingStatuses: Array<CheckStatus | undefined>,
@@ -181,19 +170,9 @@ export const buildVoiceSourceReadinessGroups = (
 }
 
 export const buildVoiceReadinessCategories = (
-  profile: BusinessProfile,
+  _profile: BusinessProfile,
   checks: Record<string, CheckStatus>,
 ): VoiceReadinessCategory[] => {
-  const serviceAreaPresent = Boolean(
-    profile.localMarket.trim() ||
-      profile.targetLocation.trim() ||
-      profile.serviceArea.trim(),
-  )
-  const servicePresent = Boolean(
-    profile.primaryCategory.trim() ||
-      profile.primaryServices.trim() ||
-      profile.industryTags.trim(),
-  )
   const listingStatuses = [
     checks['listing-google'],
     checks['listing-apple'],
@@ -256,9 +235,9 @@ export const buildVoiceReadinessCategories = (
         'Can public sources clearly connect the business name, website, and local identity?',
       sourceSection: 'Business Settings',
       weight: 10,
-      suggestedStatus:
-        profile.businessName.trim() && profile.website.trim() ? 'pass' : 'partial',
-      suggestedReason: 'Derived from business name and website fields.',
+      suggestedStatus: 'unknown',
+      suggestedReason:
+        'Business Settings are source-of-truth inputs, not public visibility evidence. Verify identity through Website SEO and Listings before scoring this readiness signal.',
       recommendedAction:
         'Align the official business name across the website, major listings, social profiles, and directory citations.',
       packageFit: 'Starter Visibility Cleanup',
@@ -270,14 +249,9 @@ export const buildVoiceReadinessCategories = (
         'Are phone/contact paths clear enough for voice-style contact requests?',
       sourceSection: 'Business Settings',
       weight: 12,
-      suggestedStatus:
-        hasContactClarity(profile) && hasMultiContactContext(profile)
-          ? 'pass'
-          : hasContactClarity(profile)
-            ? 'partial'
-            : 'fail',
+      suggestedStatus: 'unknown',
       suggestedReason:
-        'Derived from phone fields and contact structure documentation.',
+        'Entered phone/contact data defines the expected source of truth but does not prove public contact clarity. Verify through Website SEO and Listings before scoring.',
       recommendedAction:
         'Clarify phone/contact details on the website and listings. If multiple valid numbers exist, label each contact path and choose one preferred listing number where required.',
       packageFit: 'Starter Visibility Cleanup',
@@ -289,9 +263,9 @@ export const buildVoiceReadinessCategories = (
         'Can voice-style local searches understand where the business is relevant?',
       sourceSection: 'Business Settings',
       weight: 12,
-      suggestedStatus: serviceAreaPresent ? 'pass' : 'fail',
+      suggestedStatus: 'unknown',
       suggestedReason:
-        'Derived from local market, target location, and service-area fields.',
+        'Entered market/service-area data defines the expected source of truth but does not prove that public sources communicate it. Verify through Website SEO, Listings, or Search Visibility.',
       recommendedAction:
         'Add clearer city, service-area, and nearby-market language to the website, listings, and supporting profiles.',
       packageFit: 'Website SEO Implementation',
@@ -317,9 +291,9 @@ export const buildVoiceReadinessCategories = (
         'Are core services and categories clear enough for conversational service questions?',
       sourceSection: 'Business Settings / Website SEO',
       weight: 12,
-      suggestedStatus: servicePresent ? 'pass' : 'partial',
+      suggestedStatus: 'unknown',
       suggestedReason:
-        'Derived from primary category, primary services, and industry tags.',
+        'Entered category/service data defines the expected source of truth but does not prove public service clarity. Verify through Website SEO and Listings before scoring.',
       recommendedAction:
         'Strengthen service/category wording on the homepage, service pages, listings, and structured data.',
       packageFit: 'Website SEO Implementation',

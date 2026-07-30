@@ -237,7 +237,7 @@ const websiteSignal = (
   website: string,
 ): 'Yes' | 'No' | 'Partial' => {
   if (!website.trim()) return 'No'
-  let domain = ''
+  let domain: string
   try {
     domain = new URL(/^https?:\/\//i.test(website) ? website : `https://${website}`)
       .hostname.replace(/^www\./i, '')
@@ -332,16 +332,7 @@ const manualReviewResponse = (
   fetchedUrl,
   status,
   listingResult: 'manual_review_needed',
-  foundData: {
-    businessNameFound: 'No',
-    phoneFound: 'No',
-    websiteFound: 'No',
-    addressOrServiceAreaFound: 'No',
-    categoryServicesFound: 'No',
-    descriptionFound: 'No',
-    reviewsRatingsVisible: 'No',
-    photosPortfolioVisible: 'No',
-  },
+  foundData: {},
   publicEvidenceNotes:
     'Public page fetch was unavailable or blocked. The operator can still review the page manually and mark the evidence as public page observed.',
   recommendedAction: recommendedActionFor('manual_review_needed'),

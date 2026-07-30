@@ -1,3 +1,12 @@
+export interface LinkEvidence {
+  url: string
+  anchorText: string
+  sourceRegion: 'header' | 'navigation' | 'footer' | 'body'
+  internal: boolean
+  classification: 'contact' | 'rejected-contact-candidate' | 'other'
+  reason: string
+}
+
 export interface WebsiteAuditResult {
   ok: true
   normalizedUrl: string
@@ -20,11 +29,18 @@ export interface WebsiteAuditResult {
   faqIndicators: string[]
   hasContactLink: boolean
   contactLinks: string[]
+  contactLinkEvidence: LinkEvidence[]
+  rejectedContactCandidates: LinkEvidence[]
   socialProfileLinks: string[]
   sitemapAvailable: boolean
   robotsAvailable: boolean
   homepageStatus: number
   contentLength: number
+  httpsAvailable: boolean
+  httpsStatus: number | null
+  httpAvailable: boolean
+  httpStatus: number | null
+  httpRedirectsToHttps: boolean
   analyzedAt: string
 }
 
@@ -45,6 +61,8 @@ export interface WebsiteAuditBlockedResult {
   blocked: boolean
   fetchStrategyUsed: string
   httpsFallbackTried: boolean
+  protocolFallbackTried: boolean
+  wwwFallbackTried: boolean
   timestamp: string
 }
 

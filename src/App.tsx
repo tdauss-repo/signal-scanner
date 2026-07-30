@@ -16,6 +16,7 @@ import { ScoreCard } from './components/ScoreCard'
 import { SearchVisibilityPanel } from './components/SearchVisibilityPanel'
 import { VoiceReadinessPanel } from './components/VoiceReadinessPanel'
 import { buildAuditItems } from './data/auditCatalog'
+import { applyCurrentCatalogMetadata, migrateSystemGeneratedFix } from './utils/catalogMetadata'
 import { defaultProfile } from './data/demoProfile'
 import type { AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem, SavedScanFile, SavedScanRecord, SearchVisibilityQuery, SearchVisibilityTestState, VoicePromptTestState } from './types/audit'
 import type { ManualWebsiteObservation } from './types/websiteAudit'
@@ -430,11 +431,21 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
           ...parsed.websiteAudit?.manualObservation,
         },
       },
-      manualFixes: (parsed.manualFixes ?? []).map((fix) => ({
-        ...fix,
-        evidenceConfidence:
-          fix.evidenceConfidence ?? 'manual_needs_confirmation',
-      })),
+      manualFixes: (parsed.manualFixes ?? [])
+        .map((fix) => ({
+          ...fix,
+          evidenceConfidence:
+            fix.evidenceConfidence ?? 'manual_needs_confirmation',
+        }))
+        .map((fix) =>
+          migrateSystemGeneratedFix(
+            fix,
+            buildAuditItems({
+              ...defaultProfile,
+              ...parsed.profile,
+            }).map(applyCurrentCatalogMetadata),
+          ),
+        ),
     }
 }
 
@@ -545,7 +556,7 @@ function App() {
   const [currentScanId, setCurrentScanId] = useState(loadCurrentScanId)
 
   const auditItems = useMemo(
-    () => buildAuditItems(auditState.profile),
+    () => buildAuditItems(auditState.profile).map(applyCurrentCatalogMetadata),
     [auditState.profile],
   )
 
@@ -629,7 +640,7 @@ function App() {
       'AI Answers': ai,
       Voice: voice,
     }
-  }, [auditState.aiAnswerTests, auditState.checks, auditState.directories.activeRows, auditState.profile, auditState.voicePromptTests, groups])
+  }, [auditState.aiAnswerTests, auditState.checks, auditState.directories.activeRows, auditState.profile, groups])
 
   const fixes = useMemo(
     () => [
@@ -638,10 +649,20 @@ function App() {
           (item) => item.area !== 'ai' && !item.id.startsWith('voice-prompt-'),
         ),
         auditState.checks,
-      ),
+      ).map((fix) => ({
+        ...fix,
+        evidenceNote: auditState.notes[fix.id],
+        evidenceConfidence: auditState.evidenceConfidence[fix.id],
+      })),
       ...auditState.manualFixes,
     ],
-    [auditItems, auditState.checks, auditState.manualFixes],
+    [
+      auditItems,
+      auditState.checks,
+      auditState.evidenceConfidence,
+      auditState.manualFixes,
+      auditState.notes,
+    ],
   )
 
   const currentSavedScan = savedScans.find((scan) => scan.id === currentScanId)
@@ -1212,10 +1233,10 @@ function App() {
     try {
       const result = await runWebsiteAutoAudit(auditState.profile)
 
-      if (!result.ok) {
+      if (result.ok === false) {
         const blockedNote = [
-          'Automated homepage access blocked.',
-          'The website opens in a browser, but the automated scanner could not fetch the homepage. This is usually caused by hosting/CDN protection, platform security rules, firewall settings, or server-side request blocking. Use Browser Observation Review for this site.',
+          result.error,
+          result.details,
           `Requested URL: ${result.requestedUrl}`,
           `Final URL: ${result.finalUrl || result.redirectUrl}`,
           `HTTP status: ${result.status}`,
@@ -1645,14 +1666,13 @@ function App() {
             </p>
             {websiteAuditError ? (
               <p className="error-text">
-                Scan access: Red - actual website/server error likely affecting
-                users. {websiteAuditError}
+                Scanner error - no website finding was recorded. {websiteAuditError}
               </p>
             ) : null}
             {latestWebsiteAttempt ? (
               <div className="auto-audit-result">
                 <strong>Latest scan attempt</strong>
-                {latestWebsiteAttempt.ok ? (
+                {latestWebsiteAttempt.ok === true ? (
                   <>
                     <span className={websiteScanAccess.className}>
                       {websiteScanAccess.label}
@@ -1670,6 +1690,23 @@ function App() {
                       {latestWebsiteAttempt.servicePhraseMatches.length} service phrase(s),{' '}
                       {latestWebsiteAttempt.serviceAreaPhraseMatches.length} area phrase(s)
                     </span>
+                    {latestWebsiteAttempt.rejectedContactCandidates.length > 0 ? (
+                      <details className="scanner-diagnostics">
+                        <summary>Scanner diagnostics: rejected contact-link candidates ({latestWebsiteAttempt.rejectedContactCandidates.length})</summary>
+                        <p>
+                          These links were considered by legacy matching but rejected by the current contact classifier. They are operator diagnostics only and are not customer findings.
+                        </p>
+                        <ul>
+                          {latestWebsiteAttempt.rejectedContactCandidates.map((link) => (
+                            <li key={`${link.url}-${link.anchorText}`}>
+                              <strong>{link.anchorText || '(no anchor text)'}</strong>{' '}
+                              <span>{link.url}</span>{' '}
+                              <em>({link.sourceRegion}; {link.reason})</em>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ) : null}
                   </>
                 ) : (
                   <>
@@ -1677,15 +1714,9 @@ function App() {
                       Scan access: Gray - needs manual review
                     </span>
                     <span className="blocked-message">
-                      Automated homepage access blocked
+                      {latestWebsiteAttempt.error}
                     </span>
-                    <span>
-                      The website opens in a browser, but the automated scanner
-                      could not fetch the homepage. This is usually caused by
-                      hosting/CDN protection, platform security rules, or
-                      firewall settings, or server-side request blocking. Use
-                      Browser Observation Review for this site.
-                    </span>
+                    <span>{latestWebsiteAttempt.details}</span>
                     <span>Diagnostic detail: {latestWebsiteAttempt.details}</span>
                     <span>Requested URL: {latestWebsiteAttempt.requestedUrl}</span>
                     <span>Final URL: {latestWebsiteAttempt.finalUrl || latestWebsiteAttempt.redirectUrl}</span>
@@ -1697,7 +1728,8 @@ function App() {
                     </span>
                     <span>Redirect occurred: {latestWebsiteAttempt.redirectOccurred ? 'Yes' : 'No'}</span>
                     <span>Redirect count: {latestWebsiteAttempt.redirectCount}</span>
-                    <span>HTTPS fallback tried: {latestWebsiteAttempt.httpsFallbackTried ? 'Yes' : 'No'}</span>
+                    <span>Protocol fallback tried: {latestWebsiteAttempt.protocolFallbackTried ? 'Yes' : 'No'}</span>
+                    <span>WWW hostname fallback tried: {latestWebsiteAttempt.wwwFallbackTried ? 'Yes' : 'No'}</span>
                     <span>Blocked/forbidden: {latestWebsiteAttempt.blocked ? 'Yes' : 'No'}</span>
                     <span>Timestamp: {new Date(latestWebsiteAttempt.timestamp).toLocaleString()}</span>
                     <span>{latestWebsiteAttempt.recommendedNextStep}</span>

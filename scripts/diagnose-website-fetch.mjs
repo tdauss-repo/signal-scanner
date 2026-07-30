@@ -15,24 +15,41 @@ const ensureUrl = (raw) => {
   return url
 }
 
+const toggleProtocol = (url) => {
+  const toggled = new URL(url.toString())
+  toggled.protocol = url.protocol === 'https:' ? 'http:' : 'https:'
+  return toggled
+}
+
+const toggleWww = (url) => {
+  const toggled = new URL(url.toString())
+  toggled.hostname = /^www\./i.test(toggled.hostname)
+    ? toggled.hostname.replace(/^www\./i, '')
+    : `www.${toggled.hostname}`
+  return toggled
+}
+
 const urlVariants = (raw) => {
   const normalized = ensureUrl(raw)
-  if (normalized.protocol === 'http:') normalized.protocol = 'https:'
+  const bases = [
+    normalized,
+    toggleProtocol(normalized),
+    toggleWww(normalized),
+    toggleProtocol(toggleWww(normalized)),
+  ]
+  const variants = new Set()
 
-  const variants = new Set([normalized.toString()])
-  if (normalized.pathname === '/' || normalized.pathname === '') {
-    variants.add(normalized.origin)
-    variants.add(`${normalized.origin}/`)
-  } else {
-    const withoutTrailingSlash = new URL(normalized)
-    withoutTrailingSlash.pathname = withoutTrailingSlash.pathname.replace(/\/+$/, '')
-    variants.add(withoutTrailingSlash.toString())
-
-    const withTrailingSlash = new URL(normalized)
-    if (!withTrailingSlash.pathname.endsWith('/')) {
-      withTrailingSlash.pathname = `${withTrailingSlash.pathname}/`
+  for (const base of bases) {
+    variants.add(base.toString())
+    const alternate = new URL(base.toString())
+    if (base.pathname === '' || base.pathname === '/') {
+      alternate.pathname = base.pathname === '/' ? '' : '/'
+    } else if (base.pathname.endsWith('/')) {
+      alternate.pathname = base.pathname.replace(/\/+$/, '')
+    } else {
+      alternate.pathname = `${base.pathname}/`
     }
-    variants.add(withTrailingSlash.toString())
+    variants.add(alternate.toString())
   }
 
   return [...variants]

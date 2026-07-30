@@ -51,9 +51,7 @@ export const buildSearchVisibilityQueries = (
   ].filter(Boolean)
   const primaryService = services[0] || profile.primaryCategory || 'local service'
   const city = profile.localMarket || profile.targetLocation || serviceAreas[0] || ''
-  const cityWithState = /ohio|michigan|indiana|sylvania|toledo/i.test(city)
-    ? city
-    : `${city} Ohio`.trim()
+  const cityWithState = city
   const primaryArea = serviceAreas[0] || cityWithState
   const secondaryArea = serviceAreas.find((area) => area !== primaryArea) || cityWithState
   const category = profile.primaryCategory || primaryService
