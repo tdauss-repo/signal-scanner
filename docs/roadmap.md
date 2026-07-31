@@ -58,3 +58,7 @@ Planned work:
 
 ## Long-Term Vision
 Local Signal Scanner should become a reliable operating system for local visibility management, helping businesses maintain trust, discoverability, and conversion readiness across search and AI-driven experiences.
+
+## Adjacent Security Backlog
+
+- Before expanding website acquisition beyond the current authorized homepage scan, add SSRF hardening for user-supplied HTTP(S) targets, including destination validation and redirect-safe network controls.

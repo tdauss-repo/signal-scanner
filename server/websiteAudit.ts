@@ -1,78 +1,21 @@
+import type {
+  LinkEvidence,
+  WebsiteAuditBlockedResult,
+  WebsiteAuditResult,
+} from '../src/types/websiteAudit.ts'
+
+export type {
+  LinkEvidence,
+  WebsiteAuditBlockedResult,
+  WebsiteAuditResult,
+} from '../src/types/websiteAudit.ts'
+
 export interface WebsiteAuditRequest {
   website: string
   businessName: string
   phone: string
   services: string[]
   serviceAreas: string[]
-}
-
-
-export interface LinkEvidence {
-  url: string
-  anchorText: string
-  sourceRegion: 'header' | 'navigation' | 'footer' | 'body'
-  internal: boolean
-  classification: 'contact' | 'rejected-contact-candidate' | 'other'
-  reason: string
-}
-
-export interface WebsiteAuditResult {
-  ok: true
-  normalizedUrl: string
-  fetchedUrl: string
-  fetchStrategyUsed: string
-  redirectCount: number
-  title: string
-  metaDescription: string
-  canonicalUrl: string
-  h1Text: string[]
-  h2Text: string[]
-  visibleTextSummary: string
-  businessNameFound: boolean
-  phoneNumberMatches: string[]
-  servicePhraseMatches: string[]
-  serviceAreaPhraseMatches: string[]
-  serviceLinks: string[]
-  jsonLdSchemaBlocks: unknown[]
-  detectedSchemaTypes: string[]
-  faqIndicators: string[]
-  hasContactLink: boolean
-  contactLinks: string[]
-  contactLinkEvidence: LinkEvidence[]
-  rejectedContactCandidates: LinkEvidence[]
-  socialProfileLinks: string[]
-  sitemapAvailable: boolean
-  robotsAvailable: boolean
-  homepageStatus: number
-  contentLength: number
-  httpsAvailable: boolean
-  httpsStatus: number | null
-  httpAvailable: boolean
-  httpStatus: number | null
-  httpRedirectsToHttps: boolean
-  analyzedAt: string
-}
-
-export interface WebsiteAuditBlockedResult {
-  ok: false
-  status: number
-  statusText?: string
-  error: string
-  errorType: string
-  details: string
-  recommendedNextStep: string
-  requestedUrl: string
-  normalizedUrl?: string
-  redirectUrl: string
-  finalUrl?: string
-  redirectOccurred: boolean
-  redirectCount: number
-  blocked: boolean
-  fetchStrategyUsed: string
-  httpsFallbackTried: boolean
-  protocolFallbackTried: boolean
-  wwwFallbackTried: boolean
-  timestamp: string
 }
 
 const maxHtmlBytes = 1_000_000
@@ -197,12 +140,14 @@ const failureResult = (
   details: string,
   fetchStrategyUsed: string,
   redirectCount: number,
+  attemptedCount: number,
   protocolFallbackTried: boolean,
   wwwFallbackTried: boolean,
 ): WebsiteAuditBlockedResult => {
   const finalUrl = response?.url || attemptedUrl.toString()
   const status = response?.status ?? 0
   const blocked = status === 403 || errorType === 'http_forbidden'
+  const timestamp = new Date().toISOString()
   const error =
     errorType === 'dns_resolution'
       ? 'Website hostname could not be resolved'
@@ -228,6 +173,25 @@ const failureResult = (
 
   return {
     ok: false,
+    acquisition: {
+      captureVersion: 1,
+      provider: 'found-local-server',
+      method: 'server_fetch',
+      outcome: blocked ? 'blocked' : 'unavailable',
+      requestedUrl,
+      ...(response?.url ? { sourceUrl: response.url } : {}),
+      occurredAt: timestamp,
+      attemptSummary: {
+        attemptedCount,
+        selectedUrl: finalUrl,
+        selectedStrategy: fetchStrategyUsed,
+        selectedStatus: status || undefined,
+        errorType,
+        protocolFallbackTried,
+        wwwFallbackTried,
+      },
+      recordOrigin: 'captured',
+    },
     status,
     statusText: response?.statusText,
     error,
@@ -245,7 +209,7 @@ const failureResult = (
     httpsFallbackTried: protocolFallbackTried,
     protocolFallbackTried,
     wwwFallbackTried,
-    timestamp: new Date().toISOString(),
+    timestamp,
   }
 }
 
@@ -649,6 +613,7 @@ export const auditWebsite = async (
   let body = ''
   let fetchStrategyUsed = ''
   let redirectCount = 0
+  let attemptedCount = 0
 
   logWebsiteAuditAttempt('start', {
     requestedUrl,
@@ -663,6 +628,7 @@ export const auditWebsite = async (
   for (const variant of variants) {
     for (const strategy of strategies) {
       try {
+        attemptedCount += 1
         const result = await fetchWithLimit(variant, 'GET', strategy.headers)
         response = result.response
         body = result.body
@@ -701,6 +667,7 @@ export const auditWebsite = async (
               : `Homepage returned HTTP ${response.status} ${response.statusText || ''}.`.trim(),
             fetchStrategyUsed,
             redirectCount,
+            attemptedCount,
             variant.protocol !== originalProtocol,
             variant.hostname !== originalHost,
           ),
@@ -731,6 +698,7 @@ export const auditWebsite = async (
               error.message,
               fetchStrategy,
               0,
+              attemptedCount,
               variant.protocol !== originalProtocol,
               variant.hostname !== originalHost,
             ),
@@ -758,6 +726,15 @@ export const auditWebsite = async (
     if (selectedAttempt) {
       return {
         ...selectedAttempt,
+        acquisition: {
+          ...selectedAttempt.acquisition,
+          attemptSummary: {
+            ...selectedAttempt.acquisition.attemptSummary,
+            attemptedCount,
+            protocolFallbackTried,
+            wwwFallbackTried,
+          },
+        },
         protocolFallbackTried,
         wwwFallbackTried,
         httpsFallbackTried: protocolFallbackTried,
@@ -773,6 +750,7 @@ export const auditWebsite = async (
       'Unable to fetch usable homepage HTML with safe request strategies.',
       'No strategy completed',
       0,
+      attemptedCount,
       protocolFallbackTried,
       wwwFallbackTried,
     )
@@ -841,8 +819,32 @@ export const auditWebsite = async (
     inspectTransportSecurity(fetchedBaseUrl),
   ])
 
+  const analyzedAt = new Date().toISOString()
+
   return {
     ok: true,
+    acquisition: {
+      captureVersion: 1,
+      provider: 'found-local-server',
+      method: 'server_fetch',
+      outcome: 'success',
+      requestedUrl,
+      sourceUrl: fetchedUrl,
+      occurredAt: analyzedAt,
+      attemptSummary: {
+        attemptedCount,
+        selectedUrl: fetchedUrl,
+        selectedStrategy: fetchStrategyUsed,
+        selectedStatus: response.status,
+        protocolFallbackTried: Boolean(
+          successfulAttemptUrl && successfulAttemptUrl.protocol !== originalProtocol,
+        ),
+        wwwFallbackTried: Boolean(
+          successfulAttemptUrl && successfulAttemptUrl.hostname !== originalHost,
+        ),
+      },
+      recordOrigin: 'captured',
+    },
     normalizedUrl: url.toString(),
     fetchedUrl,
     fetchStrategyUsed,
@@ -871,6 +873,6 @@ export const auditWebsite = async (
     homepageStatus: response.status,
     contentLength: body.length,
     ...transportSecurity,
-    analyzedAt: new Date().toISOString(),
+    analyzedAt,
   }
 }

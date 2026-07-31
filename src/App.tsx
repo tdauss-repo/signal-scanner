@@ -22,6 +22,12 @@ import type { AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, Busine
 import type { ManualWebsiteObservation } from './types/websiteAudit'
 import { aiAnswerPlatforms, buildFixPlan, scoreAIAnswerPlatform, scoreAIAnswers, scoreItems, trafficStatusForScore, weightedAverage } from './utils/scoring'
 import { analyzeManualWebsiteObservation, mapAutoAuditToWebsiteChecks, runWebsiteAutoAudit } from './utils/websiteAutoAudit'
+import {
+  captureManualObservationProvenance,
+  defaultManualWebsiteObservation,
+  normalizeWebsiteAuditWorkspaceState,
+  updateManualWebsiteObservationDraft,
+} from './utils/websiteAuditState'
 import { bingSearch, googleMapsSearch, googleSearch } from './utils/links'
 import {
   businessDirectoryKey,
@@ -301,16 +307,6 @@ const buildDefaultAIAnswerTests = () =>
     {} as Record<AIAnswerPlatform, AIAnswerTestState>,
   )
 
-const defaultManualWebsiteObservation = (): ManualWebsiteObservation => ({
-  observedTitle: '',
-  observedMetaDescription: '',
-  visibleHomepageText: '',
-  observedLinks: '',
-  observedSchemaSnippet: '',
-  notes: '',
-  analyzedAt: '',
-})
-
 const initialState: AuditState = {
   profile: defaultProfile,
   checks: {},
@@ -423,14 +419,7 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
       }),
       evidenceConfidence: parsed.evidenceConfidence ?? {},
       reportSummary: parsed.reportSummary ?? '',
-      websiteAudit: {
-        lastSuccessful: parsed.websiteAudit?.lastSuccessful ?? null,
-        latestAttempt: parsed.websiteAudit?.latestAttempt ?? null,
-        manualObservation: {
-          ...defaultManualWebsiteObservation(),
-          ...parsed.websiteAudit?.manualObservation,
-        },
-      },
+      websiteAudit: normalizeWebsiteAuditWorkspaceState(parsed.websiteAudit),
       manualFixes: (parsed.manualFixes ?? [])
         .map((fix) => ({
           ...fix,
@@ -1300,19 +1289,19 @@ function App() {
     updateState({
       websiteAudit: {
         ...auditState.websiteAudit,
-        manualObservation: {
-          ...auditState.websiteAudit.manualObservation,
-          ...nextObservation,
-        },
+        manualObservation: updateManualWebsiteObservationDraft(
+          auditState.websiteAudit.manualObservation,
+          nextObservation,
+        ),
       },
     })
   }
 
   const analyzeManualObservation = () => {
-    const observation = {
-      ...auditState.websiteAudit.manualObservation,
-      analyzedAt: new Date().toISOString(),
-    }
+    const observation = captureManualObservationProvenance(
+      auditState.websiteAudit.manualObservation,
+      new Date().toISOString(),
+    )
     const mapping = analyzeManualWebsiteObservation(
       observation,
       auditState.profile,
@@ -1766,6 +1755,16 @@ function App() {
                 </p>
               </div>
               <div className="manual-website-grid">
+                <label className="full-width-label">
+                  Recorded source URL
+                  <input
+                    value={auditState.websiteAudit.manualObservation.sourceUrl}
+                    onChange={(event) =>
+                      setManualWebsiteObservation({ sourceUrl: event.target.value })
+                    }
+                    placeholder={auditState.profile.website || 'https://example.com'}
+                  />
+                </label>
                 <label>
                   Observed page title
                   <input
@@ -1848,11 +1847,20 @@ function App() {
               {auditState.websiteAudit.manualObservation.analyzedAt ? (
                 <p className="method-guidance">
                   Manual observation analyzed{' '}
+                   {new Date(
+                     auditState.websiteAudit.manualObservation.analyzedAt,
+                   ).toLocaleString()}
+                   . Findings are labeled as based on operator-provided website
+                   observation.
+                 </p>
+               ) : null}
+              {auditState.websiteAudit.manualObservation.recordedAt ? (
+                <p className="method-guidance">
+                  Recorded at{' '}
                   {new Date(
-                    auditState.websiteAudit.manualObservation.analyzedAt,
+                    auditState.websiteAudit.manualObservation.recordedAt,
                   ).toLocaleString()}
-                  . Findings are labeled as based on operator-provided website
-                  observation.
+                  .
                 </p>
               ) : null}
             </div>

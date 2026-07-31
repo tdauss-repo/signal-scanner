@@ -1,3 +1,42 @@
+export type WebsiteAcquisitionMethod =
+  | 'server_fetch'
+  | 'operator_observation'
+  | 'rendered_browser'
+
+export type WebsiteAcquisitionOutcome =
+  | 'success'
+  | 'blocked'
+  | 'unavailable'
+  | 'observed'
+
+export type WebsiteAcquisitionRecordOrigin =
+  | 'captured'
+  | 'legacy_reconstructed'
+
+export interface WebsiteAttemptSummary {
+  // Aggregate metadata for the full homepage acquisition run. Some fields
+  // describe the selected/meaningful attempt while others summarize the run.
+  attemptedCount?: number
+  selectedUrl?: string
+  selectedStrategy?: string
+  selectedStatus?: number
+  errorType?: string
+  protocolFallbackTried?: boolean
+  wwwFallbackTried?: boolean
+}
+
+export interface WebsiteAcquisitionProvenance {
+  captureVersion: 1
+  provider: string
+  method: WebsiteAcquisitionMethod
+  outcome: WebsiteAcquisitionOutcome
+  requestedUrl?: string
+  sourceUrl?: string
+  occurredAt?: string
+  attemptSummary?: WebsiteAttemptSummary
+  recordOrigin: WebsiteAcquisitionRecordOrigin
+}
+
 export interface LinkEvidence {
   url: string
   anchorText: string
@@ -9,6 +48,7 @@ export interface LinkEvidence {
 
 export interface WebsiteAuditResult {
   ok: true
+  acquisition: WebsiteAcquisitionProvenance
   normalizedUrl: string
   fetchedUrl: string
   fetchStrategyUsed: string
@@ -46,6 +86,7 @@ export interface WebsiteAuditResult {
 
 export interface WebsiteAuditBlockedResult {
   ok: false
+  acquisition: WebsiteAcquisitionProvenance
   status: number
   statusText?: string
   error: string
@@ -69,6 +110,9 @@ export interface WebsiteAuditBlockedResult {
 export type WebsiteAuditResponse = WebsiteAuditResult | WebsiteAuditBlockedResult
 
 export interface ManualWebsiteObservation {
+  sourceUrl: string
+  recordedAt: string
+  acquisition: WebsiteAcquisitionProvenance | null
   observedTitle: string
   observedMetaDescription: string
   visibleHomepageText: string

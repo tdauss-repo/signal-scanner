@@ -57,6 +57,14 @@ try {
     assert.equal(legacyResult.httpsAvailable, false)
     assert.equal(legacyResult.httpAvailable, true)
     assert.equal(legacyResult.httpRedirectsToHttps, false)
+    assert.equal(legacyResult.acquisition.provider, 'found-local-server')
+    assert.equal(legacyResult.acquisition.method, 'server_fetch')
+    assert.equal(legacyResult.acquisition.outcome, 'success')
+    assert.equal(legacyResult.acquisition.recordOrigin, 'captured')
+    assert.equal(legacyResult.acquisition.requestedUrl, 'legacy.example')
+    assert.equal(legacyResult.acquisition.sourceUrl, 'http://legacy.example/')
+    assert.equal(legacyResult.acquisition.attemptSummary?.selectedUrl, 'http://legacy.example/')
+    assert.equal(legacyResult.acquisition.attemptSummary?.attemptedCount, 2)
   }
 
 
@@ -104,6 +112,64 @@ try {
   assert.equal(wwwFallbackResult.ok, true)
   if (wwwFallbackResult.ok) {
     assert.match(wwwFallbackResult.fetchedUrl, /:\/\/www\.www-only\.example\//)
+    assert.equal(wwwFallbackResult.acquisition.attemptSummary?.wwwFallbackTried, true)
+    assert((wwwFallbackResult.acquisition.attemptSummary?.attemptedCount ?? 0) >= 2)
+  }
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input)
+    if (init?.method === 'HEAD') return new Response('', { status: 404 })
+    if (url === 'https://path.example/services') {
+      return new Response('', { status: 404, statusText: 'Not Found' })
+    }
+    if (url === 'https://path.example/services/') {
+      return new Response(
+        '<html><head><title>Example Business Services</title></head><body>Example Business preschool Southgate</body></html>',
+        { status: 200, headers: { 'content-type': 'text/html' } },
+      )
+    }
+    return new Response('', { status: 404 })
+  }
+  const pathFallbackResult = await auditWebsite({
+    ...baseRequest,
+    website: 'https://path.example/services',
+  })
+  assert.equal(pathFallbackResult.ok, true)
+  if (pathFallbackResult.ok) {
+    assert.equal(pathFallbackResult.fetchedUrl, 'https://path.example/services/')
+    assert.equal(
+      pathFallbackResult.acquisition.attemptSummary?.selectedUrl,
+      'https://path.example/services/',
+    )
+    assert((pathFallbackResult.acquisition.attemptSummary?.attemptedCount ?? 0) >= 2)
+  }
+
+  globalThis.fetch = async (input, init) => {
+    const url = String(input)
+    if (init?.method === 'HEAD') return new Response('', { status: 404 })
+    if (url.startsWith('https://redirected.example')) {
+      const response = new Response(
+        '<html><head><title>Example Business</title></head><body>Example Business preschool Southgate</body></html>',
+        { status: 200, headers: { 'content-type': 'text/html' } },
+      )
+      Object.defineProperty(response, 'url', {
+        value: 'https://final.redirected.example/home/',
+      })
+      return response
+    }
+    return new Response('', { status: 404 })
+  }
+  const redirectedSourceResult = await auditWebsite({
+    ...baseRequest,
+    website: 'https://redirected.example',
+  })
+  assert.equal(redirectedSourceResult.ok, true)
+  if (redirectedSourceResult.ok) {
+    assert.equal(
+      redirectedSourceResult.acquisition.sourceUrl,
+      'https://final.redirected.example/home/',
+    )
+    assert.equal(redirectedSourceResult.fetchedUrl, 'https://final.redirected.example/home/')
   }
 
   globalThis.fetch = async (input) => {
@@ -121,6 +187,8 @@ try {
   if (!mixedFailureResult.ok) {
     assert.equal(mixedFailureResult.errorType, 'http_forbidden')
     assert.equal(mixedFailureResult.blocked, true)
+    assert.equal(mixedFailureResult.acquisition.outcome, 'blocked')
+    assert.equal(mixedFailureResult.acquisition.attemptSummary?.errorType, 'http_forbidden')
   }
 
   globalThis.fetch = async () => new Response('Forbidden', { status: 403, statusText: 'Forbidden' })
@@ -135,6 +203,15 @@ try {
     assert.equal(forbiddenResult.error, 'Automated homepage access blocked')
     assert.equal(forbiddenResult.protocolFallbackTried, true)
     assert.equal(forbiddenResult.wwwFallbackTried, true)
+    assert.equal(forbiddenResult.acquisition.provider, 'found-local-server')
+    assert.equal(forbiddenResult.acquisition.method, 'server_fetch')
+    assert.equal(forbiddenResult.acquisition.outcome, 'blocked')
+    assert.equal(forbiddenResult.acquisition.recordOrigin, 'captured')
+    assert.equal(forbiddenResult.acquisition.requestedUrl, 'https://blocked.example')
+    assert.equal(forbiddenResult.acquisition.sourceUrl, undefined)
+    assert.equal(forbiddenResult.acquisition.attemptSummary?.selectedUrl, forbiddenResult.finalUrl)
+    assert.equal(forbiddenResult.acquisition.attemptSummary?.selectedStatus, 403)
+    assert((forbiddenResult.acquisition.attemptSummary?.attemptedCount ?? 0) > 1)
   }
 
   globalThis.fetch = async () => {
@@ -150,6 +227,10 @@ try {
     assert.equal(dnsResult.blocked, false)
     assert.equal(dnsResult.error, 'Website hostname could not be resolved')
     assert.match(dnsResult.recommendedNextStep, /could not resolve/i)
+    assert.equal(dnsResult.acquisition.outcome, 'unavailable')
+    assert.equal(dnsResult.acquisition.recordOrigin, 'captured')
+    assert.equal(dnsResult.acquisition.attemptSummary?.errorType, 'dns_resolution')
+    assert((dnsResult.acquisition.attemptSummary?.attemptedCount ?? 0) > 0)
   }
 
 
