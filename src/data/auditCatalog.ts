@@ -1,4 +1,4 @@
-import type { AuditItem, BusinessProfile, EvidenceLink } from '../types/audit'
+import type { AuditItem, BusinessProfile, BusinessProfileState, EvidenceLink } from '../types/audit'
 import { buildDirectorySuggestions } from '../utils/directorySuggestions'
 import {
   bingSearch,
@@ -36,7 +36,10 @@ export const aiPlatforms = [
   { id: 'grok', name: 'Grok', url: 'https://x.com/i/grok' },
 ] as const
 
-export const buildAuditItems = (profile: BusinessProfile): AuditItem[] => {
+export const buildAuditItems = (
+  profile: BusinessProfile,
+  profileState?: BusinessProfileState,
+): AuditItem[] => {
   const listingItems: AuditItem[] = [
     {
       id: 'listing-google',
@@ -248,7 +251,7 @@ export const buildAuditItems = (profile: BusinessProfile): AuditItem[] => {
     },
   ]
 
-  const keywordItems: AuditItem[] = buildSearchVisibilityQueries(profile).map(
+  const keywordItems: AuditItem[] = buildSearchVisibilityQueries(profile, profileState).map(
     searchVisibilityQueryToAuditItem,
   )
 

@@ -8,6 +8,8 @@ interface ScoreCardProps {
   weight?: string
   active?: boolean
   onClick?: () => void
+  displayValue?: string
+  details?: string
 }
 
 export function ScoreCard({
@@ -16,6 +18,8 @@ export function ScoreCard({
   weight,
   active = false,
   onClick,
+  displayValue,
+  details,
 }: ScoreCardProps) {
   const score = result.score === null ? 0 : Math.round(result.score)
 
@@ -29,15 +33,15 @@ export function ScoreCard({
     >
       <div>
         <p className="score-label">{label}</p>
-        <strong>{formatScore(result.score)}</strong>
+        <strong>{displayValue ?? formatScore(result.score)}</strong>
       </div>
       <StatusBadge status={result.status} label={result.statusLabel} />
       <div className="score-track" aria-hidden="true">
         <span style={{ width: `${score}%` }} />
       </div>
       <p className="score-meta">
-        {result.checked} checked
-        {typeof result.unchecked === 'number'
+        {details ?? `${result.checked} checked`}
+        {!details && typeof result.unchecked === 'number'
           ? ` | ${result.unchecked} unchecked`
           : ''}
         {weight ? ` | ${weight}` : ''}

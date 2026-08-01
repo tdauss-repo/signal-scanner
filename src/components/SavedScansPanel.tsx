@@ -58,7 +58,7 @@ export function SavedScansPanel({
           Save as new scan
         </button>
         <button type="button" className="secondary" onClick={onStartBlank}>
-          Start blank scan
+          New business scan
         </button>
         <label className="import-scan-button">
           Import scan JSON

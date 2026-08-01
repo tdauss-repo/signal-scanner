@@ -99,12 +99,12 @@ const checkMethods: DirectoryCheckMethod[] = [
 
 const authorityOptions: DirectoryAuthority[] = ['High', 'Medium', 'Low']
 
-const ownerAccessOptions: OwnerAccessStatus[] = [
-  'Not checked',
-  'Unverified - public listing only',
-  'Confirmed with owner',
-  'Owner access missing',
-  'Access request needed',
+const ownerAccessOptions: Array<{ value: OwnerAccessStatus; label: string }> = [
+  { value: 'Not checked', label: 'Unknown' },
+  { value: 'Unverified - public listing only', label: 'Unknown — public listing only' },
+  { value: 'Confirmed with owner', label: 'Confirmed' },
+  { value: 'Owner access missing', label: 'Unavailable' },
+  { value: 'Access request needed', label: 'Recovery required' },
 ]
 
 const directoryStatusOptions: Array<{
@@ -159,6 +159,8 @@ const rowStatus = (row: DirectoryAuditRow): CheckStatus => {
   return 'pass'
 }
 
+// Kept here with the directory UI because it shares its row-status rules.
+// eslint-disable-next-line react-refresh/only-export-components
 export function directoryRowToAuditItem(row: DirectoryAuditRow) {
   const weight = row.authority === 'High' ? 10 : row.authority === 'Medium' ? 7 : 4
 
@@ -179,6 +181,7 @@ export function directoryRowToAuditItem(row: DirectoryAuditRow) {
   }
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function directoryRowToStatus(row: DirectoryAuditRow): CheckStatus {
   return rowStatus(row)
 }
@@ -1369,8 +1372,8 @@ export function DirectoryAuditPanel({
                   }
                 >
                   {ownerAccessOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>

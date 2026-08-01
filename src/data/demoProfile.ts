@@ -3,7 +3,13 @@ import type { BusinessProfile } from '../types/audit'
 export const defaultProfile: BusinessProfile = {
   businessName: 'JEM Photography',
   website: 'https://www.jemcamera.com',
+  streetAddress: '',
+  city: 'Sylvania',
+  state: 'OH',
+  zip: '',
   phone: '419.410.4974',
+  knownListingUrl: '',
+  operatorNote: '',
   phoneNumbers: [
     {
       id: 'jem-jen-phone',

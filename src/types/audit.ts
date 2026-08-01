@@ -25,7 +25,13 @@ export type EvidenceConfidence =
 export interface BusinessProfile {
   businessName: string
   website: string
+  streetAddress: string
+  city: string
+  state: string
+  zip: string
   phone: string
+  knownListingUrl: string
+  operatorNote: string
   phoneNumbers: PhoneContactRecord[]
   contactStructureNote: string
   primaryCategory: string
@@ -37,6 +43,36 @@ export interface BusinessProfile {
   primaryServices: string
   targetLocation: string
   keywords: string
+}
+
+export type BusinessProfileValueStatus =
+  | 'observed'
+  | 'inferred'
+  | 'operator_reviewed'
+  | 'owner_confirmed'
+  | 'legacy_imported'
+
+export type BusinessProfileValueConfidence = 'low' | 'medium' | 'high'
+
+/**
+ * A reviewed profile fact is intentionally kept separate from the flat
+ * BusinessProfile inputs used by the existing audit and reporting workflow.
+ * The flat profile remains the compatibility projection for those consumers.
+ */
+export interface BusinessProfileValue<T = unknown> {
+  value: T
+  source: string
+  observedAt?: string
+  recordedAt?: string
+  confidence: BusinessProfileValueConfidence
+  status: BusinessProfileValueStatus
+}
+
+export type BusinessProfileField = keyof BusinessProfile
+
+export interface BusinessProfileState {
+  schemaVersion: 1
+  values: Partial<Record<BusinessProfileField, BusinessProfileValue>>
 }
 
 export interface PhoneContactRecord {
@@ -76,13 +112,19 @@ export interface AuditState {
   notes: Record<string, string>
   evidenceConfidence: Record<string, EvidenceConfidence>
   profile: BusinessProfile
+  businessProfile: BusinessProfileState
   lastUpdated: string
   reportSummary: string
   websiteAudit: WebsiteAuditWorkspaceState
   selectedAIPlatform: AIAnswerPlatform
   aiAnswerTests: Record<AIAnswerPlatform, AIAnswerTestState>
   searchVisibilityTests: Record<string, SearchVisibilityTestState>
+  searchDestinationObservations: Record<
+    string,
+    Partial<Record<SearchDestination, SearchDestinationObservation>>
+  >
   voicePromptTests: Record<string, VoicePromptTestState>
+  voiceAssistantObservations: VoiceAssistantObservation[]
   directories: DirectoryAuditState
   manualFixes: FixItem[]
 }
@@ -150,6 +192,64 @@ export interface AIAnswerTestState {
   suggestedFix: string
   priority: 'High' | 'Medium' | 'Low'
   packageFit: AIAnswerPackageFit
+  observations: AIAnswerObservation[]
+}
+
+export type AIEvidenceMode = 'consumer_observation' | 'controlled_scan'
+export type AIObservationMentioned = 'yes' | 'no' | 'unclear'
+export type AIObservationPosition = 'early' | 'middle' | 'late' | 'not_applicable'
+export type AIRecommendationStrength =
+  | 'directly_recommended'
+  | 'included_among_options'
+  | 'merely_referenced'
+  | 'not_mentioned'
+export type AIFactualAccuracy =
+  | 'accurate'
+  | 'partially_accurate'
+  | 'inaccurate'
+  | 'unable_to_verify'
+
+export interface AIAnswerObservation {
+  id: string
+  evidenceMode: AIEvidenceMode
+  promptType: 'non_branded_discovery' | 'branded_factual_accuracy' | 'comparative_consideration'
+  promptUsed: string
+  platform: AIAnswerPlatform
+  model: string
+  observedAt: string
+  loginState: 'logged_in' | 'logged_out' | 'unknown'
+  locationContext: string
+  personalizationContext: string
+  mentioned: AIObservationMentioned
+  mentionPosition: AIObservationPosition
+  recommendationStrength: AIRecommendationStrength
+  officialWebsiteCited: AIObservationMentioned
+  factualAccuracy: AIFactualAccuracy
+  unsupportedClaims: string
+  competitorsMentioned: string
+  rawResponse: string
+  sourceLinks: string
+  evidenceNotes: string
+  recommendedAction: string
+  operatorReviewed: boolean
+  provenance: 'operator_observation' | 'legacy_imported'
+}
+
+export type EvidenceKind =
+  | 'owner_confirmed_truth'
+  | 'external_observation'
+  | 'derived_interpretation'
+  | 'acquisition_failure'
+  | 'absence'
+  | 'unable_to_verify'
+
+export interface DestinationEvidence {
+  destination: string
+  observedAt: string
+  confidence: EvidenceConfidence
+  provenance: 'operator_observation' | 'legacy_imported'
+  evidenceKind: EvidenceKind
+  reviewed: boolean
 }
 
 export type AIAnswerResultStatus = CheckStatus | 'signin_required'
@@ -174,13 +274,20 @@ export type SearchVisibilityIntentType =
   | 'Category discovery'
   | 'Competitor/comparison discovery'
 
+export type SearchVisibilityRole =
+  | 'Brand Presence'
+  | 'Core Local Discovery'
+  | 'Supporting Discovery'
+
 export type SearchVisibilityResult =
   | 'not_checked'
   | 'found_prominently'
   | 'found_weak'
   | 'found_directory_only'
+  | 'found_conflicting_information'
   | 'not_found'
   | 'manual_review_needed'
+  | 'unable_to_verify'
 
 export type SearchVisibilityWhereFound =
   | 'Website'
@@ -190,11 +297,46 @@ export type SearchVisibilityWhereFound =
   | 'Competitor results only'
   | 'Not observed'
 
+export type SearchVisibilityObservedResultType =
+  | 'official_website'
+  | 'local_business_profile'
+  | 'directory_listing'
+  | 'social_profile'
+  | 'third_party_mention'
+  | 'business_name_correct'
+  | 'address_correct'
+  | 'phone_correct'
+  | 'website_correct'
+  | 'category_correct'
+  | 'not_found'
+
+export type SearchDestination =
+  | 'Google Search'
+  | 'Google Maps'
+  | 'Bing Search'
+  | 'Apple Maps'
+  | 'DuckDuckGo'
+  | 'Yelp'
+  | 'Facebook'
+  | 'Instagram'
+
+export interface SearchDestinationObservation extends DestinationEvidence {
+  destination: SearchDestination
+  query: string
+  overallResult: SearchVisibilityResult
+  observedResultTypes: SearchVisibilityObservedResultType[]
+  evidenceNotes: string
+  competitorsObserved: string
+  recommendedAction: string
+}
+
 export interface SearchVisibilityQuery {
   id: string
   query: string
   intentType: SearchVisibilityIntentType
   priority: 'High' | 'Medium' | 'Low'
+  role: SearchVisibilityRole
+  isDiagnostic?: boolean
 }
 
 export type SearchVisibilityFindingPriority =
@@ -211,6 +353,10 @@ export interface SearchVisibilityTestState {
   recommendedAction: string
   evidenceConfidence: EvidenceConfidence
   packageFit: AIAnswerPackageFit
+  observedResultTypes: SearchVisibilityObservedResultType[]
+  observedAt: string
+  searchDestination: string
+  provenance: 'operator_observation' | 'legacy_imported'
 }
 
 export type VoicePromptTestStatus =
@@ -243,6 +389,33 @@ export interface VoicePromptTestState {
   evidenceNotes: string
   evidenceConfidence: EvidenceConfidence
   packageFit: AIAnswerPackageFit
+  recommendedAction: string
+}
+
+export type VoiceAssistantObservationResult =
+  | 'directly_identified'
+  | 'included_among_options'
+  | 'correct_business_action_available'
+  | 'found_with_inaccurate_facts'
+  | 'wrong_business_selected'
+  | 'not_found'
+  | 'unable_to_verify'
+
+export interface VoiceAssistantObservation {
+  id: string
+  assistant: VoicePlatformTested
+  deviceOrInterface: string
+  exactUtterance: string
+  locationContext: string
+  loginState: 'logged_in' | 'logged_out' | 'unknown'
+  observedAt: string
+  result: VoiceAssistantObservationResult
+  responseTranscript: string
+  visibleSource: string
+  evidenceNotes: string
+  evidenceConfidence: EvidenceConfidence
+  provenance: 'operator_observation' | 'legacy_imported'
+  operatorReviewed: boolean
   recommendedAction: string
 }
 

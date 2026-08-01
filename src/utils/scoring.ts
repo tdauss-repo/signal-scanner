@@ -8,6 +8,10 @@ import type {
   TrafficStatus,
 } from '../types/audit'
 
+export const numericOverallScoreAreas = [
+  'Website SEO',
+] as const
+
 const statusPoints: Record<CheckStatus, number | null> = {
   pass: 1,
   partial: 0.55,
@@ -69,6 +73,18 @@ export const weightedAverage = (
 
   return earned / possible
 }
+
+/** AI Visibility is evidence-only and deliberately excluded from this score. */
+export const overallVisibilityScore = (scores: {
+  website: number | null
+}) => weightedAverage([
+  { score: scores.website, weight: 24 },
+])
+
+/** Uses only scored visibility areas; AI Visibility is evidence-only. */
+export const overallVisibilityCheckedCount = (counts: {
+  website: number
+}) => counts.website
 
 export const aiAnswerPlatforms: AIAnswerPlatform[] = [
   'ChatGPT',

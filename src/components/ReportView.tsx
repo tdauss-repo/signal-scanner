@@ -8,6 +8,7 @@ import type {
 } from '../types/audit'
 import { customerEvidenceConfidenceLabel } from '../utils/evidenceConfidence'
 import { formatScore } from '../utils/scoring'
+import type { AIVisibilityEvidenceSummary } from '../utils/aiPresence'
 import { StatusBadge } from './StatusBadge'
 
 interface ReportViewProps {
@@ -20,14 +21,13 @@ interface ReportViewProps {
   reportSummary: string
   onReportSummaryChange: (summary: string) => void
   evidenceConfidence?: Record<string, EvidenceConfidence>
+  aiVisibilityEvidence: AIVisibilityEvidenceSummary
 }
 
 const reportSections = [
-  'Listings',
   'Website SEO',
-  'Search Visibility',
-  'AI Answers',
-  'Voice',
+  'Public Presence',
+  'Profile Management',
 ] as const
 
 const friendlyStatus = (score: ScoreResult | undefined) => {
@@ -40,11 +40,11 @@ const friendlyStatus = (score: ScoreResult | undefined) => {
 
 const fixSection = (fix: FixItem) => {
   const area = fix.area.toLowerCase()
-  if (area.includes('listing') || area.includes('directory')) return 'Listings'
+  if (area.includes('listing') || area.includes('directory')) return 'Profile Management'
   if (area.includes('website')) return 'Website SEO'
-  if (area.includes('search')) return 'Search Visibility'
-  if (area.includes('ai')) return 'AI Answers'
-  if (area.includes('voice')) return 'Voice'
+  if (area.includes('search')) return 'Public Presence'
+  if (area.includes('ai')) return 'Overall'
+  if (area.includes('voice')) return 'Profile Management'
   return 'Overall'
 }
 
@@ -74,7 +74,7 @@ const whyItMattersForFix = (fix: FixItem) => {
     return 'AI answer tools rely on public source signals to describe the business accurately.'
   }
   if (fix.area.toLowerCase().includes('voice')) {
-    return 'Voice-style searches rely on clear source data for identity, contact, services, location, and reviews.'
+    return 'Clear listing and entity source data supports reliable navigation, contact, and location information.'
   }
   return 'This improvement can make the business easier to find and understand online.'
 }
@@ -141,7 +141,7 @@ const sectionSummary = (
     : 'Keep monitoring this area and preserve the current source signals.'
 
   const copy: Record<typeof section, string> = {
-    Listings:
+    'Profile Management':
       status === 'Strong'
         ? 'Core listing signals appear to be in good shape based on the checked items.'
         : 'Listing consistency and directory signals should be reviewed so customers, maps, and AI systems see the same business details.',
@@ -149,29 +149,17 @@ const sectionSummary = (
       status === 'Strong'
         ? 'The website is contributing useful business, service, and local context.'
         : 'Website clarity can be strengthened so services, location, contact options, FAQ content, and schema are easier to understand.',
-    'Search Visibility':
+    'Public Presence':
       status === 'Strong'
         ? 'Manual search observations show useful visibility for checked customer-style queries.'
         : 'Some service and location searches need stronger supporting signals before they become reliable discovery paths.',
-    'AI Answers':
-      status === 'Strong'
-        ? 'AI answer tests are recognizing useful business facts across checked platforms.'
-        : 'AI answer visibility still needs more source clarity or more platform coverage before it can be considered strong.',
-    Voice:
-      status === 'Strong'
-        ? 'Voice source-readiness signals look strong across the checked public data sources.'
-        : 'Voice readiness depends on improving source data such as listings, contact clarity, reviews, FAQ content, and structured data.',
   }
 
   return { count, status, copy: copy[section], action }
 }
 
-const generateExecutiveSummary = (
-  profile: BusinessProfile,
-  _scores: Record<string, ScoreResult>,
-  _fixes: FixItem[],
-) => {
-  return `${profile.businessName} already has a solid local foundation, including a live website and public signals that help customers understand the business. The scan also found practical cleanup opportunities that could make the business easier to find and understand across search, maps, listings, and AI answers. The recommended next step is a Starter Visibility Cleanup focused on the highest-impact fixes first: listing clarity, website SEO signals, contact/service-area consistency, structured data, and public evidence alignment.`
+const generateExecutiveSummary = (profile: BusinessProfile) => {
+  return `This report summarizes the recorded website, listings, and search evidence for ${profile.businessName}. Conclusions should be reviewed alongside the supporting evidence; untested destinations and optional assistant behavior are not treated as negative findings.`
 }
 
 const positiveFindings = (
@@ -186,11 +174,8 @@ const positiveFindings = (
   if (scores['Website SEO']?.status === 'Green') {
     findings.push('Website checks show useful service, local, or technical signals.')
   }
-  if (scores['AI Answers']?.checked > 0) {
-    findings.push('AI answer workflow has at least one platform observation recorded.')
-  }
-  if (scores.Listings?.checked > 0) {
-    findings.push('Listings verification has started, giving the cleanup plan source evidence.')
+  if (scores['Profile Management']?.checked > 0) {
+    findings.push('Profile management has recorded public profile evidence while owner access remains separate.')
   }
   if (Object.values(checks).some((status) => status === 'pass')) {
     findings.push('Some checked visibility signals are already marked as passing.')
@@ -208,13 +193,14 @@ export function ReportView({
   reportSummary,
   onReportSummaryChange,
   evidenceConfidence = {},
+  aiVisibilityEvidence,
 }: ReportViewProps) {
   const [activeReportView, setActiveReportView] = useState<
     'summary' | 'internal'
   >('summary')
   const executiveSummary = useMemo(
-    () => reportSummary || generateExecutiveSummary(profile, scores, fixes),
-    [fixes, profile, reportSummary, scores],
+    () => reportSummary || generateExecutiveSummary(profile),
+    [profile, reportSummary],
   )
 
   const priorityCounts = useMemo(
@@ -372,6 +358,20 @@ export function ReportView({
             })}
           </section>
 
+          <section className="panel report-section">
+            <p className="eyebrow">AI Visibility evidence</p>
+            <h2>{aiVisibilityEvidence.statusLabel}</h2>
+            <p>
+              {aiVisibilityEvidence.reviewedObservationCount} reviewed manual
+              {' '}AI Presence observation{aiVisibilityEvidence.reviewedObservationCount === 1 ? '' : 's'}
+              {' '}of {aiVisibilityEvidence.recordedObservationCount} recorded.
+            </p>
+            <p>
+              AI Presence is manual evidence and AI/GEO readiness is qualitative.
+              Neither is included in the numeric overall score.
+            </p>
+          </section>
+
           <section className="panel report-section report-package-section">
             <p className="eyebrow">Recommended package</p>
             <div className="report-package-grid">
@@ -445,6 +445,14 @@ export function ReportView({
                 <p>{score.checked} checked</p>
               </div>
             ))}
+          </div>
+          <div className="report-block">
+            <h3>AI Visibility evidence (not numerically scored)</h3>
+            <p>
+              {aiVisibilityEvidence.statusLabel}. {aiVisibilityEvidence.reviewedObservationCount}
+              {' '}reviewed manual observation{aiVisibilityEvidence.reviewedObservationCount === 1 ? '' : 's'};
+              {' '}{aiVisibilityEvidence.recordedObservationCount} recorded.
+            </p>
           </div>
           <div className="report-block">
             <h3>Raw scanner checks and evidence notes</h3>

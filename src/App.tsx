@@ -5,10 +5,10 @@ import { AuditSection } from './components/AuditSection'
 import { CoreListingsPanel } from './components/CoreListingsPanel'
 import {
   DirectoryAuditPanel,
-  directoryRowToAuditItem,
   directoryRowToStatus,
 } from './components/DirectoryAuditPanel'
 import { FixPlan } from './components/FixPlan'
+import { BusinessProfilePanel } from './components/BusinessProfilePanel'
 import { IntakeForm } from './components/IntakeForm'
 import { ReportView } from './components/ReportView'
 import { SavedScansPanel } from './components/SavedScansPanel'
@@ -18,9 +18,9 @@ import { VoiceReadinessPanel } from './components/VoiceReadinessPanel'
 import { buildAuditItems } from './data/auditCatalog'
 import { applyCurrentCatalogMetadata, migrateSystemGeneratedFix } from './utils/catalogMetadata'
 import { defaultProfile } from './data/demoProfile'
-import type { AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem, SavedScanFile, SavedScanRecord, SearchVisibilityQuery, SearchVisibilityTestState, VoicePromptTestState } from './types/audit'
+import type { AIAnswerObservation, AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem, SavedScanFile, SavedScanRecord, SearchDestinationObservation, SearchVisibilityQuery, VoiceAssistantObservation, VoicePromptTestState } from './types/audit'
 import type { ManualWebsiteObservation } from './types/websiteAudit'
-import { aiAnswerPlatforms, buildFixPlan, scoreAIAnswerPlatform, scoreAIAnswers, scoreItems, trafficStatusForScore, weightedAverage } from './utils/scoring'
+import { aiAnswerPlatforms, buildFixPlan, numericOverallScoreAreas, overallVisibilityCheckedCount, overallVisibilityScore, scoreItems, trafficStatusForScore } from './utils/scoring'
 import { analyzeBrowserWebsiteObservation, analyzeManualWebsiteObservation, mapAutoAuditToWebsiteChecks, mergeBrowserMappingWithServerPrecedence, runWebsiteAutoAudit } from './utils/websiteAutoAudit'
 import {
   browserWebsiteObservationFromPayload,
@@ -40,19 +40,22 @@ import {
   urlDiscoveryMethodFor,
 } from './utils/directorySuggestions'
 import {
-  actionPlanPriorityForSearchObservation,
   defaultSearchVisibilityTest,
+  legacyWhereFoundToTypes,
+  migrateLegacySearchDestinationObservations,
+  normalizeSearchDestinationObservation,
+  normalizeSearchResultTypes,
   searchVisibilityResultLabel,
   searchVisibilityResultToCheckStatus,
 } from './utils/searchVisibility'
+import { buildVoiceReadinessCategories, buildVoiceSourceReadinessGroups } from './utils/voiceReadiness'
 import {
-  buildVoicePromptTests,
-  buildVoiceReadinessCategories,
-  buildVoiceSourceReadinessGroups,
-  defaultVoicePromptTest,
-  voicePromptStatusLabel,
-  voicePromptStatusToCheckStatus,
-} from './utils/voiceReadiness'
+  normalizeBusinessProfileState,
+  recordOperatorProfileChanges,
+} from './utils/businessProfileState'
+import { aggregateReviewedSearchObservations } from './utils/searchAggregation'
+import { summarizeAIVisibilityEvidence } from './utils/aiPresence'
+import { projectPublicObservationToProfiles, publicPresenceCoverage, publicPresenceQualityLabel, supportingPublicPresenceReviewedCount } from './utils/publicPresence'
 
 const storageKey = 'local-signal-scanner-state'
 const activeViewStorageKey = 'business-scanner-active-view'
@@ -62,12 +65,6 @@ const aiActionPlanId = 'manual-ai-answer-visibility-test'
 
 const aiResultToCheckStatus = (status: AIAnswerTestState['resultStatus']) =>
   status === 'signin_required' ? 'unknown' : status
-
-const aiResultLabel = (status: AIAnswerTestState['resultStatus']) => {
-  if (status === 'signin_required') return 'Not tested - sign-in required'
-  if (status === 'unknown') return 'Not tested'
-  return status
-}
 
 const createId = (prefix: string) =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -160,27 +157,21 @@ const migrateDirectories = (
 
 type ScoreView =
   | 'Overall'
-  | 'Listings'
   | 'Website SEO'
-  | 'Search Visibility'
-  | 'AI Answers'
-  | 'Voice'
 
 type ActiveView =
   | ScoreView
+  | 'Public Presence'
+  | 'Profile Management'
+  | 'AI Visibility'
   | 'Reports'
+  | 'Business Profile'
   | 'Settings'
 
-const views: ScoreView[] = [
-  'Overall',
-  'Listings',
-  'Website SEO',
-  'Search Visibility',
-  'AI Answers',
-  'Voice',
-]
+const views: ScoreView[] = ['Overall', ...numericOverallScoreAreas]
 
-const navViews: ActiveView[] = [...views, 'Reports', 'Settings']
+const navViews: ActiveView[] = [...views, 'Public Presence', 'Profile Management', 'AI Visibility', 'Reports', 'Business Profile', 'Settings']
+const visibleViewLabel = (view: ActiveView) => view
 
 const navIconPaths: Record<ActiveView, React.ReactNode> = {
   Overall: (
@@ -191,7 +182,7 @@ const navIconPaths: Record<ActiveView, React.ReactNode> = {
       <path d="M13 13h7v7h-7z" />
     </>
   ),
-  Listings: (
+  'Profile Management': (
     <>
       <path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z" />
       <circle cx="12" cy="9" r="2.5" />
@@ -205,25 +196,18 @@ const navIconPaths: Record<ActiveView, React.ReactNode> = {
       <path d="M12 4a13 13 0 0 0 0 16" />
     </>
   ),
-  'Search Visibility': (
+  'Public Presence': (
     <>
       <circle cx="10.5" cy="10.5" r="5.5" />
       <path d="m15 15 5 5" />
       <path d="M8.5 10.5h4" />
     </>
   ),
-  'AI Answers': (
+  'AI Visibility': (
     <>
       <path d="M12 4 9 10l-5 2 5 2 3 6 3-6 5-2-5-2z" />
       <path d="M5 5h3" />
       <path d="M16 19h3" />
-    </>
-  ),
-  Voice: (
-    <>
-      <path d="M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3z" />
-      <path d="M6 11a6 6 0 0 0 12 0" />
-      <path d="M12 17v3" />
     </>
   ),
   Reports: (
@@ -232,6 +216,13 @@ const navIconPaths: Record<ActiveView, React.ReactNode> = {
       <path d="M15 4v4h4" />
       <path d="M10 13h6" />
       <path d="M10 17h4" />
+    </>
+  ),
+  'Business Profile': (
+    <>
+      <circle cx="12" cy="8" r="3" />
+      <path d="M5 20c.8-4 3.2-6 7-6s6.2 2 7 6" />
+      <path d="M18 6h3M19.5 4.5v3" />
     </>
   ),
   Settings: (
@@ -285,6 +276,9 @@ function SidebarIcon({ view }: { view: ActiveView }) {
 
 const loadActiveView = (): ActiveView => {
   const stored = localStorage.getItem(activeViewStorageKey)
+  if (stored === 'AI Answers') return 'AI Visibility'
+  if (stored === 'Listings') return 'Profile Management'
+  if (stored === 'Search Visibility') return 'Public Presence'
   return navViews.includes(stored as ActiveView)
     ? (stored as ActiveView)
     : 'Overall'
@@ -301,6 +295,7 @@ const defaultAIAnswerTest: AIAnswerTestState = {
     'Improve source-of-truth pages, schema, listings, citations, reviews, and concise service/location facts so AI answer platforms can identify the business more accurately.',
   priority: 'Medium',
   packageFit: 'Starter Visibility Cleanup',
+  observations: [],
 }
 
 const buildDefaultAIAnswerTests = () =>
@@ -314,13 +309,20 @@ const buildDefaultAIAnswerTests = () =>
 
 const initialState: AuditState = {
   profile: defaultProfile,
+  businessProfile: normalizeBusinessProfileState(
+    defaultProfile,
+    undefined,
+    new Date().toISOString(),
+  ),
   checks: {},
   notes: {},
   evidenceConfidence: {},
   selectedAIPlatform: 'Gemini',
   aiAnswerTests: buildDefaultAIAnswerTests(),
   searchVisibilityTests: {},
+  searchDestinationObservations: {},
   voicePromptTests: {},
+  voiceAssistantObservations: [],
   directories: { activeRows: [], ignoredSuggestionIds: [] },
   manualFixes: [],
   reportSummary: '',
@@ -336,7 +338,13 @@ const initialState: AuditState = {
 const blankProfile: BusinessProfile = {
   businessName: '',
   website: '',
+  streetAddress: '',
+  city: '',
+  state: '',
+  zip: '',
   phone: '',
+  knownListingUrl: '',
+  operatorNote: '',
   phoneNumbers: [],
   contactStructureNote: '',
   primaryCategory: '',
@@ -353,13 +361,20 @@ const blankProfile: BusinessProfile = {
 const createBlankAuditState = (): AuditState => ({
   ...initialState,
   profile: blankProfile,
+  businessProfile: normalizeBusinessProfileState(
+    blankProfile,
+    undefined,
+    new Date().toISOString(),
+  ),
   checks: {},
   notes: {},
   evidenceConfidence: {},
   selectedAIPlatform: 'Gemini',
   aiAnswerTests: buildDefaultAIAnswerTests(),
   searchVisibilityTests: {},
+  searchDestinationObservations: {},
   voicePromptTests: {},
+  voiceAssistantObservations: [],
   directories: { activeRows: [], ignoredSuggestionIds: [] },
   manualFixes: [],
   reportSummary: '',
@@ -371,6 +386,40 @@ const createBlankAuditState = (): AuditState => ({
   },
   lastUpdated: new Date().toISOString(),
 })
+
+const legacyCity = (localMarket: string) => localMarket.split(',')[0]?.trim() ?? ''
+const legacyState = (localMarket: string) => localMarket.split(',')[1]?.trim() ?? ''
+const legacyAIObservation = (
+  platform: AIAnswerPlatform,
+  test: Partial<AIAnswerTestState>,
+): AIAnswerObservation[] =>
+  test.observations?.length
+    ? test.observations
+    : test.rawResponse || test.evidenceNotes
+      ? [{
+          id: `legacy-ai-${platform.toLowerCase()}`,
+          evidenceMode: 'consumer_observation', promptType: 'branded_factual_accuracy',
+          promptUsed: '', platform, model: '', observedAt: '', loginState: 'unknown',
+          locationContext: '', personalizationContext: 'Legacy context not recorded.',
+          mentioned: 'unclear', mentionPosition: 'not_applicable', recommendationStrength: 'not_mentioned',
+          officialWebsiteCited: 'unclear', factualAccuracy: 'unable_to_verify', unsupportedClaims: '',
+          competitorsMentioned: test.sourcesMentioned ?? '', rawResponse: test.rawResponse ?? '', sourceLinks: '',
+          evidenceNotes: test.evidenceNotes ?? '', recommendedAction: test.suggestedFix ?? '',
+          operatorReviewed: false, provenance: 'legacy_imported',
+        }]
+      : []
+
+const legacyVoiceObservations = (
+  tests: Record<string, VoicePromptTestState> | undefined,
+): VoiceAssistantObservation[] =>
+  Object.entries(tests ?? {}).map(([id, test]) => ({
+    id: `legacy-${id}`, assistant: test.platformTested, deviceOrInterface: test.deviceContext,
+    exactUtterance: id, locationContext: '', loginState: 'unknown', observedAt: '',
+    result: test.testStatus === 'business_found_accurate' ? 'directly_identified' : test.testStatus === 'business_found_incomplete' ? 'included_among_options' : test.testStatus === 'wrong_outdated' ? 'found_with_inaccurate_facts' : test.testStatus === 'not_found' ? 'not_found' : 'unable_to_verify',
+    responseTranscript: '', visibleSource: '', evidenceNotes: test.evidenceNotes,
+    evidenceConfidence: test.evidenceConfidence, provenance: 'legacy_imported', operatorReviewed: false,
+    recommendedAction: test.recommendedAction,
+  }))
 
 const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
     const defaultTests = buildDefaultAIAnswerTests()
@@ -392,28 +441,70 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
           }
         : defaultTests)
 
+    const profile: BusinessProfile = {
+      ...defaultProfile,
+      ...parsed.profile,
+      city: parsed.profile?.city ?? legacyCity(parsed.profile?.localMarket ?? defaultProfile.localMarket),
+      state: parsed.profile?.state ?? legacyState(parsed.profile?.localMarket ?? defaultProfile.localMarket),
+      streetAddress: parsed.profile?.streetAddress ?? '',
+      zip: parsed.profile?.zip ?? '',
+      knownListingUrl: parsed.profile?.knownListingUrl ?? '',
+      operatorNote: parsed.profile?.operatorNote ?? '',
+      phoneNumbers: ensurePhoneRecordIds(
+        parsed.profile?.phoneNumbers ?? defaultProfile.phoneNumbers,
+      ),
+      contactStructureNote:
+        parsed.profile?.contactStructureNote ?? defaultProfile.contactStructureNote,
+    }
+
     return {
       ...initialState,
       ...parsed,
-      profile: {
-        ...defaultProfile,
-        ...parsed.profile,
-        phoneNumbers: ensurePhoneRecordIds(
-          parsed.profile?.phoneNumbers ?? defaultProfile.phoneNumbers,
-        ),
-        contactStructureNote:
-          parsed.profile?.contactStructureNote ??
-          defaultProfile.contactStructureNote,
-      },
+      profile,
+      businessProfile: normalizeBusinessProfileState(
+        profile,
+        parsed.businessProfile,
+        parsed.lastUpdated ?? new Date().toISOString(),
+      ),
       selectedAIPlatform: parsed.selectedAIPlatform ?? 'Gemini',
-      searchVisibilityTests: parsed.searchVisibilityTests ?? {},
+      searchVisibilityTests: Object.fromEntries(
+        Object.entries(parsed.searchVisibilityTests ?? {}).map(([id, test]) => [
+          id,
+          {
+            ...defaultSearchVisibilityTest(),
+            ...test,
+            observedResultTypes:
+              test.observedResultTypes?.length
+                ? test.observedResultTypes
+                : legacyWhereFoundToTypes(test.whereFound),
+            provenance: test.provenance ?? 'legacy_imported',
+          },
+        ]),
+      ),
+      searchDestinationObservations: Object.fromEntries(
+        Object.entries(
+          parsed.searchDestinationObservations ??
+            migrateLegacySearchDestinationObservations(parsed.searchVisibilityTests),
+        ).map(([queryId, destinationObservations]) => [
+          queryId,
+          Object.fromEntries(
+            Object.entries(destinationObservations).map(([destination, observation]) => [
+              destination,
+              normalizeSearchDestinationObservation({ ...observation, observedResultTypes: normalizeSearchResultTypes(observation.observedResultTypes ?? []) }),
+            ]),
+          ),
+        ]),
+      ),
       voicePromptTests: parsed.voicePromptTests ?? {},
+      voiceAssistantObservations:
+        parsed.voiceAssistantObservations ?? legacyVoiceObservations(parsed.voicePromptTests),
       aiAnswerTests: aiAnswerPlatforms.reduce(
         (tests, platform) => ({
           ...tests,
           [platform]: {
             ...defaultAIAnswerTest,
             ...savedTests[platform],
+            observations: legacyAIObservation(platform, savedTests[platform] ?? {}),
             evidenceConfidence:
               savedTests[platform]?.evidenceConfidence ?? 'ai_answer_response',
           },
@@ -421,8 +512,7 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
         {} as Record<AIAnswerPlatform, AIAnswerTestState>,
       ),
       directories: migrateDirectories(parsed.directories, {
-        ...defaultProfile,
-        ...parsed.profile,
+        ...profile,
       }),
       evidenceConfidence: parsed.evidenceConfidence ?? {},
       reportSummary: parsed.reportSummary ?? '',
@@ -436,10 +526,7 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
         .map((fix) =>
           migrateSystemGeneratedFix(
             fix,
-            buildAuditItems({
-              ...defaultProfile,
-              ...parsed.profile,
-            }).map(applyCurrentCatalogMetadata),
+            buildAuditItems(profile).map(applyCurrentCatalogMetadata),
           ),
         ),
     }
@@ -554,8 +641,11 @@ function App() {
   const [currentScanId, setCurrentScanId] = useState(loadCurrentScanId)
 
   const auditItems = useMemo(
-    () => buildAuditItems(auditState.profile).map(applyCurrentCatalogMetadata),
-    [auditState.profile],
+    () =>
+      buildAuditItems(auditState.profile, auditState.businessProfile).map(
+        applyCurrentCatalogMetadata,
+      ),
+    [auditState.businessProfile, auditState.profile],
   )
 
   const groups = useMemo(
@@ -574,50 +664,14 @@ function App() {
     const currentDirectoryRows = auditState.directories.activeRows.filter(
       (row) => !row.businessId || row.businessId === currentBusinessId,
     )
-    const directoryItems = currentDirectoryRows.map(
-      directoryRowToAuditItem,
-    )
-    const directoryChecks = currentDirectoryRows.reduce(
-      (checks, row) => ({
-        ...checks,
-        [directoryRowToAuditItem(row).id]: directoryRowToStatus(row),
-      }),
-      {} as Record<string, CheckStatus>,
-    )
-    const listings = scoreItems([...groups.listings, ...directoryItems], {
-      ...auditState.checks,
-      ...directoryChecks,
-    })
     const website = scoreItems(groups.website, auditState.checks)
-    const searchVisibility = scoreItems(
-      groups.searchVisibility,
-      auditState.checks,
-    )
-    const ai = scoreAIAnswers(auditState.aiAnswerTests)
-    const voiceReadinessChecks = [
-      ...buildVoiceSourceReadinessGroups(auditState.profile, auditState.checks),
-      ...buildVoiceReadinessCategories(auditState.profile, auditState.checks),
-    ].reduce(
-      (checks, category) => ({
-        ...checks,
-        [category.id]: auditState.checks[category.id] ?? category.suggestedStatus,
-      }),
-      {} as Record<string, CheckStatus>,
-    )
-    const voiceItemsForScore = groups.voice.filter(
-      (item) => !item.id.startsWith('voice-prompt-'),
-    )
-    const voice = scoreItems(voiceItemsForScore, {
-      ...auditState.checks,
-      ...voiceReadinessChecks,
+    const overallScore = overallVisibilityScore({
+      website: website.score,
     })
-    const overallScore = weightedAverage([
-      { score: listings.score, weight: 24 },
-      { score: website.score, weight: 24 },
-      { score: searchVisibility.score, weight: 18 },
-      { score: ai.score, weight: 18 },
-      { score: voice.score, weight: 16 },
-    ])
+    const primaryQueryId = groups.searchVisibility[0]?.id
+    const coverage = publicPresenceCoverage(auditState.searchDestinationObservations, primaryQueryId ? [primaryQueryId] : [])
+    const publicPresence = { score: null, status: coverage.completed === 0 ? 'Gray' as const : coverage.completed < coverage.total ? 'Yellow' as const : 'Green' as const, earned: 0, possible: 0, checked: coverage.completed, unchecked: coverage.total - coverage.completed, statusLabel: coverage.completed === 0 ? 'Not tested' : coverage.completed < coverage.total ? 'Incomplete' : publicPresenceQualityLabel(auditState.searchDestinationObservations, primaryQueryId ? [primaryQueryId] : []) }
+    const profileManagement = { score: null, status: 'Gray' as const, earned: 0, possible: 0, checked: currentDirectoryRows.length, statusLabel: 'Owner/admin access incomplete' }
 
     return {
       Overall: {
@@ -625,20 +679,34 @@ function App() {
         status: trafficStatusForScore(overallScore),
         earned: overallScore ?? 0,
         possible: 100,
-        checked:
-          listings.checked +
-          website.checked +
-          searchVisibility.checked +
-          ai.checked +
-          voice.checked,
+        checked: overallVisibilityCheckedCount({
+          website: website.checked,
+        }),
       },
-      Listings: listings,
       'Website SEO': website,
-      'Search Visibility': searchVisibility,
-      'AI Answers': ai,
-      Voice: voice,
+      'Public Presence': publicPresence,
+      'Profile Management': profileManagement,
     }
-  }, [auditState.aiAnswerTests, auditState.checks, auditState.directories.activeRows, auditState.profile, groups])
+  }, [auditState.checks, auditState.directories.activeRows, auditState.profile, auditState.searchDestinationObservations, groups])
+
+  const aiVisibilityEvidence = useMemo(
+    () => summarizeAIVisibilityEvidence(auditState.aiAnswerTests, auditState.profile),
+    [auditState.aiAnswerTests, auditState.profile],
+  )
+
+  const publicPresenceDetails = useMemo(() => {
+    const primaryQueryId = groups.searchVisibility[0]?.id
+    const coverage = publicPresenceCoverage(auditState.searchDestinationObservations, primaryQueryId ? [primaryQueryId] : [])
+    return `${coverage.completed} of ${coverage.total} primary checks complete | ${supportingPublicPresenceReviewedCount(auditState.searchDestinationObservations, primaryQueryId)} supporting checks reviewed`
+  }, [auditState.searchDestinationObservations, groups.searchVisibility])
+
+  const dashboardCards = [
+    { label: 'Overall' as const, result: scores.Overall, weight: 'weighted' },
+    { label: 'Website SEO' as const, result: scores['Website SEO'] },
+    { label: 'Public Presence' as const, result: scores['Public Presence'], displayValue: scores['Public Presence'].statusLabel, details: publicPresenceDetails },
+    { label: 'Profile Management' as const, result: scores['Profile Management'] },
+    { label: 'AI Visibility' as const, result: { score: null, status: 'Gray' as const, earned: 0, possible: 0, checked: aiVisibilityEvidence.reviewedObservationCount, statusLabel: aiVisibilityEvidence.statusLabel } },
+  ]
 
   const fixes = useMemo(
     () => [
@@ -693,6 +761,23 @@ function App() {
     }))
   }
 
+  const updateProfileFromOperator = (profile: BusinessProfile) => {
+    setAuditState((current) => {
+      const recordedAt = new Date().toISOString()
+      return {
+        ...current,
+        profile,
+        businessProfile: recordOperatorProfileChanges(
+          current.profile,
+          profile,
+          current.businessProfile,
+          recordedAt,
+        ),
+        lastUpdated: recordedAt,
+      }
+    })
+  }
+
   const setCheck = (id: string, status: CheckStatus) => {
     updateState({ checks: { ...auditState.checks, [id]: status } })
   }
@@ -732,57 +817,72 @@ function App() {
     })
   }
 
-  const setSearchVisibilityTest = (
-    id: string,
-    searchVisibilityTest: SearchVisibilityTestState,
+  const setSearchDestinationObservation = (
+    query: SearchVisibilityQuery,
+    observation: SearchDestinationObservation,
   ) => {
-    const checkStatus = searchVisibilityResultToCheckStatus(
-      searchVisibilityTest.visibilityResult,
-    )
+    const normalizedObservation = normalizeSearchDestinationObservation(observation)
     updateState({
-      searchVisibilityTests: {
-        ...auditState.searchVisibilityTests,
-        [id]: searchVisibilityTest,
+      searchDestinationObservations: {
+        ...auditState.searchDestinationObservations,
+        [query.id]: {
+          ...auditState.searchDestinationObservations[query.id],
+          [normalizedObservation.destination]: normalizedObservation,
+        },
       },
+      directories: projectPublicObservationToProfiles(
+        auditState.directories,
+        businessDirectoryKey(auditState.profile),
+        normalizedObservation,
+      ),
       checks: {
         ...auditState.checks,
-        [id]: checkStatus,
+        [query.id]: searchVisibilityResultToCheckStatus(normalizedObservation.overallResult),
       },
-      notes: {
-        ...auditState.notes,
-        [id]: searchVisibilityTest.evidenceNotes,
-      },
+      notes: { ...auditState.notes, [query.id]: normalizedObservation.evidenceNotes },
       evidenceConfidence: {
         ...auditState.evidenceConfidence,
-        [id]: searchVisibilityTest.evidenceConfidence,
+        [query.id]: normalizedObservation.confidence,
       },
     })
   }
 
   const addSearchVisibilityToActionPlan = (query: SearchVisibilityQuery) => {
+    const aggregate = aggregateReviewedSearchObservations(
+      Object.values(auditState.searchDestinationObservations[query.id] ?? {}),
+    )
+    if (!aggregate) {
+      window.alert('Review at least one destination observation before adding it to the Action Plan.')
+      return
+    }
     const test = {
       ...defaultSearchVisibilityTest(),
       ...auditState.searchVisibilityTests[query.id],
+      recommendedAction: aggregate.recommendation,
+      evidenceNotes: aggregate.observations
+        .map((item) => `${item.destination}: ${item.evidenceNotes}`)
+        .filter(Boolean)
+        .join('\n'),
+      competitorsObserved: aggregate.observations
+        .map((item) => `${item.destination}: ${item.competitorsObserved}`)
+        .filter(Boolean)
+        .join('\n'),
+      evidenceConfidence: aggregate.evidenceConfidence,
     }
-    const status = searchVisibilityResultToCheckStatus(test.visibilityResult)
-    const observedPriority = actionPlanPriorityForSearchObservation(
-      query,
-      test.visibilityResult,
-    )
     const manualFix: FixItem = {
       id: `manual-search-visibility-${query.id}`,
-      priority: observedPriority,
+      priority: aggregate.priority,
       area: `Search Visibility - ${query.intentType}`,
-      issue: `Search visibility for "${query.query}"`,
+      issue: `Search visibility for "${query.query}" (${aggregate.kind.replace(/_/g, ' ')})`,
       fix: test.recommendedAction,
-      status,
+      status: aggregate.status,
       evidenceNote: [
         `Query: ${query.query}`,
         `Intent type: ${query.intentType}`,
         `Query importance: ${query.priority}`,
-        `Finding priority: ${observedPriority}`,
-        `Visibility result: ${searchVisibilityResultLabel(test.visibilityResult)}`,
-        `Where found: ${test.whereFound}`,
+        `Aggregate interpretation: ${aggregate.kind.replace(/_/g, ' ')}`,
+        `Primary destinations considered: ${aggregate.primaryObservations.map((item) => item.destination).join(', ') || 'none reviewed'}`,
+        `Reviewed destinations: ${aggregate.observations.map((item) => `${item.destination} (${searchVisibilityResultLabel(item.overallResult)})`).join(', ')}`,
         test.evidenceNotes,
       ]
         .filter(Boolean)
@@ -804,7 +904,7 @@ function App() {
       ],
       checks: {
         ...auditState.checks,
-        [query.id]: status,
+        [query.id]: aggregate.status,
       },
       notes: {
         ...auditState.notes,
@@ -814,33 +914,6 @@ function App() {
       evidenceConfidence: {
         ...auditState.evidenceConfidence,
         [query.id]: test.evidenceConfidence,
-      },
-    })
-  }
-
-  const setVoicePromptTest = (
-    id: string,
-    voicePromptTest: VoicePromptTestState,
-  ) => {
-    const checkStatus = voicePromptStatusToCheckStatus(
-      voicePromptTest.testStatus,
-    )
-    updateState({
-      voicePromptTests: {
-        ...auditState.voicePromptTests,
-        [id]: voicePromptTest,
-      },
-      checks: {
-        ...auditState.checks,
-        [id]: checkStatus,
-      },
-      notes: {
-        ...auditState.notes,
-        [id]: voicePromptTest.evidenceNotes,
-      },
-      evidenceConfidence: {
-        ...auditState.evidenceConfidence,
-        [id]: voicePromptTest.evidenceConfidence,
       },
     })
   }
@@ -857,7 +930,7 @@ function App() {
       id: `manual-${id}`,
       priority:
         status === 'fail' ? 'High' : category.weight >= 10 ? 'Medium' : 'Low',
-      area: 'Voice Search Readiness',
+      area: 'Listings / Entity Readiness',
       issue: category.label,
       fix: category.recommendedAction,
       status,
@@ -873,7 +946,7 @@ function App() {
       evidenceConfidence:
         auditState.evidenceConfidence[id] ?? 'derived_readiness_signal',
       whyItMatters:
-        'Voice-style answers depend on clear public signals for identity, contact, location, services, listings, reviews, FAQs, and structured data.',
+        'Clear public entity signals support reliable business identity, contact, location, services, listings, reviews, FAQs, and structured data.',
     }
 
     updateState({
@@ -892,77 +965,39 @@ function App() {
     })
   }
 
-  const addVoicePromptToActionPlan = (id: string) => {
-    const prompt = buildVoicePromptTests(auditState.profile).find(
-      (item) => item.id === id,
-    )
-    if (!prompt) return
-    const test = {
-      ...defaultVoicePromptTest(prompt),
-      ...auditState.voicePromptTests[id],
-    }
-    const status = voicePromptStatusToCheckStatus(test.testStatus)
+  const addVoiceAssistantObservationToActionPlan = (id: string) => {
+    const observation = auditState.voiceAssistantObservations.find((item) => item.id === id)
+    if (!observation?.operatorReviewed) return
     const manualFix: FixItem = {
-      id: `manual-${id}`,
-      priority: prompt.priority,
-      area: `Voice Search Readiness - ${prompt.intent}`,
-      issue: prompt.prompt,
-      fix: test.recommendedAction,
-      status,
-      evidenceNote: [
-        `Prompt: ${prompt.prompt}`,
-        `Platform tested: ${test.platformTested}`,
-        `Test device/context: ${test.deviceContext}`,
-        `Personalization risk: ${test.personalizationRisk}`,
-        `Test status: ${voicePromptStatusLabel(test.testStatus)}`,
-        test.evidenceNotes,
-      ]
-        .filter(Boolean)
-        .join('\n'),
-      packageFit: test.packageFit,
-      effort: test.packageFit === 'Website SEO Implementation' ? 'Medium' : 'Low',
-      evidenceConfidence: test.evidenceConfidence,
-      whyItMatters:
-        'Voice-style prompt tests reveal whether public signals resolve the correct business, contact path, services, and local relevance.',
+      id: `manual-voice-observation-${id}`,
+      priority: observation.result === 'wrong_business_selected' || observation.result === 'not_found' ? 'High' : 'Medium',
+      area: `Voice Assistant Observation - ${observation.assistant}`,
+      issue: observation.exactUtterance || `Voice observation for ${observation.assistant}`,
+      fix: observation.recommendedAction || 'Review the observed assistant response against public source data, then improve the relevant business, location, contact, and listing signals.',
+      status: observation.result === 'directly_identified' || observation.result === 'correct_business_action_available' ? 'pass' : observation.result === 'included_among_options' || observation.result === 'unable_to_verify' ? 'partial' : 'fail',
+      evidenceNote: [`Assistant: ${observation.assistant}`, `Result: ${observation.result}`, observation.responseTranscript, observation.evidenceNotes].filter(Boolean).join('\n'),
+      sources: observation.visibleSource,
+      packageFit: 'Starter Visibility Cleanup',
+      effort: 'Low',
+      evidenceConfidence: observation.evidenceConfidence,
+      whyItMatters: 'A device-specific assistant observation is evidence from one context, not a guarantee of what every consumer assistant will return.',
     }
-
-    updateState({
-      manualFixes: [
-        ...auditState.manualFixes.filter((fix) => fix.id !== manualFix.id),
-        manualFix,
-      ],
-      checks: {
-        ...auditState.checks,
-        [id]: status,
-      },
-      notes: {
-        ...auditState.notes,
-        [id]: test.evidenceNotes,
-        [manualFix.id]: manualFix.evidenceNote ?? '',
-      },
-      evidenceConfidence: {
-        ...auditState.evidenceConfidence,
-        [id]: test.evidenceConfidence,
-      },
-    })
+    updateState({ manualFixes: [...auditState.manualFixes.filter((fix) => fix.id !== manualFix.id), manualFix] })
   }
 
   const addAIAnswerToActionPlan = () => {
     const platform = auditState.selectedAIPlatform
     const test = auditState.aiAnswerTests[platform]
-    if (
-      test.resultStatus === 'signin_required' &&
-      (!test.evidenceNotes.trim() || !test.suggestedFix.trim())
-    ) {
+    const observation = test.observations.find((item) => item.operatorReviewed)
+    if (!observation) {
       window.alert(
-        'This platform is marked as sign-in required, so it will stay out of the Action Plan unless you add an evidence summary and recommended action.',
+        'Review at least one consumer observation before adding AI evidence to the Action Plan.',
       )
       return
     }
 
-    const statusLabel = aiResultLabel(test.resultStatus)
     const checkStatus = aiResultToCheckStatus(test.resultStatus)
-    const issue = test.gapTitle.trim() || `${platform} AI answer visibility gap`
+    const issue = test.gapTitle.trim() || `${platform} AI observation follow-up`
     const manualFix: FixItem = {
       id: `${aiActionPlanId}-${platform.toLowerCase().replace(/\W+/g, '-')}-${issue
         .toLowerCase()
@@ -970,16 +1005,18 @@ function App() {
       priority: test.priority,
       area: `AI Answers - ${platform}`,
       issue,
-      fix: test.suggestedFix,
+      fix: observation.recommendedAction || test.suggestedFix,
       status: checkStatus,
       evidenceNote: [
         `Platform tested: ${platform}`,
-        `Result status: ${statusLabel}`,
-        test.evidenceNotes,
+        `Evidence mode: ${observation.evidenceMode}`,
+        `Mentioned: ${observation.mentioned}`,
+        `Factual accuracy: ${observation.factualAccuracy}`,
+        observation.evidenceNotes,
       ]
         .filter(Boolean)
         .join('\n'),
-      sources: test.sourcesMentioned,
+      sources: observation.sourceLinks || test.sourcesMentioned,
       packageFit: test.packageFit,
       platform,
       effort: test.packageFit === 'Website SEO Implementation' ? 'Medium' : 'Low',
@@ -1074,11 +1111,6 @@ function App() {
 
   const setSelectedAIPlatform = (platform: AIAnswerPlatform) => {
     updateState({ selectedAIPlatform: platform })
-  }
-
-  const resetChecks = () => {
-    const confirmed = window.confirm('Clear saved statuses and evidence notes?')
-    if (confirmed) updateState({ checks: {}, notes: {} })
   }
 
   const downloadScanJson = (scan: SavedScanRecord) => {
@@ -1195,11 +1227,6 @@ function App() {
     if (scan) downloadScanJson(scan)
   }
 
-  const exportJson = () => {
-    const existing = savedScans.find((scan) => scan.id === currentScanId)
-    downloadScanJson(savedScanFromWorkspace(auditState, existing))
-  }
-
   const importSavedScan = (file: File) => {
     const reader = new FileReader()
     reader.onload = () => {
@@ -1292,17 +1319,41 @@ function App() {
     }
   }
 
+  const researchBusiness = () => {
+    setActiveView('Website SEO')
+    void runAutoAudit()
+  }
+
   const setManualWebsiteObservation = (
     nextObservation: Partial<ManualWebsiteObservation>,
   ) => {
+    const manualObservation = updateManualWebsiteObservationDraft(
+      auditState.websiteAudit.manualObservation,
+      nextObservation,
+    )
+    const draftWasInvalidated =
+      auditState.websiteAudit.manualObservation.analyzedAt &&
+      !manualObservation.analyzedAt
+    const retainedChecks = { ...auditState.checks }
+    const retainedNotes = { ...auditState.notes }
+    const retainedConfidence = { ...auditState.evidenceConfidence }
+    if (draftWasInvalidated) {
+      Object.entries(retainedConfidence).forEach(([id, confidence]) => {
+        if (confidence === 'operator_observation') {
+          delete retainedChecks[id]
+          delete retainedNotes[id]
+          delete retainedConfidence[id]
+        }
+      })
+    }
     updateState({
       websiteAudit: {
         ...auditState.websiteAudit,
-        manualObservation: updateManualWebsiteObservationDraft(
-          auditState.websiteAudit.manualObservation,
-          nextObservation,
-        ),
+        manualObservation,
       },
+      checks: retainedChecks,
+      notes: retainedNotes,
+      evidenceConfidence: retainedConfidence,
     })
   }
 
@@ -1460,14 +1511,6 @@ function App() {
     (record) => record.isValidPublicContact && record.number.trim(),
   )
 
-  const aiPlatformScores = aiAnswerPlatforms.reduce(
-    (platformScores, platform) => ({
-      ...platformScores,
-      [platform]: scoreAIAnswerPlatform(auditState.aiAnswerTests[platform]),
-    }),
-    {} as Record<AIAnswerPlatform, number>,
-  )
-
   const renderActiveView = () => {
     if (activeView === 'Overall') {
       return (
@@ -1593,7 +1636,7 @@ function App() {
             <p className="eyebrow">Sales Summary</p>
             <p>
               I identified {fixes.length} potential visibility gaps across
-              website SEO, listings, search visibility, AI answers, and voice
+              website SEO, listings, search visibility, and optional manual AI evidence
               readiness. The recommended starter cleanup focuses on the
               highest-impact fixes first.
             </p>
@@ -1649,23 +1692,23 @@ function App() {
       )
     }
 
-    if (activeView === 'Listings') {
+    if (activeView === 'Profile Management') {
       return (
         <div className="listings-cockpit">
           <section className="panel listings-overview-panel">
             <div>
-              <p className="eyebrow">Guided Listings Verification</p>
-              <h2>Listings visibility cockpit</h2>
+              <p className="eyebrow">Public profiles and ownership</p>
+              <h2>Profile Management</h2>
               <p>
-                Review core platforms first, then activate relevant industry
-                and local directory opportunities. Suggested directories do not
-                affect score until activated.
+                Which public profiles exist, who controls them, and what
+                requires owner confirmation or correction? Public evidence does
+                not infer owner/admin access.
               </p>
             </div>
             <div className="metric-stack listings-metric-stack">
               <div>
-                <span>Listings score</span>
-                <strong>{Math.round(scores.Listings.score ?? 0)}</strong>
+                <span>Owner/admin access</span>
+                <strong>Confirm separately</strong>
               </div>
               <div>
                 <span>Activated directories</span>
@@ -1692,6 +1735,20 @@ function App() {
             state={auditState.directories}
             onChange={setDirectories}
             onAddToActionPlan={addDirectoryToActionPlan}
+          />
+
+          <VoiceReadinessPanel
+            profile={auditState.profile}
+            checks={auditState.checks}
+            notes={auditState.notes}
+            evidenceConfidence={auditState.evidenceConfidence}
+            observations={auditState.voiceAssistantObservations}
+            onStatusChange={setCheck}
+            onNoteChange={setNote}
+            onEvidenceConfidenceChange={setEvidenceConfidence}
+            onObservationChange={(voiceAssistantObservations) => updateState({ voiceAssistantObservations })}
+            onAddCategoryToActionPlan={addVoiceCategoryToActionPlan}
+            onAddObservationToActionPlan={(id) => addVoiceAssistantObservationToActionPlan(id)}
           />
         </div>
       )
@@ -1989,27 +2046,27 @@ function App() {
       )
     }
 
-    if (activeView === 'Search Visibility') {
+    if (activeView === 'Public Presence') {
       return (
         <SearchVisibilityPanel
           profile={auditState.profile}
-          tests={auditState.searchVisibilityTests}
-          onChange={setSearchVisibilityTest}
+          profileState={auditState.businessProfile}
+          legacyTests={auditState.searchVisibilityTests}
+          observations={auditState.searchDestinationObservations}
+          onChange={setSearchDestinationObservation}
           onAddToActionPlan={addSearchVisibilityToActionPlan}
         />
       )
     }
 
-    if (activeView === 'AI Answers') {
+    if (activeView === 'AI Visibility') {
       return (
         <AIAnswerVisibilityTest
           profile={auditState.profile}
+          profileState={auditState.businessProfile}
           selectedPlatform={auditState.selectedAIPlatform}
           value={auditState.aiAnswerTests[auditState.selectedAIPlatform]}
           tests={auditState.aiAnswerTests}
-          platformScores={aiPlatformScores}
-          checkedCount={scores['AI Answers'].checked}
-          uncheckedCount={scores['AI Answers'].unchecked ?? 0}
           onSelectedPlatformChange={setSelectedAIPlatform}
           onChange={setAIAnswerTest}
           onAddToActionPlan={addAIAnswerToActionPlan}
@@ -2031,6 +2088,17 @@ function App() {
             updateState({ reportSummary })
           }
           evidenceConfidence={auditState.evidenceConfidence}
+          aiVisibilityEvidence={aiVisibilityEvidence}
+        />
+      )
+    }
+
+    if (activeView === 'Business Profile') {
+      return (
+        <BusinessProfilePanel
+          profile={auditState.profile}
+          profileState={auditState.businessProfile}
+          onChange={updateProfileFromOperator}
         />
       )
     }
@@ -2064,30 +2132,14 @@ function App() {
           />
           <IntakeForm
             profile={auditState.profile}
-            onChange={(profile) => updateState({ profile })}
-            onReset={resetChecks}
-            onPrint={() => window.print()}
-            onExport={exportJson}
+            onChange={updateProfileFromOperator}
+            onResearch={researchBusiness}
           />
         </div>
       )
     }
 
-    return (
-      <VoiceReadinessPanel
-        profile={auditState.profile}
-        checks={auditState.checks}
-        notes={auditState.notes}
-        evidenceConfidence={auditState.evidenceConfidence}
-        promptTests={auditState.voicePromptTests}
-        onStatusChange={setCheck}
-        onNoteChange={setNote}
-        onEvidenceConfidenceChange={setEvidenceConfidence}
-        onPromptChange={setVoicePromptTest}
-        onAddCategoryToActionPlan={addVoiceCategoryToActionPlan}
-        onAddPromptToActionPlan={addVoicePromptToActionPlan}
-      />
-    )
+    return null
   }
 
   return (
@@ -2119,7 +2171,7 @@ function App() {
               <span className="sidebar-icon" aria-hidden="true">
                 <SidebarIcon view={view} />
               </span>
-              {view}
+              {visibleViewLabel(view)}
             </button>
           ))}
         </nav>
@@ -2169,12 +2221,14 @@ function App() {
             role="tablist"
             aria-label="Dashboard score summary"
           >
-            {views.map((label) => (
+            {dashboardCards.map(({ label, result, weight, displayValue, details }) => (
               <ScoreCard
                 key={label}
-                label={label}
-                result={scores[label]}
-                weight={label === 'Overall' ? 'weighted' : undefined}
+                label={visibleViewLabel(label)}
+                result={result}
+                weight={weight}
+                displayValue={displayValue}
+                details={details}
                 active={activeView === label}
                 onClick={() => setActiveView(label)}
               />
