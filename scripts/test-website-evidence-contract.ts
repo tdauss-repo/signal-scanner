@@ -125,6 +125,7 @@ assert.equal(normalizedLegacy.manualObservation.observedTitle, 'Observed manuall
 assert.equal(normalizedLegacy.manualObservation.sourceUrl, '')
 assert.equal(normalizedLegacy.manualObservation.recordedAt, '')
 assert.equal(normalizedLegacy.manualObservation.acquisition, null)
+assert.equal(normalizedLegacy.browserObservation, null)
 
 const manualObservation = captureManualObservationProvenance(
   {
@@ -189,6 +190,7 @@ assert.equal(
 assert.equal(normalizedMalformed.manualObservation.notes, 'Preserve unrelated manual state.')
 assert.equal(normalizedMalformed.manualObservation.recordedAt, '2026-07-30T12:14:00.000Z')
 assert.equal(normalizedMalformed.manualObservation.acquisition, null)
+assert.equal(normalizedMalformed.browserObservation, null)
 
 const legacyMapping = mapAutoAuditToWebsiteChecks(
   legacySuccessfulResult as WebsiteAuditResult,

@@ -10,6 +10,7 @@
     "dev:all": "node scripts/dev-all.mjs",
     "diagnose:website": "node scripts/diagnose-website-fetch.mjs",
     "test:proving-001": "node --import tsx scripts/test-website-audit.ts && node --import tsx scripts/test-website-evidence-contract.ts",
+    "test:proving-002": "node --import tsx scripts/test-browser-website-observation.ts",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

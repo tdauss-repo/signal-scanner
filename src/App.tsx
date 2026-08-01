@@ -21,7 +21,12 @@ import { defaultProfile } from './data/demoProfile'
 import type { AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem, SavedScanFile, SavedScanRecord, SearchVisibilityQuery, SearchVisibilityTestState, VoicePromptTestState } from './types/audit'
 import type { ManualWebsiteObservation } from './types/websiteAudit'
 import { aiAnswerPlatforms, buildFixPlan, scoreAIAnswerPlatform, scoreAIAnswers, scoreItems, trafficStatusForScore, weightedAverage } from './utils/scoring'
-import { analyzeManualWebsiteObservation, mapAutoAuditToWebsiteChecks, runWebsiteAutoAudit } from './utils/websiteAutoAudit'
+import { analyzeBrowserWebsiteObservation, analyzeManualWebsiteObservation, mapAutoAuditToWebsiteChecks, mergeBrowserMappingWithServerPrecedence, runWebsiteAutoAudit } from './utils/websiteAutoAudit'
+import {
+  browserWebsiteObservationFromPayload,
+  captureBrowserWebsiteObservationProvenance,
+  parseBrowserWebsiteEvidencePayload,
+} from './utils/browserWebsiteObservation'
 import {
   captureManualObservationProvenance,
   defaultManualWebsiteObservation,
@@ -323,6 +328,7 @@ const initialState: AuditState = {
     lastSuccessful: null,
     latestAttempt: null,
     manualObservation: defaultManualWebsiteObservation(),
+    browserObservation: null,
   },
   lastUpdated: new Date().toISOString(),
 }
@@ -361,6 +367,7 @@ const createBlankAuditState = (): AuditState => ({
     lastSuccessful: null,
     latestAttempt: null,
     manualObservation: defaultManualWebsiteObservation(),
+    browserObservation: null,
   },
   lastUpdated: new Date().toISOString(),
 })
@@ -540,6 +547,8 @@ function App() {
   const [auditState, setAuditState] = useState<AuditState>(loadState)
   const [websiteAuditLoading, setWebsiteAuditLoading] = useState(false)
   const [websiteAuditError, setWebsiteAuditError] = useState('')
+  const [browserEvidenceJson, setBrowserEvidenceJson] = useState('')
+  const [browserEvidenceImportError, setBrowserEvidenceImportError] = useState('')
   const [activeView, setActiveView] = useState<ActiveView>(loadActiveView)
   const [savedScans, setSavedScans] = useState<SavedScanRecord[]>(loadSavedScans)
   const [currentScanId, setCurrentScanId] = useState(loadCurrentScanId)
@@ -1326,8 +1335,69 @@ function App() {
     })
   }
 
+  const applyBrowserObservationAnalysis = (
+    observation: NonNullable<AuditState['websiteAudit']['browserObservation']>,
+  ) => {
+    const mapping = analyzeBrowserWebsiteObservation(
+      observation,
+      auditState.profile,
+    )
+    const mergedBrowserEvidence = mergeBrowserMappingWithServerPrecedence(
+      auditState,
+      auditState.profile,
+      mapping,
+    )
+    updateState({
+      websiteAudit: {
+        ...auditState.websiteAudit,
+        browserObservation: observation,
+      },
+      ...mergedBrowserEvidence,
+    })
+  }
+
+  const importBrowserEvidence = () => {
+    const parsed = parseBrowserWebsiteEvidencePayload(browserEvidenceJson)
+    if (!parsed.ok) {
+      setBrowserEvidenceImportError(parsed.error)
+      return
+    }
+
+    const observation = browserWebsiteObservationFromPayload(
+      parsed.payload,
+      new Date().toISOString(),
+    )
+    setBrowserEvidenceImportError('')
+    applyBrowserObservationAnalysis(observation)
+  }
+
+  const reanalyzeBrowserObservation = () => {
+    const observation = auditState.websiteAudit.browserObservation
+    if (!observation) return
+
+    setBrowserEvidenceImportError('')
+    applyBrowserObservationAnalysis(
+      captureBrowserWebsiteObservationProvenance(
+        observation,
+        new Date().toISOString(),
+      ),
+    )
+  }
+
   const latestWebsiteAttempt = auditState.websiteAudit.latestAttempt
   const lastSuccessfulWebsiteAudit = auditState.websiteAudit.lastSuccessful
+  const browserWebsiteObservation = auditState.websiteAudit.browserObservation
+  const browserEvidenceDiffersFromLastServerSuccess = (() => {
+    if (!browserWebsiteObservation || !lastSuccessfulWebsiteAudit) return false
+    try {
+      return (
+        new URL(browserWebsiteObservation.sourceUrl).toString() !==
+        new URL(lastSuccessfulWebsiteAudit.fetchedUrl).toString()
+      )
+    } catch {
+      return browserWebsiteObservation.sourceUrl !== lastSuccessfulWebsiteAudit.fetchedUrl
+    }
+  })()
 
   const websiteScanAccess =
     latestWebsiteAttempt?.ok &&
@@ -1754,6 +1824,56 @@ function App() {
                   version keeps review manual and authorized.
                 </p>
               </div>
+              <div className="manual-website-grid">
+                <label className="full-width-label">
+                  Browser-assisted structured evidence JSON
+                  <textarea
+                    className="large-textarea"
+                    value={browserEvidenceJson}
+                    onChange={(event) => {
+                      setBrowserEvidenceJson(event.target.value)
+                      setBrowserEvidenceImportError('')
+                    }}
+                    placeholder="Run scripts/browser-website-evidence-helper.js in the public page browser console, then paste the JSON payload here."
+                  />
+                </label>
+              </div>
+              <button type="button" onClick={importBrowserEvidence}>
+                Import Browser-Assisted Evidence
+              </button>
+              {browserEvidenceImportError ? (
+                <p className="error-text">{browserEvidenceImportError}</p>
+              ) : null}
+              {browserWebsiteObservation ? (
+                <div className="auto-audit-result">
+                  <strong>Browser-assisted evidence</strong>
+                  <span>Source URL: {browserWebsiteObservation.sourceUrl}</span>
+                  <span>
+                    DOM captured:{' '}
+                    {new Date(browserWebsiteObservation.capturedAt).toLocaleString()}
+                  </span>
+                  {browserWebsiteObservation.recordedAt ? (
+                    <span>
+                      Recorded in Found Local:{' '}
+                      {new Date(browserWebsiteObservation.recordedAt).toLocaleString()}
+                    </span>
+                  ) : null}
+                  <span>
+                    Found {browserWebsiteObservation.detectedSchemaTypes.length} schema type(s),{' '}
+                    {browserWebsiteObservation.links.length} link(s),{' '}
+                    {browserWebsiteObservation.contactLinks.length} contact link(s)
+                  </span>
+                  {browserEvidenceDiffersFromLastServerSuccess ? (
+                    <span>
+                      Browser-assisted source differs from the last successful
+                      server acquisition. Both evidence records are preserved.
+                    </span>
+                  ) : null}
+                  <button type="button" onClick={reanalyzeBrowserObservation}>
+                    Re-analyze Browser-Assisted Evidence
+                  </button>
+                </div>
+              ) : null}
               <div className="manual-website-grid">
                 <label className="full-width-label">
                   Recorded source URL

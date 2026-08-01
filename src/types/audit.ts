@@ -1,4 +1,5 @@
 import type {
+  BrowserWebsiteObservation,
   ManualWebsiteObservation,
   WebsiteAuditResponse,
   WebsiteAuditResult,
@@ -90,6 +91,7 @@ export interface WebsiteAuditWorkspaceState {
   lastSuccessful: WebsiteAuditResult | null
   latestAttempt: WebsiteAuditResponse | null
   manualObservation: ManualWebsiteObservation
+  browserObservation: BrowserWebsiteObservation | null
 }
 
 export interface SavedScanRecord {

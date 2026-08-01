@@ -1,6 +1,13 @@
-import type { BusinessProfile } from '../types/audit'
+import type {
+  BusinessProfile,
+  CheckStatus,
+  EvidenceConfidence,
+  WebsiteAuditWorkspaceState,
+} from '../types/audit'
 import type {
   AutoAuditMapping,
+  BrowserObservedLink,
+  BrowserWebsiteObservation,
   ManualWebsiteObservation,
   WebsiteAuditResponse,
   WebsiteAuditResult,
@@ -304,6 +311,16 @@ const manualNote = (label: string, value: string | string[] | boolean) =>
         : value || 'Not observed',
   )
 
+const formatBrowserObservedLinks = (links: BrowserObservedLink[]) => {
+  if (!links.length) return 'None found'
+  return links
+    .map((link) => {
+      const label = link.anchorText ? `"${link.anchorText}"` : '(no anchor text)'
+      return `${label} -> ${link.url} [${link.sourceRegion}; ${link.internal ? 'internal' : 'external'}]`
+    })
+    .join('\n')
+}
+
 export const analyzeManualWebsiteObservation = (
   observation: ManualWebsiteObservation,
   profile: BusinessProfile,
@@ -523,6 +540,274 @@ export const analyzeManualWebsiteObservation = (
     'website-sitemap-robots': [
       sourcePrefix,
       'Sitemap and robots.txt were not automatically checked from manual observation.',
+    ].join('\n'),
+  }
+
+  return { statuses, notes }
+}
+
+export const mergeBrowserMappingWithServerPrecedence = (
+  current: {
+    checks: Record<string, CheckStatus>
+    notes: Record<string, string>
+    evidenceConfidence: Record<string, EvidenceConfidence>
+    websiteAudit: WebsiteAuditWorkspaceState
+  },
+  profile: BusinessProfile,
+  browserMapping: AutoAuditMapping,
+) => {
+  const serverAuthoritativeIds = new Set(
+    current.websiteAudit.lastSuccessful
+      ? Object.keys(
+          mapAutoAuditToWebsiteChecks(
+            current.websiteAudit.lastSuccessful,
+            profile,
+          ).statuses,
+        )
+      : [],
+  )
+  const browserStatuses = Object.fromEntries(
+    Object.entries(browserMapping.statuses).filter(
+      ([id]) => !serverAuthoritativeIds.has(id),
+    ),
+  ) as Record<string, CheckStatus>
+  const browserNotes = Object.fromEntries(
+    Object.entries(browserMapping.notes).filter(
+      ([id]) => !serverAuthoritativeIds.has(id),
+    ),
+  ) as Record<string, string>
+  const browserConfidence: Record<string, EvidenceConfidence> = {}
+  for (const id of Object.keys(browserStatuses)) {
+    browserConfidence[id] = 'operator_observation'
+  }
+
+  return {
+    checks: { ...current.checks, ...browserStatuses },
+    notes: { ...current.notes, ...browserNotes },
+    evidenceConfidence: {
+      ...current.evidenceConfidence,
+      ...browserConfidence,
+    },
+  }
+}
+
+export const analyzeBrowserWebsiteObservation = (
+  observation: BrowserWebsiteObservation,
+  profile: BusinessProfile,
+): AutoAuditMapping => {
+  const services = [
+    ...splitCsv(profile.primaryServices),
+    ...splitCsv(profile.industryTags),
+    profile.primaryCategory,
+  ].filter(Boolean)
+  const areas = [
+    ...splitCsv(profile.serviceArea),
+    profile.localMarket,
+    profile.targetLocation,
+  ].filter(Boolean)
+  const phoneNumbers = [
+    profile.phone,
+    ...validProfilePhoneNumbers(profile).map((record) => record.number),
+  ].filter(Boolean)
+  const linkUrls = observation.links.map((link) => link.url)
+  const combined = [
+    observation.title,
+    observation.metaDescription,
+    observation.h1Text.join(' '),
+    observation.h2Text.join(' '),
+    observation.visibleText,
+    linkUrls.join(' '),
+    observation.jsonLdTextBlocks.join(' '),
+  ]
+    .join(' ')
+    .toLowerCase()
+  const visibleCombined = [
+    observation.title,
+    observation.metaDescription,
+    observation.h1Text.join(' '),
+    observation.h2Text.join(' '),
+    observation.visibleText,
+    linkUrls.join(' '),
+  ]
+    .join(' ')
+    .toLowerCase()
+  const phoneFound = phoneNumbers.some((phone) => {
+    const digits = normalizeDigits(phone)
+    return digits.length >= 7 && normalizeDigits(combined).includes(digits)
+  })
+  const serviceMatches = services.filter((service) =>
+    visibleCombined.includes(service.toLowerCase()),
+  )
+  const areaMatches = areas.filter((area) =>
+    visibleCombined.includes(area.toLowerCase()),
+  )
+  const businessNameFound =
+    profile.businessName &&
+    visibleCombined.includes(profile.businessName.toLowerCase())
+  const websiteDomain = (() => {
+    try {
+      return new URL(profile.website).hostname.replace(/^www\./, '')
+    } catch {
+      return profile.website.replace(/^https?:\/\//, '').replace(/^www\./, '')
+    }
+  })().toLowerCase()
+  const websiteDomainFound =
+    Boolean(websiteDomain) && visibleCombined.includes(websiteDomain)
+  const contactLinkFound = observation.contactLinks.length > 0
+  const serviceLinkMatches = linkUrls.filter((link) =>
+    services.some((service) => {
+      const normalizedService = service.toLowerCase().replace(/\s+/g, '-')
+      return link.toLowerCase().includes(normalizedService)
+    }),
+  )
+  const faqFound = observation.faqIndicators.length > 0
+  const localSchemaFound =
+    observation.detectedSchemaTypes.some((type) =>
+      /LocalBusiness|ProfessionalService|Organization|Place/i.test(type),
+    ) || observation.jsonLdTextBlocks.length > 0
+  const titleLower = observation.title.toLowerCase()
+  const metaLower = observation.metaDescription.toLowerCase()
+  const titleHasContext =
+    Boolean(observation.title) &&
+    (businessNameFound ||
+      containsAny(titleLower, services) ||
+      containsAny(titleLower, areas))
+  const metaHasContext =
+    observation.metaDescription.length >= 70 &&
+    (containsAny(metaLower, services) || containsAny(metaLower, areas))
+  const claritySignals = [
+    titleHasContext,
+    metaHasContext,
+    businessNameFound,
+    websiteDomainFound,
+    phoneFound || contactLinkFound,
+    serviceMatches.length > 0,
+    areaMatches.length > 0,
+    serviceLinkMatches.length > 0,
+    faqFound,
+    localSchemaFound,
+  ].filter(Boolean).length
+
+  const sourcePrefix =
+    'Based on browser-assisted evidence from an operator-opened public page.'
+  const statuses: AutoAuditMapping['statuses'] = {
+    'website-title': titleHasContext
+      ? 'pass'
+      : observation.title
+        ? 'partial'
+        : 'fail',
+    'website-meta-description': metaHasContext
+      ? 'pass'
+      : observation.metaDescription
+        ? 'partial'
+        : 'fail',
+    'website-homepage-clarity':
+      claritySignals >= 7
+        ? 'pass'
+        : claritySignals >= 4
+          ? 'partial'
+          : 'fail',
+    'website-service-pages':
+      serviceMatches.length >= Math.min(3, services.length)
+        ? 'pass'
+        : serviceMatches.length > 0 || serviceLinkMatches.length > 0
+          ? 'partial'
+          : 'fail',
+    'website-local-content':
+      areaMatches.length >= Math.min(2, areas.length)
+        ? 'pass'
+        : areaMatches.length > 0
+          ? 'partial'
+          : 'fail',
+    'website-schema': localSchemaFound
+      ? 'partial'
+      : observation.jsonLdTextBlocks.length > 0
+        ? 'fail'
+        : 'partial',
+    'website-faq': faqFound ? 'pass' : 'fail',
+    'website-mobile-conversion':
+      phoneFound && contactLinkFound
+        ? 'pass'
+        : phoneFound || contactLinkFound
+          ? 'partial'
+          : 'fail',
+    'website-social-links':
+      observation.socialProfileLinks.length >= 2
+        ? 'pass'
+        : observation.socialProfileLinks.length === 1
+          ? 'partial'
+          : 'fail',
+    'website-sitemap-robots': 'unknown',
+  }
+
+  const notes: AutoAuditMapping['notes'] = {
+    'website-title': [
+      sourcePrefix,
+      manualNote('Observed page title', observation.title),
+      manualNote('Observed H1 headings', observation.h1Text),
+    ].join('\n'),
+    'website-meta-description': [
+      sourcePrefix,
+      manualNote('Observed meta description', observation.metaDescription),
+    ].join('\n'),
+    'website-homepage-clarity': [
+      sourcePrefix,
+      manualNote('Source URL', observation.sourceUrl),
+      manualNote('Business name observed', Boolean(businessNameFound)),
+      manualNote('Website/domain observed', Boolean(websiteDomainFound)),
+      manualNote('Phone/contact observed', Boolean(phoneFound)),
+      manualNote('Service terms observed', serviceMatches),
+      manualNote('Location/service-area terms observed', areaMatches),
+      manualNote('Contact links observed', observation.contactLinks),
+      manualNote('Service links observed', serviceLinkMatches),
+      manualNote('FAQ indicators observed', observation.faqIndicators),
+      manualNote('Schema types observed', observation.detectedSchemaTypes),
+      manualNote('H2 headings observed', observation.h2Text.slice(0, 8)),
+    ].join('\n'),
+    'website-service-pages': [
+      sourcePrefix,
+      manualNote('Service terms observed', serviceMatches),
+      manualNote('Observed service/internal links', serviceLinkMatches),
+    ].join('\n'),
+    'website-local-content': [
+      sourcePrefix,
+      manualNote('Location/service-area terms observed', areaMatches),
+    ].join('\n'),
+    'website-schema': [
+      sourcePrefix,
+      observation.jsonLdTextBlocks.length > 0
+        ? `JSON-LD block count observed: ${observation.jsonLdTextBlocks.length}`
+        : 'No JSON-LD blocks were observed by the browser helper.',
+      manualNote('Detected schema types', observation.detectedSchemaTypes),
+    ].join('\n'),
+    'website-faq': [
+      sourcePrefix,
+      manualNote('FAQ indicators observed', observation.faqIndicators),
+    ].join('\n'),
+    'website-mobile-conversion': [
+      sourcePrefix,
+      manualNote('Phone/contact observed', Boolean(phoneFound)),
+      `Contact/registration paths observed: ${formatBrowserObservedLinks(
+        observation.links.filter((link) => observation.contactLinks.includes(link.url)),
+      )}`,
+      hasDocumentedMultiContactSetup(profile)
+        ? contactStructureEvidence(
+            {
+              phoneNumberMatches: phoneFound ? phoneNumbers : [],
+            } as WebsiteAuditResult,
+            profile,
+          )
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+    'website-social-links': [
+      sourcePrefix,
+      manualNote('Social profile links observed', observation.socialProfileLinks),
+    ].join('\n'),
+    'website-sitemap-robots': [
+      sourcePrefix,
+      'Sitemap and robots.txt were not checked by browser-assisted DOM evidence.',
     ].join('\n'),
   }
 

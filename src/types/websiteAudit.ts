@@ -1,6 +1,7 @@
 export type WebsiteAcquisitionMethod =
   | 'server_fetch'
   | 'operator_observation'
+  | 'browser_assisted_observation'
   | 'rendered_browser'
 
 export type WebsiteAcquisitionOutcome =
@@ -44,6 +45,13 @@ export interface LinkEvidence {
   internal: boolean
   classification: 'contact' | 'rejected-contact-candidate' | 'other'
   reason: string
+}
+
+export interface BrowserObservedLink {
+  url: string
+  anchorText: string
+  sourceRegion: 'header' | 'navigation' | 'footer' | 'body'
+  internal: boolean
 }
 
 export interface WebsiteAuditResult {
@@ -122,7 +130,41 @@ export interface ManualWebsiteObservation {
   analyzedAt: string
 }
 
+export interface BrowserWebsiteEvidencePayload {
+  schema: 'found-local-browser-website-evidence'
+  captureVersion: 1
+  capturedAt: string
+  sourceUrl: string
+  title: string
+  metaDescription: string
+  h1Text: string[]
+  h2Text: string[]
+  visibleText: string
+  links: BrowserObservedLink[]
+  jsonLdTextBlocks: string[]
+}
+
+export interface BrowserWebsiteObservation {
+  captureVersion: 1
+  sourceUrl: string
+  capturedAt: string
+  recordedAt: string
+  acquisition: WebsiteAcquisitionProvenance | null
+  title: string
+  metaDescription: string
+  h1Text: string[]
+  h2Text: string[]
+  visibleText: string
+  links: BrowserObservedLink[]
+  jsonLdTextBlocks: string[]
+  faqIndicators: string[]
+  detectedSchemaTypes: string[]
+  contactLinks: string[]
+  socialProfileLinks: string[]
+  analyzedAt: string
+}
+
 export interface AutoAuditMapping {
-  statuses: Record<string, 'pass' | 'partial' | 'fail'>
+  statuses: Record<string, 'pass' | 'partial' | 'fail' | 'unknown'>
   notes: Record<string, string>
 }

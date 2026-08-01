@@ -1,5 +1,6 @@
 import type { WebsiteAuditWorkspaceState } from '../types/audit'
 import type {
+  BrowserWebsiteObservation,
   ManualWebsiteObservation,
   WebsiteAcquisitionProvenance,
   WebsiteAuditBlockedResult,
@@ -84,6 +85,7 @@ const isWebsiteAcquisitionMethod = (
 ): value is WebsiteAcquisitionProvenance['method'] =>
   value === 'server_fetch' ||
   value === 'operator_observation' ||
+  value === 'browser_assisted_observation' ||
   value === 'rendered_browser'
 
 const isWebsiteAcquisitionOutcome = (
@@ -238,6 +240,55 @@ const normalizeManualObservation = (
   }
 }
 
+const isBrowserObservedLink = (value: unknown) => {
+  if (!isRecord(value)) return false
+  return (
+    isString(value.url) &&
+    isString(value.anchorText) &&
+    ['header', 'navigation', 'footer', 'body'].includes(String(value.sourceRegion)) &&
+    isBoolean(value.internal)
+  )
+}
+
+const isBrowserWebsiteObservation = (
+  value: unknown,
+): value is BrowserWebsiteObservation => {
+  if (!isRecord(value)) return false
+
+  return (
+    value.captureVersion === 1 &&
+    isString(value.sourceUrl) &&
+    isString(value.capturedAt) &&
+    isString(value.recordedAt) &&
+    (value.acquisition === null || isWebsiteAcquisitionProvenance(value.acquisition)) &&
+    isString(value.title) &&
+    isString(value.metaDescription) &&
+    Array.isArray(value.h1Text) &&
+    value.h1Text.every(isString) &&
+    Array.isArray(value.h2Text) &&
+    value.h2Text.every(isString) &&
+    isString(value.visibleText) &&
+    Array.isArray(value.links) &&
+    value.links.every(isBrowserObservedLink) &&
+    Array.isArray(value.jsonLdTextBlocks) &&
+    value.jsonLdTextBlocks.every(isString) &&
+    Array.isArray(value.faqIndicators) &&
+    value.faqIndicators.every(isString) &&
+    Array.isArray(value.detectedSchemaTypes) &&
+    value.detectedSchemaTypes.every(isString) &&
+    Array.isArray(value.contactLinks) &&
+    value.contactLinks.every(isString) &&
+    Array.isArray(value.socialProfileLinks) &&
+    value.socialProfileLinks.every(isString) &&
+    isString(value.analyzedAt)
+  )
+}
+
+const normalizeBrowserObservation = (
+  observation: unknown,
+): BrowserWebsiteObservation | null =>
+  isBrowserWebsiteObservation(observation) ? observation : null
+
 export const normalizeWebsiteAuditWorkspaceState = (
   state: Partial<WebsiteAuditWorkspaceState> | undefined,
 ): WebsiteAuditWorkspaceState => ({
@@ -245,6 +296,7 @@ export const normalizeWebsiteAuditWorkspaceState = (
     normalizeAutomatedResult(state?.lastSuccessful) as WebsiteAuditResult | null,
   latestAttempt: normalizeAutomatedResult(state?.latestAttempt),
   manualObservation: normalizeManualObservation(state?.manualObservation),
+  browserObservation: normalizeBrowserObservation(state?.browserObservation),
 })
 
 export const updateManualWebsiteObservationDraft = (
