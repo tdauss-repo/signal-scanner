@@ -8,6 +8,7 @@ import type {
 } from '../types/audit'
 import { customerEvidenceConfidenceLabel } from '../utils/evidenceConfidence'
 import { formatScore } from '../utils/scoring'
+import { effectivePackageFit } from '../utils/salesReadiness'
 import type { AIVisibilityEvidenceSummary } from '../utils/aiPresence'
 import { StatusBadge } from './StatusBadge'
 
@@ -212,7 +213,7 @@ export function ReportView({
     [fixes],
   )
   const topOpportunities = fixes
-    .filter((fix) => fix.status === 'fail' || fix.status === 'partial')
+    .filter((fix) => effectivePackageFit(fix) === 'starter' && (fix.status === 'fail' || fix.status === 'partial'))
     .slice(0, 6)
   const workingWell = positiveFindings(profile, scores, checks)
   const rawFindings = Object.entries(checks).filter(

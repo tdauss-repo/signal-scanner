@@ -14,6 +14,7 @@
     "test:profile-separation": "node --import tsx scripts/test-profile-separation.ts",
     "test:visibility-workflow": "node --import tsx scripts/test-visibility-workflow.ts",
     "test:packet-a": "node --import tsx scripts/test-packet-a.ts",
+    "test:packet-b": "node --import tsx scripts/test-packet-b.ts",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

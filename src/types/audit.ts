@@ -127,6 +127,7 @@ export interface AuditState {
   voiceAssistantObservations: VoiceAssistantObservation[]
   directories: DirectoryAuditState
   manualFixes: FixItem[]
+  salesReadiness: SalesReadinessState
 }
 
 export interface WebsiteAuditWorkspaceState {
@@ -180,6 +181,70 @@ export interface FixItem {
   effort?: string
   whyItMatters?: string
   evidenceConfidence?: EvidenceConfidence
+  evidenceSummary?: string
+  evidenceSources?: string[]
+  salesConfidence?: 'confirmed' | 'supported' | 'uncertain' | 'unable_to_verify'
+  impact?: 'high' | 'medium' | 'low'
+  salesEffort?: 'small' | 'medium' | 'large'
+  salesPackageFit?: 'starter' | 'later' | 'owner_action' | 'excluded'
+  dependencies?: string[]
+  verificationMethod?: string
+  sourceArea?: 'website' | 'public_presence' | 'profile_management' | 'ai_geo_readiness' | 'entity_clarity' | 'customer_question'
+  reviewed?: boolean
+}
+
+export type EntityClarityResult = 'Clear' | 'Partial' | 'Conflicting' | 'Not found' | 'Owner confirmation needed' | 'Unable to verify'
+export interface EntityClarityFinding {
+  id: string
+  dimension: 'Business name' | 'Primary offering' | 'Location/service area' | 'Primary contact/enrollment action'
+  observedValue: string
+  expectedValue: string
+  sourceEvidence: string
+  sourceUrl: string
+  recordedAt: string
+  confidence: EvidenceConfidence
+  result: EntityClarityResult
+  operatorNotes: string
+  reviewed: boolean
+}
+
+export type CustomerQuestionStatus = 'Answered' | 'Partially answered' | 'Not found' | 'Owner confirmation needed' | 'Unable to verify'
+export interface CustomerQuestion {
+  id: string
+  question: string
+  category: string
+  status: CustomerQuestionStatus
+  supportingEvidence: string
+  sourceUrl: string
+  recordedAt: string
+  confidence: EvidenceConfidence
+  operatorNotes: string
+  reviewed: boolean
+  packageFit: 'starter' | 'later' | 'owner_action' | 'excluded'
+  recommendedAction: string
+  verificationMethod: string
+}
+
+export type CorroborationResult = 'Match' | 'Partial match' | 'Conflict' | 'Not found' | 'Acquisition unavailable' | 'Owner confirmation needed' | 'Unable to verify'
+export interface CorroborationRecord {
+  id: string
+  destination: string
+  field: 'Business name' | 'Primary category' | 'Phone' | 'Website URL' | 'Address/service area' | 'Hours'
+  expectedValue: string
+  observedValue: string
+  sourceUrl: string
+  sourceEvidence: string
+  recordedAt: string
+  confidence: EvidenceConfidence
+  result: CorroborationResult
+  provenance: 'operator_observation' | 'legacy_imported'
+  notes: string
+  reviewed: boolean
+}
+
+export interface SalesReadinessState {
+  entityClarity: EntityClarityFinding[]
+  customerQuestions: CustomerQuestion[]
 }
 
 export interface AIAnswerTestState {

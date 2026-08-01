@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import type { FixItem } from '../types/audit'
 import { evidenceConfidenceLabel } from '../utils/evidenceConfidence'
+import { effectivePackageFit, packageFitLabel } from '../utils/salesReadiness'
 import { StatusBadge } from './StatusBadge'
 
 interface FixPlanProps {
@@ -15,6 +17,7 @@ const effortForFix = (fix: FixItem) => {
 }
 
 const packageFitForFix = (fix: FixItem) => {
+  if (fix.salesPackageFit || fix.packageFit) return packageFitLabel(fix)
   if (fix.packageFit) return fix.packageFit
   if (fix.area.toLowerCase().includes('website')) {
     return 'Starter cleanup now; Website SEO Implementation if scope grows.'
@@ -61,6 +64,8 @@ const evidenceForFix = (fix: FixItem, notes: Record<string, string>) => {
 }
 
 export function FixPlan({ fixes, notes = {} }: FixPlanProps) {
+  const [filter, setFilter] = useState<'starter' | 'owner_action' | 'later' | 'excluded' | 'all'>('starter')
+  const visible = fixes.filter((fix) => filter === 'all' || effectivePackageFit(fix) === filter).slice(0, filter === 'starter' ? 5 : undefined)
   return (
     <section className="panel">
       <div className="panel-header">
@@ -73,13 +78,13 @@ export function FixPlan({ fixes, notes = {} }: FixPlanProps) {
         </p>
       </div>
       <div className="fix-list">
-        {fixes.length === 0 ? (
+        <div className="directory-actions">{(['starter', 'owner_action', 'later', 'excluded', 'all'] as const).map((value) => <button className={filter === value ? '' : 'secondary'} key={value} type="button" onClick={() => setFilter(value)}>{({ starter: 'Starter', owner_action: 'Owner actions', later: 'Later', excluded: 'Excluded', all: 'All findings' })[value]}</button>)}</div>
+        {visible.length === 0 ? (
           <p className="empty-state">
-            No verified gaps marked yet. Complete the guided verification and
-            automated audit steps to generate sales-ready recommendations.
+            {filter === 'starter' ? 'No reviewed Starter actions are available yet.' : 'No findings in this view.'}
           </p>
         ) : (
-          fixes.map((fix) => (
+          visible.map((fix) => (
             <article className="fix-item" key={fix.id}>
               <div className="fix-priority-cell">
                 <StatusBadge status={fix.priority} />
@@ -105,6 +110,8 @@ export function FixPlan({ fixes, notes = {} }: FixPlanProps) {
                 <strong>Package fit</strong>
                 <p>{packageFitForFix(fix)}</p>
               </div>
+              {fix.verificationMethod ? <div className="fix-table-cell"><strong>Verification</strong><p>{fix.verificationMethod}</p></div> : null}
+              {fix.dependencies?.length ? <div className="fix-table-cell"><strong>Dependencies</strong><p>{fix.dependencies.join(', ')}</p></div> : null}
             </article>
           ))
         )}

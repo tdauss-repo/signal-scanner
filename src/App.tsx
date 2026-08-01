@@ -15,6 +15,7 @@ import { SavedScansPanel } from './components/SavedScansPanel'
 import { ScoreCard } from './components/ScoreCard'
 import { SearchVisibilityPanel } from './components/SearchVisibilityPanel'
 import { VoiceReadinessPanel } from './components/VoiceReadinessPanel'
+import { SalesReadinessPanel } from './components/SalesReadinessPanel'
 import { buildAuditItems } from './data/auditCatalog'
 import { applyCurrentCatalogMetadata, migrateSystemGeneratedFix } from './utils/catalogMetadata'
 import { defaultProfile } from './data/demoProfile'
@@ -56,6 +57,7 @@ import {
 import { aggregateReviewedSearchObservations } from './utils/searchAggregation'
 import { summarizeAIVisibilityEvidence } from './utils/aiPresence'
 import { projectPublicObservationToProfiles, publicPresenceCoverage, publicPresenceQualityLabel, supportingPublicPresenceReviewedCount } from './utils/publicPresence'
+import { entityAction, normalizeSalesReadiness, questionAction, sortSalesActions } from './utils/salesReadiness'
 
 const storageKey = 'local-signal-scanner-state'
 const activeViewStorageKey = 'business-scanner-active-view'
@@ -164,13 +166,14 @@ type ActiveView =
   | 'Public Presence'
   | 'Profile Management'
   | 'AI Visibility'
+  | 'Sales Readiness'
   | 'Reports'
   | 'Business Profile'
   | 'Settings'
 
 const views: ScoreView[] = ['Overall', ...numericOverallScoreAreas]
 
-const navViews: ActiveView[] = [...views, 'Public Presence', 'Profile Management', 'AI Visibility', 'Reports', 'Business Profile', 'Settings']
+const navViews: ActiveView[] = [...views, 'Public Presence', 'Profile Management', 'AI Visibility', 'Sales Readiness', 'Reports', 'Business Profile', 'Settings']
 const visibleViewLabel = (view: ActiveView) => view
 
 const navIconPaths: Record<ActiveView, React.ReactNode> = {
@@ -218,6 +221,7 @@ const navIconPaths: Record<ActiveView, React.ReactNode> = {
       <path d="M10 17h4" />
     </>
   ),
+  'Sales Readiness': (<><path d="M5 19V9l7-5 7 5v10"/><path d="M9 19v-5h6v5"/></>),
   'Business Profile': (
     <>
       <circle cx="12" cy="8" r="3" />
@@ -325,6 +329,7 @@ const initialState: AuditState = {
   voiceAssistantObservations: [],
   directories: { activeRows: [], ignoredSuggestionIds: [] },
   manualFixes: [],
+  salesReadiness: normalizeSalesReadiness(undefined, defaultProfile),
   reportSummary: '',
   websiteAudit: {
     lastSuccessful: null,
@@ -377,6 +382,7 @@ const createBlankAuditState = (): AuditState => ({
   voiceAssistantObservations: [],
   directories: { activeRows: [], ignoredSuggestionIds: [] },
   manualFixes: [],
+  salesReadiness: normalizeSalesReadiness(undefined, blankProfile),
   reportSummary: '',
   websiteAudit: {
     lastSuccessful: null,
@@ -529,6 +535,7 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
             buildAuditItems(profile).map(applyCurrentCatalogMetadata),
           ),
         ),
+      salesReadiness: normalizeSalesReadiness(parsed.salesReadiness, profile),
     }
 }
 
@@ -731,6 +738,8 @@ function App() {
     ],
   )
 
+  const salesFixes = useMemo(() => sortSalesActions(fixes), [fixes])
+
   const currentSavedScan = savedScans.find((scan) => scan.id === currentScanId)
   const hasUnsavedChanges = currentSavedScan
     ? JSON.stringify(normalizeAuditState(currentSavedScan.payload)) !==
@@ -845,6 +854,16 @@ function App() {
         [query.id]: normalizedObservation.confidence,
       },
     })
+  }
+
+  const addEntityFindingToActionPlan = (finding: import('./types/audit').EntityClarityFinding) => {
+    const fix = entityAction(finding)
+    if (fix) updateState({ manualFixes: [...auditState.manualFixes.filter((item) => item.id !== fix.id), fix] })
+  }
+
+  const addCustomerQuestionToActionPlan = (question: import('./types/audit').CustomerQuestion) => {
+    const fix = questionAction(question)
+    if (fix) updateState({ manualFixes: [...auditState.manualFixes.filter((item) => item.id !== fix.id), fix] })
   }
 
   const addSearchVisibilityToActionPlan = (query: SearchVisibilityQuery) => {
@@ -1687,7 +1706,7 @@ function App() {
             </div>
           </section>
 
-          <FixPlan fixes={fixes} notes={auditState.notes} />
+          <FixPlan fixes={salesFixes} notes={auditState.notes} />
         </div>
       )
     }
@@ -2072,6 +2091,10 @@ function App() {
           onAddToActionPlan={addAIAnswerToActionPlan}
         />
       )
+    }
+
+    if (activeView === 'Sales Readiness') {
+      return <SalesReadinessPanel state={auditState.salesReadiness} profile={auditState.profile} directories={auditState.directories.activeRows} onChange={(salesReadiness) => updateState({ salesReadiness })} onAddEntity={addEntityFindingToActionPlan} onAddQuestion={addCustomerQuestionToActionPlan} />
     }
 
     if (activeView === 'Reports') {
