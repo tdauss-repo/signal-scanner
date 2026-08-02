@@ -57,7 +57,7 @@ import {
 import { aggregateReviewedSearchObservations } from './utils/searchAggregation'
 import { summarizeAIVisibilityEvidence } from './utils/aiPresence'
 import { projectPublicObservationToProfiles, publicPresenceCoverage, publicPresenceQualityLabel, supportingPublicPresenceReviewedCount } from './utils/publicPresence'
-import { entityAction, normalizeSalesReadiness, questionAction, sortSalesActions } from './utils/salesReadiness'
+import { classifyAuditFixForSales, entityAction, normalizeSalesReadiness, questionAction, sortSalesActions } from './utils/salesReadiness'
 
 const storageKey = 'local-signal-scanner-state'
 const activeViewStorageKey = 'business-scanner-active-view'
@@ -726,7 +726,7 @@ function App() {
         ...fix,
         evidenceNote: auditState.notes[fix.id],
         evidenceConfidence: auditState.evidenceConfidence[fix.id],
-      })),
+      })).map(classifyAuditFixForSales),
       ...auditState.manualFixes,
     ],
     [

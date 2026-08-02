@@ -8,7 +8,7 @@ import type {
 } from '../types/audit'
 import { customerEvidenceConfidenceLabel } from '../utils/evidenceConfidence'
 import { formatScore } from '../utils/scoring'
-import { effectivePackageFit } from '../utils/salesReadiness'
+import { effectivePackageFit, packageFitLabel } from '../utils/salesReadiness'
 import type { AIVisibilityEvidenceSummary } from '../utils/aiPresence'
 import { StatusBadge } from './StatusBadge'
 
@@ -49,8 +49,8 @@ const fixSection = (fix: FixItem) => {
   return 'Overall'
 }
 
-const packageFitForFix = (fix: FixItem) => {
-  if (fix.packageFit) return fix.packageFit
+const reportPackageFitForFix = (fix: FixItem) => {
+  if (fix.salesPackageFit || fix.packageFit) return packageFitLabel(fix)
   if (fix.area.toLowerCase().includes('website')) return 'Website SEO Implementation'
   if (fix.area.toLowerCase().includes('search')) return 'Monthly Visibility Monitoring'
   return 'Starter Visibility Cleanup'
@@ -126,7 +126,7 @@ const customerPackageFitForFix = (fix: FixItem) => {
   if (isHomepageSeoClarityFix(fix)) {
     return 'Starter Visibility Cleanup or Website SEO Implementation depending on implementation depth.'
   }
-  return packageFitForFix(fix)
+  return reportPackageFitForFix(fix)
 }
 
 const sectionSummary = (

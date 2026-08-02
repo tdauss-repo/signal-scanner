@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { defaultProfile } from '../src/data/demoProfile.ts'
-import { deriveCorroboration, effectivePackageFit, entityAction, normalizeSalesReadiness, questionAction, seededCustomerQuestions, sortSalesActions } from '../src/utils/salesReadiness.ts'
+import { classifyAuditFixForSales, deriveCorroboration, effectivePackageFit, entityAction, isStarterEligible, normalizeSalesReadiness, questionAction, seededCustomerQuestions, sortSalesActions } from '../src/utils/salesReadiness.ts'
 
 const profile = { ...defaultProfile, businessName: 'Montessori Downriver', primaryCategory: 'Montessori school' }
 const state = normalizeSalesReadiness(undefined, profile)
@@ -25,6 +26,16 @@ const actions = [
 ]
 assert.deepEqual(sortSalesActions(actions).map((action) => action.id), ['starter', 'later'])
 assert.deepEqual(sortSalesActions([...actions].reverse()).map((action) => action.id), ['starter', 'later'])
+const https = classifyAuditFixForSales({ id: 'website-https', priority: 'High', area: 'Website SEO fixes', issue: 'HTTPS / secure website connection', fix: 'Enable HTTPS.', status: 'fail', evidenceNote: 'HTTP response observed without a secure redirect.', evidenceConfidence: 'public_page_observed' })
+const social = classifyAuditFixForSales({ id: 'listing-social', priority: 'Low', area: 'Profile Management', issue: 'Facebook and Instagram business identity', fix: 'Review social profiles.', status: 'partial', evidenceNote: 'Profile evidence observed.', evidenceConfidence: 'operator_observation' })
+assert.equal(isStarterEligible(https), true)
+assert.equal(sortSalesActions([social, https])[0].id, 'website-https')
+assert.equal(isStarterEligible(classifyAuditFixForSales({ id: 'brand', priority: 'Low', area: 'Public Presence', issue: 'Strong canonical brand presence', fix: 'No action needed', status: 'pass', evidenceNote: 'Found prominently.' })), false)
+assert.equal(isStarterEligible(classifyAuditFixForSales({ id: 'voice', priority: 'Medium', area: 'VOICE-SEARCH READINESS FIXES', issue: 'Voice Search Readiness', fix: 'Legacy', status: 'partial' })), false)
+assert.equal(isStarterEligible({ ...https, reviewed: false }), false)
 assert.equal(effectivePackageFit({ ...actions[0], packageFit: 'Starter Visibility Cleanup', salesPackageFit: 'excluded' }), 'excluded')
+const reportSource = readFileSync(new URL('../src/components/ReportView.tsx', import.meta.url), 'utf8')
+assert.match(reportSource, /packageFitLabel\(fix\)/)
+assert.match(reportSource, /effectivePackageFit\(fix\) === 'starter'/)
 assert.equal(seededCustomerQuestions({ ...profile, businessName: 'Other Business', primaryCategory: '' }).length, 0)
 console.log('Packet B sales-readiness checks passed.')

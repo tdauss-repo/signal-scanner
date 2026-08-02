@@ -64,13 +64,28 @@ export const effectivePackageFit = (fix: FixItem): NonNullable<FixItem['salesPac
 }
 export const packageFitLabel = (fix: FixItem) => ({ starter: 'Starter', owner_action: 'Owner action', later: 'Later', excluded: 'Excluded' })[effectivePackageFit(fix)]
 
+const salesConfidenceFor = (fix: FixItem): NonNullable<FixItem['salesConfidence']> => fix.evidenceConfidence === 'owner_confirmed' ? 'confirmed' : fix.evidenceConfidence === 'manual_needs_confirmation' || !fix.evidenceNote ? 'uncertain' : 'supported'
+/** Projects existing audit fixes into bounded Packet B action metadata. */
+export const classifyAuditFixForSales = (fix: FixItem): FixItem => {
+  const text = `${fix.area} ${fix.issue} ${fix.fix}`.toLowerCase()
+  if (/voice-search readiness fixes|voice search readiness/.test(text)) return { ...fix, area: 'Profile Management', salesPackageFit: 'excluded', sourceArea: 'profile_management', reviewed: false, salesConfidence: 'unable_to_verify', evidenceSummary: fix.evidenceNote ?? '', verificationMethod: '' }
+  if (fix.status === 'pass' || /no action needed|maintain the reviewed source signals/.test(text)) return { ...fix, salesPackageFit: 'later', impact: 'low', salesEffort: 'small', reviewed: false, sourceArea: 'public_presence', verificationMethod: '' }
+  if (fix.area.toLowerCase().includes('website') && (fix.status === 'fail' || fix.status === 'partial')) {
+    const critical = /https|secure|certificate|connection/.test(text)
+    return { ...fix, evidenceSummary: fix.evidenceNote ?? '', evidenceSources: fix.sources ? [fix.sources] : [], salesConfidence: salesConfidenceFor(fix), impact: critical ? 'high' : 'medium', salesEffort: critical ? 'medium' : 'small', salesPackageFit: 'starter', dependencies: [], verificationMethod: critical ? 'Verify a valid HTTPS response, certificate, canonical secure URL, HTTP-to-HTTPS redirect, and secure canonical/internal links.' : 'Re-check the cited website evidence after the corrective change.', sourceArea: 'website', reviewed: Boolean(fix.evidenceNote || fix.evidenceConfidence) }
+  }
+  return fix
+}
+export const isStarterEligible = (fix: FixItem) => effectivePackageFit(fix) === 'starter' && fix.reviewed === true && (fix.status === 'fail' || fix.status === 'partial') && Boolean(fix.evidenceSummary || fix.evidenceNote) && Boolean(fix.verificationMethod) && !/no action needed|voice-search readiness fixes/i.test(`${fix.issue} ${fix.fix}`)
+
 const fitRank: Record<NonNullable<FixItem['salesPackageFit']>, number> = { starter: 0, owner_action: 1, later: 2, excluded: 3 }
 const impactRank: Record<NonNullable<FixItem['impact']>, number> = { high: 0, medium: 1, low: 2 }
 const confidenceRank: Record<NonNullable<FixItem['salesConfidence']>, number> = { confirmed: 0, supported: 1, uncertain: 2, unable_to_verify: 3 }
 const effortRank: Record<NonNullable<FixItem['salesEffort']>, number> = { small: 0, medium: 1, large: 2 }
 export const sortSalesActions = (fixes: FixItem[]) => [...fixes].sort((a, b) => {
   const compare = (x: number, y: number) => x - y
-  return compare(fitRank[effectivePackageFit(a)], fitRank[effectivePackageFit(b)]) || compare(impactRank[a.impact ?? 'low'], impactRank[b.impact ?? 'low']) || compare(confidenceRank[a.salesConfidence ?? 'uncertain'], confidenceRank[b.salesConfidence ?? 'uncertain']) || compare((a.dependencies ?? []).length, (b.dependencies ?? []).length) || compare(effortRank[a.salesEffort ?? 'medium'], effortRank[b.salesEffort ?? 'medium']) || a.id.localeCompare(b.id)
+  const critical = (fix: FixItem) => fix.sourceArea === 'website' && /https|secure|certificate|connection/i.test(`${fix.issue} ${fix.fix}`) && fix.status === 'fail' ? 0 : 1
+  return compare(fitRank[effectivePackageFit(a)], fitRank[effectivePackageFit(b)]) || compare(critical(a), critical(b)) || compare(impactRank[a.impact ?? 'low'], impactRank[b.impact ?? 'low']) || compare(confidenceRank[a.salesConfidence ?? 'uncertain'], confidenceRank[b.salesConfidence ?? 'uncertain']) || compare((a.dependencies ?? []).length, (b.dependencies ?? []).length) || compare(effortRank[a.salesEffort ?? 'medium'], effortRank[b.salesEffort ?? 'medium']) || a.id.localeCompare(b.id)
 })
 
 export const entityAction = (finding: EntityClarityFinding): FixItem | null => !finding.reviewed || ['Clear', 'Unable to verify'].includes(finding.result) ? null : ({ id: `entity-${finding.id}`, priority: finding.result === 'Conflicting' ? 'High' : 'Medium', area: 'Entity Clarity', issue: `${finding.dimension}: ${finding.result}`, fix: finding.operatorNotes || `Resolve the specific ${finding.dimension.toLowerCase()} gap using the cited source.`, status: finding.result === 'Conflicting' ? 'fail' : 'partial', evidenceNote: finding.sourceEvidence, sources: finding.sourceUrl, evidenceSummary: finding.sourceEvidence, evidenceSources: finding.sourceUrl ? [finding.sourceUrl] : [], salesConfidence: finding.confidence === 'owner_confirmed' ? 'confirmed' : finding.confidence === 'manual_needs_confirmation' ? 'uncertain' : 'supported', impact: 'high', salesEffort: 'small', salesPackageFit: finding.result === 'Owner confirmation needed' ? 'owner_action' : 'starter', packageFit: finding.result === 'Owner confirmation needed' ? 'Owner confirmation needed' : 'Starter Visibility Cleanup', verificationMethod: 'Re-check the cited public page and compare it with the confirmed Business Profile fact.', sourceArea: 'entity_clarity', reviewed: true })

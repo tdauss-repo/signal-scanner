@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FixItem } from '../types/audit'
 import { evidenceConfidenceLabel } from '../utils/evidenceConfidence'
-import { effectivePackageFit, packageFitLabel } from '../utils/salesReadiness'
+import { effectivePackageFit, isStarterEligible, packageFitLabel } from '../utils/salesReadiness'
 import { StatusBadge } from './StatusBadge'
 
 interface FixPlanProps {
@@ -65,7 +65,7 @@ const evidenceForFix = (fix: FixItem, notes: Record<string, string>) => {
 
 export function FixPlan({ fixes, notes = {} }: FixPlanProps) {
   const [filter, setFilter] = useState<'starter' | 'owner_action' | 'later' | 'excluded' | 'all'>('starter')
-  const visible = fixes.filter((fix) => filter === 'all' || effectivePackageFit(fix) === filter).slice(0, filter === 'starter' ? 5 : undefined)
+  const visible = fixes.filter((fix) => filter === 'starter' ? isStarterEligible(fix) : filter === 'all' || effectivePackageFit(fix) === filter).slice(0, filter === 'starter' ? 5 : undefined)
   return (
     <section className="panel">
       <div className="panel-header">
