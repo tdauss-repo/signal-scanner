@@ -52,6 +52,8 @@
     sourceUrl,
     title: boundedText(document.title, limits.title),
     metaDescription: boundedText(metaDescription, limits.metaDescription),
+    metaDescriptions: Array.from(document.querySelectorAll('meta[name="description" i]')).slice(0, 30)
+      .map((element) => boundedText(element.getAttribute('content') || '', limits.metaDescription)),
     h1Text: Array.from(document.querySelectorAll('h1'))
       .slice(0, limits.h1TextCount)
       .map((element) => boundedText(element.innerText || element.textContent || '', limits.headingText))

@@ -1,0 +1,33 @@
+import type { AuditState, FixItem } from '../types/audit'
+import { canReviewFinding, isPresentedFinding } from '../utils/customerScan'
+
+export function CustomerFindingReview({ state, fixes, onReview }: {
+  state: AuditState
+  fixes: FixItem[]
+  onReview: (fix: FixItem, approved: boolean) => void
+}) {
+  const candidates = fixes.filter(canReviewFinding)
+  return <section className="panel customer-review-panel">
+    <div className="panel-header"><p className="eyebrow">Customer presentation review</p><h2>Choose findings to share</h2><p>Read the evidence, wording, scope, and verification before sharing. Presentation approval does not authorize remediation. Changed evidence or business details require a fresh review.</p></div>
+    {candidates.length ? candidates.map((fix) => <article className="customer-review-row" key={fix.id}>
+      <h3>{fix.issue}</h3><p>{fix.evidenceSummary || fix.evidenceNote}</p>
+      <p><strong>Recommendation:</strong> {fix.fix}</p><p><strong>Why it matters:</strong> {fix.whyItMatters || 'Not recorded. The customer view will say this still needs discussion.'}</p>
+      <p><strong>Verification:</strong> {fix.verificationMethod}</p>
+      {fix.intelligence ? <details><summary>Operator evidence, delivery & verification</summary>
+        <p>Lifecycle: {isPresentedFinding(state, fix) ? 'Reviewed · Action proposed (not approved for implementation)' : fix.intelligence.lifecycle}</p>
+        <p>Check: {fix.intelligence.checkId} · Condition: {fix.intelligence.condition} · Rule version: {fix.intelligence.ruleVersion}</p>
+        <p>Confidence: {fix.intelligence.evidence.confidence} · Scope: {fix.intelligence.delivery.scope} (confirm bounded scope before sale)</p>
+        <p>Source: {fix.intelligence.evidence.provenance.sourceUrl} · {fix.intelligence.evidence.provenance.occurredAt || 'Time not recorded'}</p>
+        <p>Provider: {fix.intelligence.evidence.provenance.provider} · Method: {fix.intelligence.evidence.provenance.method}</p>
+        <p>{fix.intelligence.delivery.technicalChange}</p>
+        <ol>{fix.intelligence.delivery.steps.map((step) => <li key={step}>{step}</li>)}</ol>
+        <p>Access: {fix.intelligence.delivery.access.join('; ')}</p>
+        <p>Customer input: {fix.intelligence.delivery.customerInput.join('; ')}</p>
+        <p>Dependencies / risks: {fix.intelligence.delivery.dependencies.join('; ')}</p>
+        <p>Expected corrected state: {fix.intelligence.verification.expectedState}</p>
+        <ul>{fix.intelligence.verification.criteria.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul>
+      </details> : null}
+      <button type="button" onClick={() => onReview(fix, !isPresentedFinding(state, fix))}>{isPresentedFinding(state, fix) ? 'Withdraw from customer view' : 'Approve evidence & customer wording'}</button>
+    </article>) : <p>No eligible findings yet. Findings need a failure/partial result, evidence, a recommendation, and a verification method. Continue evidence review in the Workbench.</p>}
+  </section>
+}

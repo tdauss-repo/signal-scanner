@@ -278,6 +278,10 @@ export const parseBrowserWebsiteEvidencePayload = (
     browserWebsiteObservationLimits.metaDescription,
   )
   if (!metaDescription.ok) return metaDescription
+  const metaDescriptions = parsed.metaDescriptions === undefined ? undefined : validateStringArray(parsed.metaDescriptions, 'metaDescriptions', 30, 1000)
+  if (metaDescriptions && !metaDescriptions.ok) return metaDescriptions
+  if (parsed.captureMethod !== undefined && !['rendered_browser', 'browser_assisted_observation'].includes(String(parsed.captureMethod))) return { ok: false, error: 'Unsupported captureMethod.' }
+  if (parsed.captureProvider !== undefined && (typeof parsed.captureProvider !== 'string' || parsed.captureProvider.length > 100)) return { ok: false, error: 'Invalid captureProvider.' }
   const h1Text = validateStringArray(
     parsed.h1Text,
     'h1Text',
@@ -317,6 +321,9 @@ export const parseBrowserWebsiteEvidencePayload = (
       sourceUrl: sourceUrl.value,
       title: title.value,
       metaDescription: metaDescription.value,
+      ...(metaDescriptions?.ok ? { metaDescriptions: metaDescriptions.value } : {}),
+      ...(parsed.captureProvider ? { captureProvider: String(parsed.captureProvider) } : {}),
+      ...(parsed.captureMethod ? { captureMethod: parsed.captureMethod as BrowserWebsiteEvidencePayload['captureMethod'] } : {}),
       h1Text: h1Text.value,
       h2Text: h2Text.value,
       visibleText: visibleText.value,
@@ -345,15 +352,16 @@ export const browserWebsiteObservationFromPayload = (
     analyzedAt: recordedAt,
     acquisition: {
       captureVersion: 1,
-      provider: 'found-local-browser-helper',
-      method: 'browser_assisted_observation',
+      provider: payload.captureProvider || 'found-local-browser-helper',
+      method: payload.captureMethod || 'browser_assisted_observation',
       outcome: 'observed',
       sourceUrl: payload.sourceUrl,
-      occurredAt: recordedAt,
+      occurredAt: payload.captureMethod === 'rendered_browser' ? payload.capturedAt : recordedAt,
       recordOrigin: 'captured',
     },
     title: payload.title,
     metaDescription: payload.metaDescription,
+    ...(payload.metaDescriptions ? { metaDescriptions: payload.metaDescriptions } : {}),
     h1Text: payload.h1Text,
     h2Text: payload.h2Text,
     visibleText: payload.visibleText,
@@ -377,6 +385,8 @@ export const captureBrowserWebsiteObservationProvenance = (
     sourceUrl: observation.sourceUrl,
     title: observation.title,
     metaDescription: observation.metaDescription,
+    // Editing/re-recording is operator-assisted evidence, not a fresh rendered acquisition.
+    ...(observation.metaDescriptions ? { metaDescriptions: observation.metaDescriptions } : {}),
     h1Text: observation.h1Text,
     h2Text: observation.h2Text,
     visibleText: observation.visibleText,
@@ -416,6 +426,8 @@ export const updateBrowserWebsiteObservationDraft = (
 
   return {
     ...nextObservation,
+    // A scalar edit cannot establish how many elements the source now contains.
+    ...(updates.metaDescription !== undefined ? { metaDescriptions: undefined } : {}),
     acquisition: null,
     recordedAt: '',
     analyzedAt: '',

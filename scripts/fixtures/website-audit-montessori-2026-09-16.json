@@ -1,0 +1,179 @@
+{
+  "provenance": {
+    "kind": "HISTORICAL_LIVE_CAPTURE",
+    "source": "/tmp/found-local-mary/website-audit.json",
+    "sha256": "7dc031150de9177476f1d74c6b07f61d14a17efddc06b7cffac06e331ae50ab1",
+    "note": "Predates Packet D detailed transport fields. Not a fresh D.2 scan. descriptionElements are from the separately captured homepage.html (2026-09-16T10:20:54Z)."
+  },
+  "request": {
+    "website": "http://www.montessoridownriver.com/",
+    "businessName": "Montessori Center of Downriver",
+    "phone": "734-282-6465",
+    "services": [],
+    "serviceAreas": [
+      "Southgate, MI"
+    ]
+  },
+  "response": {
+    "ok": true,
+    "acquisition": {
+      "captureVersion": 1,
+      "provider": "found-local-server",
+      "method": "server_fetch",
+      "outcome": "success",
+      "requestedUrl": "http://www.montessoridownriver.com/",
+      "sourceUrl": "http://montessoridownriver.com/",
+      "occurredAt": "2026-09-16T10:17:13.903Z",
+      "attemptSummary": {
+        "attemptedCount": 1,
+        "selectedUrl": "http://montessoridownriver.com/",
+        "selectedStrategy": "normal fetch (http://www.montessoridownriver.com/)",
+        "selectedStatus": 200,
+        "protocolFallbackTried": false,
+        "wwwFallbackTried": false
+      },
+      "recordOrigin": "captured"
+    },
+    "normalizedUrl": "http://www.montessoridownriver.com/",
+    "fetchedUrl": "http://montessoridownriver.com/",
+    "fetchStrategyUsed": "normal fetch (http://www.montessoridownriver.com/)",
+    "redirectCount": 1,
+    "title": "Montessori Center of Downriver - Child-Centered Education",
+    "metaDescription": "Just another WordPress site",
+    "canonicalUrl": "http://montessoridownriver.com/",
+    "h1Text": [],
+    "h2Text": [
+      "Introduction to Montessori",
+      "A Message From Our Director, Mary Lamos"
+    ],
+    "visibleTextSummary": "Montessori Center of Downriver - Child-Centered Education Montessori Center of Downriver Home Our Programs About Our School Testimonials Employment Opportunities More Montessori Parents 2026/2027 School Calendar Information for Parents Parent Handbook Health and Safety Recall List Pay Here FAQs Blog Birthday Celebration Contact Us Registration ✕ LOVE OF WORK SELF DISCIPLINE SOCIALABILITY CONCENTRATION Enrolling Now Enrolling now for fall 2026/27 school year! Meet the Staff Meet our dedicated staff members. Our Classrooms Gallery of classroom photos. FAQ Frequently asked questions. Our Blog Our blog articles with more information on Montessori subjects. Introduction to Montessori The Montessori Method of education, developed by Dr. Maria Montessori, is a child-centered educational approach based on scientific observations of children from birth to adulthood. Dr. Montessori’s Method has be",
+    "businessNameFound": true,
+    "phoneNumberMatches": [],
+    "servicePhraseMatches": [],
+    "serviceAreaPhraseMatches": [],
+    "serviceLinks": [],
+    "jsonLdSchemaBlocks": [
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebPage",
+            "@id": "http://montessoridownriver.com/",
+            "url": "http://montessoridownriver.com/",
+            "name": "Montessori Center of Downriver - Child-Centered Education",
+            "isPartOf": {
+              "@id": "http://montessoridownriver.com/#website"
+            },
+            "datePublished": "2015-03-27T14:23:40+00:00",
+            "dateModified": "2026-07-20T15:33:00+00:00",
+            "description": "The Montessori Center of Downriver has been serving the metro-Detroit community for over 25 years, focusing on child development goals.",
+            "breadcrumb": {
+              "@id": "http://montessoridownriver.com/#breadcrumb"
+            },
+            "inLanguage": "en-US",
+            "potentialAction": [
+              {
+                "@type": "ReadAction",
+                "target": [
+                  "http://montessoridownriver.com/"
+                ]
+              }
+            ]
+          },
+          {
+            "@type": "BreadcrumbList",
+            "@id": "http://montessoridownriver.com/#breadcrumb",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home"
+              }
+            ]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "http://montessoridownriver.com/#website",
+            "url": "http://montessoridownriver.com/",
+            "name": "Montessori Center of Downriver",
+            "description": "Early Education Development Center",
+            "potentialAction": [
+              {
+                "@type": "SearchAction",
+                "target": {
+                  "@type": "EntryPoint",
+                  "urlTemplate": "http://montessoridownriver.com/?s={search_term_string}"
+                },
+                "query-input": "required name=search_term_string"
+              }
+            ],
+            "inLanguage": "en-US"
+          }
+        ]
+      }
+    ],
+    "detectedSchemaTypes": [
+      "WebPage",
+      "ReadAction",
+      "BreadcrumbList",
+      "ListItem",
+      "WebSite",
+      "SearchAction",
+      "EntryPoint"
+    ],
+    "faqIndicators": [
+      "FAQ",
+      "Frequently asked questions"
+    ],
+    "hasContactLink": true,
+    "contactLinks": [
+      "http://montessoridownriver.com/contact-us/",
+      "http://montessoridownriver.com/the-enrollment-process/"
+    ],
+    "contactLinkEvidence": [
+      {
+        "url": "http://montessoridownriver.com/contact-us/",
+        "anchorText": "Contact Us",
+        "sourceRegion": "navigation",
+        "internal": true,
+        "classification": "contact",
+        "reason": "anchor text expresses contact/booking intent"
+      },
+      {
+        "url": "http://montessoridownriver.com/the-enrollment-process/",
+        "anchorText": "Registration",
+        "sourceRegion": "navigation",
+        "internal": true,
+        "classification": "contact",
+        "reason": "anchor text expresses contact/booking intent"
+      }
+    ],
+    "rejectedContactCandidates": [
+      {
+        "url": "https://www.cpsc.gov/Recalls?tabset=on&amp;search_combined_fields=&amp;field_rc_date_value=&amp;field_rc_date_value_1=&amp;field_rc_hazards_target_id=All&amp;field_rc_recall_by_product_target_id=119&amp;field_rc_manufactured_in_value=&amp;field_rc_date_value=&amp;field_rc_date_value_1=&amp;field_rc_hazards_target_id=All&amp;field_rc_recall_by_product_target_id=119",
+        "anchorText": "Recall List",
+        "sourceRegion": "navigation",
+        "internal": false,
+        "classification": "rejected-contact-candidate",
+        "reason": "contact-like text appears only as a loose URL substring; no supported contact intent was found"
+      }
+    ],
+    "socialProfileLinks": [
+      "https://www.pinterest.com/montessoridownriver/"
+    ],
+    "sitemapAvailable": true,
+    "robotsAvailable": true,
+    "homepageStatus": 200,
+    "contentLength": 131266,
+    "httpsAvailable": false,
+    "httpsStatus": null,
+    "httpAvailable": true,
+    "httpStatus": 200,
+    "httpRedirectsToHttps": false,
+    "analyzedAt": "2026-09-16T10:17:13.903Z"
+  },
+  "descriptionElements": [
+    "<meta name=\"description\" content=\"Just another WordPress site\"/>",
+    "<meta name=\"description\" content=\"The Montessori Center of Downriver has been serving the metro-Detroit community for over 25 years, focusing on child development goals.\" />"
+  ]
+}

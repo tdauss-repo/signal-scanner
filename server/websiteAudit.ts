@@ -3,6 +3,8 @@ import type {
   WebsiteAuditBlockedResult,
   WebsiteAuditResult,
 } from '../src/types/websiteAudit.ts'
+import { fetchPage } from './pageTransport.ts'
+import { metaDescriptionsFromHtml, normalizeAcquisition } from '../src/utils/acquisition.ts'
 
 export type {
   LinkEvidence,
@@ -44,11 +46,13 @@ const compatibleScannerHeaders = {
 export class WebsiteAuditError extends Error {
   statusCode: number
   errorType: string
+  errorCode?: string
 
-  constructor(message: string, statusCode = 400, errorType = 'request_error') {
+  constructor(message: string, statusCode = 400, errorType = 'request_error', errorCode?: string) {
     super(message)
     this.statusCode = statusCode
     this.errorType = errorType
+    this.errorCode = errorCode
   }
 }
 
@@ -250,40 +254,9 @@ const fetchWithLimit = async (
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
-    const response = await fetch(url, {
-      method,
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: method === 'GET' ? headers : { ...headers, accept: '*/*' },
-    })
-
-    if (method === 'HEAD') return { response, body: '' }
-
-    const reader = response.body?.getReader()
-    if (!reader) return { response, body: '' }
-
-    const chunks: Uint8Array[] = []
-    let received = 0
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (!value) continue
-
-      received += value.byteLength
-      if (received > maxHtmlBytes) {
-        reader.cancel().catch(() => undefined)
-        throw new WebsiteAuditError(
-          'Homepage HTML is larger than the 1 MB audit limit.',
-          413,
-        )
-      }
-      chunks.push(value)
-    }
-
-    const body = new TextDecoder().decode(concatChunks(chunks, received))
-    return { response, body }
+    return await fetchPage(url, method, method === 'GET' ? headers : { ...headers, accept: '*/*' }, controller.signal, maxHtmlBytes)
   } catch (error) {
+    if (error instanceof RangeError) throw new WebsiteAuditError(error.message, 413)
     if (error instanceof WebsiteAuditError) throw error
     if (error instanceof Error && error.name === 'AbortError') {
       throw new WebsiteAuditError('Website fetch timed out.', 504, 'timeout')
@@ -312,6 +285,7 @@ const fetchWithLimit = async (
         `The scanner could not establish a connection to the website. ${cause.message ?? ''}`.trim(),
         502,
         'connection_error',
+        cause.code,
       )
     }
     throw new WebsiteAuditError(
@@ -324,16 +298,6 @@ const fetchWithLimit = async (
   } finally {
     clearTimeout(timeout)
   }
-}
-
-const concatChunks = (chunks: Uint8Array[], totalLength: number) => {
-  const combined = new Uint8Array(totalLength)
-  let offset = 0
-  for (const chunk of chunks) {
-    combined.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return combined
 }
 
 const stripTags = (html: string) =>
@@ -547,8 +511,9 @@ const probeUrl = async (url: URL) => {
       status: response.status,
       finalUrl: response.url || url.toString(),
     }
-  } catch {
-    return { available: false, status: null, finalUrl: url.toString() }
+  } catch (error) {
+    return { available: false, status: null, finalUrl: url.toString(), errorType: error instanceof WebsiteAuditError ? error.errorType : 'fetch_error',
+      ...(error instanceof WebsiteAuditError && error.errorCode ? { errorCode: error.errorCode } : {}) }
   }
 }
 
@@ -568,6 +533,7 @@ const inspectTransportSecurity = async (fetchedBaseUrl: URL) => {
   ])
 
   return {
+    transportEvidence: { http: httpProbe, https: httpsProbe },
     httpsAvailable: httpsProbe.available,
     httpsStatus: httpsProbe.status,
     httpAvailable: httpProbe.available,
@@ -758,6 +724,8 @@ export const auditWebsite = async (
 
   const fetchedUrl = response.url || successfulAttemptUrl?.toString() || url.toString()
   const fetchedBaseUrl = new URL(fetchedUrl)
+  const captured = normalizeAcquisition({ captureVersion: 1, provider: 'found-local-server', method: 'server_fetch', outcome: 'success', requestedUrl, sourceUrl: fetchedUrl, occurredAt: new Date().toISOString(), recordOrigin: 'captured' }, { html: body, statusCode: response.status })
+  const metaDescriptions = metaDescriptionsFromHtml(captured.html || '')
   const title = firstMatch(body, /<title[^>]*>([\s\S]*?)<\/title>/i)
   const metaDescription = firstMatch(
     body,
@@ -851,6 +819,7 @@ export const auditWebsite = async (
     redirectCount,
     title,
     metaDescription,
+    metaDescriptions,
     canonicalUrl,
     h1Text,
     h2Text,

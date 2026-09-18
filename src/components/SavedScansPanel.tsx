@@ -77,7 +77,7 @@ export function SavedScansPanel({
       <div className="saved-scan-list">
         {scans.length === 0 ? (
           <p className="empty-state">
-            No saved scans yet. Save the current JEM scan before testing another
+            No saved scans yet. Save the current scan before testing another
             business.
           </p>
         ) : (

@@ -15,6 +15,9 @@
     "test:visibility-workflow": "node --import tsx scripts/test-visibility-workflow.ts",
     "test:packet-a": "node --import tsx scripts/test-packet-a.ts",
     "test:packet-b": "node --import tsx scripts/test-packet-b.ts",
+    "test:packet-c": "node --import tsx scripts/test-packet-c.ts",
+    "test:packet-d": "node --import tsx scripts/test-packet-d.ts && node --import tsx scripts/test-live-https-integration.ts",
+    "prove:acquisition": "node --import tsx scripts/prove-acquisition.ts",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"

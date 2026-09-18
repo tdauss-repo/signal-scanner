@@ -63,6 +63,12 @@ export interface WebsiteAuditResult {
   redirectCount: number
   title: string
   metaDescription: string
+  /** All captured elements, including duplicates. Missing on legacy records means unknown. */
+  metaDescriptions?: string[]
+  transportEvidence?: {
+    http: { available: boolean; status: number | null; finalUrl: string; errorType?: string }
+    https: { available: boolean; status: number | null; finalUrl: string; errorType?: string; errorCode?: string }
+  }
   canonicalUrl: string
   h1Text: string[]
   h2Text: string[]
@@ -131,6 +137,9 @@ export interface ManualWebsiteObservation {
 }
 
 export interface BrowserWebsiteEvidencePayload {
+  metaDescriptions?: string[]
+  captureProvider?: string
+  captureMethod?: 'rendered_browser' | 'browser_assisted_observation'
   schema: 'found-local-browser-website-evidence'
   captureVersion: 1
   capturedAt: string
@@ -145,6 +154,7 @@ export interface BrowserWebsiteEvidencePayload {
 }
 
 export interface BrowserWebsiteObservation {
+  metaDescriptions?: string[]
   captureVersion: 1
   sourceUrl: string
   capturedAt: string

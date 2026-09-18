@@ -23,6 +23,8 @@ export function IntakeForm({ profile, onChange, onResearch }: IntakeFormProps) {
         <p>
           Enter only the facts you know. Research and reviewed business details
           live in Business Profile.
+          {' '}For a different business, use New business scan in Saved Scans;
+          editing this seed keeps this workspace’s existing evidence.
         </p>
       </div>
       <div className="form-grid">

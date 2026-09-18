@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { AIAnswerVisibilityTest } from './components/AIAnswerVisibilityTest'
 import { AuditSection } from './components/AuditSection'
@@ -16,6 +16,12 @@ import { ScoreCard } from './components/ScoreCard'
 import { SearchVisibilityPanel } from './components/SearchVisibilityPanel'
 import { VoiceReadinessPanel } from './components/VoiceReadinessPanel'
 import { SalesReadinessPanel } from './components/SalesReadinessPanel'
+import { CustomerScanView } from './components/CustomerScanView'
+import { CustomerFindingReview } from './components/CustomerFindingReview'
+import { canReviewFinding, customerReviewKey, isPresentedFinding } from './utils/customerScan'
+import { mergeIntelligentFindings } from './utils/findingIntelligence'
+import type { CustomerView } from './utils/customerScan'
+import { blankProfile, normalizeWorkspaceProfile } from './utils/workspaceProfile'
 import { buildAuditItems } from './data/auditCatalog'
 import { applyCurrentCatalogMetadata, migrateSystemGeneratedFix } from './utils/catalogMetadata'
 import { defaultProfile } from './data/demoProfile'
@@ -85,19 +91,6 @@ const dateSlug = (value: string) =>
 
 const cloneAuditState = (state: AuditState): AuditState =>
   JSON.parse(JSON.stringify(state)) as AuditState
-
-const phoneRecordId = (index: number, number?: string, label?: string) =>
-  `phone-${index}-${(label || 'contact').replace(/\W+/g, '-').toLowerCase()}-${(number || 'new')
-    .replace(/\W+/g, '')
-    .toLowerCase()}`
-
-const ensurePhoneRecordIds = (
-  phoneNumbers: BusinessProfile['phoneNumbers'] | undefined,
-) =>
-  (phoneNumbers ?? []).map((record, index) => ({
-    ...record,
-    id: record.id || phoneRecordId(index, record.number, record.label),
-  }))
 
 const migrateDirectories = (
   directories: Partial<AuditState['directories']> | undefined,
@@ -340,29 +333,6 @@ const initialState: AuditState = {
   lastUpdated: new Date().toISOString(),
 }
 
-const blankProfile: BusinessProfile = {
-  businessName: '',
-  website: '',
-  streetAddress: '',
-  city: '',
-  state: '',
-  zip: '',
-  phone: '',
-  knownListingUrl: '',
-  operatorNote: '',
-  phoneNumbers: [],
-  contactStructureNote: '',
-  primaryCategory: '',
-  secondaryCategories: '',
-  industryTags: '',
-  localMarket: '',
-  existingDirectoryUrls: '',
-  serviceArea: '',
-  primaryServices: '',
-  targetLocation: '',
-  keywords: '',
-}
-
 const createBlankAuditState = (): AuditState => ({
   ...initialState,
   profile: blankProfile,
@@ -393,8 +363,6 @@ const createBlankAuditState = (): AuditState => ({
   lastUpdated: new Date().toISOString(),
 })
 
-const legacyCity = (localMarket: string) => localMarket.split(',')[0]?.trim() ?? ''
-const legacyState = (localMarket: string) => localMarket.split(',')[1]?.trim() ?? ''
 const legacyAIObservation = (
   platform: AIAnswerPlatform,
   test: Partial<AIAnswerTestState>,
@@ -447,21 +415,7 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
           }
         : defaultTests)
 
-    const profile: BusinessProfile = {
-      ...defaultProfile,
-      ...parsed.profile,
-      city: parsed.profile?.city ?? legacyCity(parsed.profile?.localMarket ?? defaultProfile.localMarket),
-      state: parsed.profile?.state ?? legacyState(parsed.profile?.localMarket ?? defaultProfile.localMarket),
-      streetAddress: parsed.profile?.streetAddress ?? '',
-      zip: parsed.profile?.zip ?? '',
-      knownListingUrl: parsed.profile?.knownListingUrl ?? '',
-      operatorNote: parsed.profile?.operatorNote ?? '',
-      phoneNumbers: ensurePhoneRecordIds(
-        parsed.profile?.phoneNumbers ?? defaultProfile.phoneNumbers,
-      ),
-      contactStructureNote:
-        parsed.profile?.contactStructureNote ?? defaultProfile.contactStructureNote,
-    }
+    const profile = normalizeWorkspaceProfile(parsed.profile ?? defaultProfile)
 
     return {
       ...initialState,
@@ -638,6 +592,10 @@ const parseImportedScanFile = (text: string): SavedScanRecord | null => {
 }
 
 function App() {
+  // Always open the customer-safe surface, regardless of the persisted Workbench tab.
+  const [workbenchOpen, setWorkbenchOpen] = useState(false)
+  const [customerView, setCustomerView] = useState<CustomerView>('Scan')
+  const websiteRequestGeneration = useRef(0)
   const [auditState, setAuditState] = useState<AuditState>(loadState)
   const [websiteAuditLoading, setWebsiteAuditLoading] = useState(false)
   const [websiteAuditError, setWebsiteAuditError] = useState('')
@@ -716,7 +674,7 @@ function App() {
   ]
 
   const fixes = useMemo(
-    () => [
+    () => mergeIntelligentFindings(auditState, [
       ...buildFixPlan(
         auditItems.filter(
           (item) => item.area !== 'ai' && !item.id.startsWith('voice-prompt-'),
@@ -728,17 +686,25 @@ function App() {
         evidenceConfidence: auditState.evidenceConfidence[fix.id],
       })).map(classifyAuditFixForSales),
       ...auditState.manualFixes,
-    ],
+    ]),
     [
       auditItems,
-      auditState.checks,
-      auditState.evidenceConfidence,
-      auditState.manualFixes,
-      auditState.notes,
+      auditState,
     ],
   )
 
-  const salesFixes = useMemo(() => sortSalesActions(fixes), [fixes])
+  const salesFixes = useMemo(() => sortSalesActions(fixes.map((fix) =>
+    fix.intelligence && isPresentedFinding(auditState, fix) ? { ...fix, reviewed: true } : fix)), [fixes, auditState])
+
+  const reviewCustomerFinding = (fix: FixItem, approved: boolean) => {
+    if (approved && !canReviewFinding(fix)) return
+    setAuditState((current) => {
+      const reviews = { ...current.customerFindingReviews }
+      if (approved) reviews[fix.id] = customerReviewKey(current, fix)
+      else delete reviews[fix.id]
+      return { ...current, customerFindingReviews: reviews, lastUpdated: new Date().toISOString() }
+    })
+  }
 
   const currentSavedScan = savedScans.find((scan) => scan.id === currentScanId)
   const hasUnsavedChanges = currentSavedScan
@@ -771,6 +737,9 @@ function App() {
   }
 
   const updateProfileFromOperator = (profile: BusinessProfile) => {
+    websiteRequestGeneration.current += 1
+    setWebsiteAuditLoading(false)
+    setWebsiteAuditError('')
     setAuditState((current) => {
       const recordedAt = new Date().toISOString()
       return {
@@ -1188,7 +1157,12 @@ function App() {
     if (!saveBeforeReplacingWorkspace()) return
     const scan = savedScans.find((item) => item.id === id)
     if (!scan) return
+    websiteRequestGeneration.current += 1
+    setWebsiteAuditLoading(false)
+    setBrowserEvidenceJson('')
+    setBrowserEvidenceImportError('')
     setCurrentScanId(scan.id)
+    setCustomerView('Scan')
     setAuditState(normalizeAuditState(scan.payload))
     setWebsiteAuditError('')
   }
@@ -1264,18 +1238,25 @@ function App() {
 
   const startBlankScan = () => {
     if (!saveBeforeReplacingWorkspace()) return
+    websiteRequestGeneration.current += 1
+    setWebsiteAuditLoading(false)
+    setBrowserEvidenceJson('')
+    setBrowserEvidenceImportError('')
     setCurrentScanId('')
+    setCustomerView('Scan')
     setAuditState(createBlankAuditState())
     setWebsiteAuditError('')
     setActiveView('Settings')
   }
 
   const runAutoAudit = async () => {
+    const requestGeneration = ++websiteRequestGeneration.current
     setWebsiteAuditLoading(true)
     setWebsiteAuditError('')
 
     try {
       const result = await runWebsiteAutoAudit(auditState.profile)
+      if (requestGeneration !== websiteRequestGeneration.current) return
 
       if (result.ok === false) {
         const blockedNote = [
@@ -1330,11 +1311,12 @@ function App() {
         lastUpdated: new Date().toISOString(),
       }))
     } catch (error) {
+      if (requestGeneration !== websiteRequestGeneration.current) return
       setWebsiteAuditError(
         error instanceof Error ? error.message : 'Website audit failed.',
       )
     } finally {
-      setWebsiteAuditLoading(false)
+      if (requestGeneration === websiteRequestGeneration.current) setWebsiteAuditLoading(false)
     }
   }
 
@@ -2165,6 +2147,21 @@ function App() {
     return null
   }
 
+  if (!workbenchOpen) {
+    return <CustomerScanView
+      key={currentScanId || 'workspace'}
+      state={auditState}
+      items={auditItems}
+      fixes={salesFixes}
+      view={customerView}
+      onView={setCustomerView}
+      loading={websiteAuditLoading}
+      scanError={Boolean(websiteAuditError)}
+      onScan={() => void runAutoAudit()}
+      onWorkbench={() => setWorkbenchOpen(true)}
+    />
+  }
+
   return (
     <div className="dashboard-shell">
       <aside className="sidebar">
@@ -2180,7 +2177,12 @@ function App() {
 
         <div className="tool-chip">
           <ScannerToolMark />
-          <span>Business Scanner Tool · internal scan workspace</span>
+          <span>Workbench · internal tools & evidence</span>
+        </div>
+
+        <div className="sidebar-tools">
+          <button type="button" onClick={() => setWorkbenchOpen(false)}>Return to Scan View</button>
+          <button type="button" onClick={() => setActiveView('Overall')}>Review customer findings</button>
         </div>
 
         <nav className="sidebar-nav" aria-label="Primary navigation">
@@ -2227,7 +2229,7 @@ function App() {
       <main className="dashboard-main">
         <header className="main-header">
           <div>
-            <h1>Business Scanner Tool</h1>
+            <h1>Found Local Workbench</h1>
             <p>
               {auditState.profile.businessName} | scanned{' '}
               {new Date(auditState.lastUpdated).toLocaleString()}
@@ -2258,6 +2260,7 @@ function App() {
             ))}
           </section>
 
+          {activeView === 'Overall' ? <CustomerFindingReview state={auditState} fixes={salesFixes} onReview={reviewCustomerFinding} /> : null}
           {renderActiveView()}
         </div>
       </main>

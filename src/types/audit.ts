@@ -5,6 +5,8 @@ import type {
   WebsiteAuditResult,
 } from './websiteAudit.js'
 
+import type { FindingIntelligence } from './findingIntelligence.js'
+
 export type TrafficStatus = 'Green' | 'Yellow' | 'Red' | 'Gray'
 
 export type CheckStatus = 'pass' | 'partial' | 'fail' | 'unknown'
@@ -128,6 +130,8 @@ export interface AuditState {
   directories: DirectoryAuditState
   manualFixes: FixItem[]
   salesReadiness: SalesReadinessState
+  /** Explicit customer-presentation approvals, bound to the reviewed workspace evidence. */
+  customerFindingReviews?: Record<string, string>
 }
 
 export interface WebsiteAuditWorkspaceState {
@@ -168,6 +172,7 @@ export interface ScoreResult {
 }
 
 export interface FixItem {
+  intelligence?: FindingIntelligence
   id: string
   priority: 'High' | 'Medium' | 'Low'
   area: string

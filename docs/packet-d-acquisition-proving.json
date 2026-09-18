@@ -1,0 +1,54 @@
+{
+  "schema": "found-local-packet-d-acquisition-proving-v1",
+  "status": "LIVE_PROVING_BLOCKED",
+  "repository_head": "ca109b7549e968d97f5078dd6a3bfc1eec730caa",
+  "branch": "proving/browser-assisted-evidence-002",
+  "identity": "PROVISIONAL Montessori Center of Downriver; confirm with Mary before delivery/remediation",
+  "environment": {"CODEX_SANDBOX_NETWORK_DISABLED": "1", "observed_failure": "getaddrinfo EAI_AGAIN", "scope": "current execution context; node-wide network state not established"},
+  "runs": [
+    {
+      "started_at": "2026-09-17T00:21:15.351Z",
+      "elapsed_ms": 272,
+      "targets": [
+        {"url": "http://www.montessoridownriver.com/", "server_fetch": "DNS_PREFLIGHT_FAILED", "rendered_browser": "DNS_PREFLIGHT_FAILED", "hostname": "www.montessoridownriver.com"},
+        {"url": "https://www.montessoridownriver.com/", "server_fetch": "DNS_PREFLIGHT_FAILED", "rendered_browser": "DNS_PREFLIGHT_FAILED", "hostname": "www.montessoridownriver.com"},
+        {"url": "https://www.michiganmontessorisociety.org/", "server_fetch": "DNS_PREFLIGHT_FAILED", "rendered_browser": "DNS_PREFLIGHT_FAILED", "hostname": "www.michiganmontessorisociety.org", "disposition": "DISCARDED_UNVERIFIED_AUXILIARY_HOSTNAME"}
+      ]
+    },
+    {
+      "started_at": "2026-09-17T01:04:24.022Z",
+      "elapsed_ms": 262,
+      "targets": [
+        {"url": "https://mmsoc.org/accredited-schools/", "server_fetch": "DNS_PREFLIGHT_FAILED", "rendered_browser": "DNS_PREFLIGHT_FAILED", "hostname": "mmsoc.org", "source": "Existing Montessori Mary Pre-Remediation Baseline 2026-09-15.json"}
+      ]
+    }
+  ],
+  "metrics": {
+    "distinct_target_urls_attempted": 4,
+    "intended_evidence_target_urls": 3,
+    "discarded_unverified_auxiliary_urls": 1,
+    "server_provider_attempts": 4,
+    "server_successes": 0,
+    "rendered_provider_attempts": 4,
+    "browser_launches": 0,
+    "rendered_successes": 0,
+    "manual_acquisitions_performed": 0,
+    "new_usable_live_captures": 0,
+    "live_false_positives": null,
+    "live_false_negatives": null,
+    "false_result_measurement_status": "NOT_MEASURABLE_WITHOUT_LIVE_CAPTURE",
+    "target_selection_corrections": 1,
+    "customer_evidence_corrections": 0,
+    "human_acquisition_interventions_performed": 0,
+    "provider_command_elapsed_ms_total": 534
+  },
+  "synthetic_tests_are_not_customer_evidence": true,
+  "scrapling_evaluation": {"source_review": "COMPLETED", "runtime_comparison": "NOT_EXECUTED_ENVIRONMENT_BLOCKED", "installed": false, "cached_wheel_found": false, "recommendation": "EXTRACT; no production adoption"},
+  "schedule_mary": "NO",
+  "customer_contacted": false,
+  "customer_assets_changed": false,
+  "model_inference_calls": 0,
+  "dependency_or_lockfile_changes": false,
+  "staged": false,
+  "committed": false
+}
