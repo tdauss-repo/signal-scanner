@@ -7,6 +7,7 @@ export interface DestinationAcquisitionCapability {
   destination: SearchDestination
   preferredProvider: string
   fallbackProvider: string
+  provingProvider?: string
   productionStatus: AcquisitionProductionStatus
   shape: AcquisitionShape
   automaticFound: boolean
@@ -36,29 +37,29 @@ export const destinationAcquisitionCapabilities: DestinationAcquisitionCapabilit
     blockerTypes: ['transport failure', 'challenge or access restriction', 'result region not inspected'],
   },
   {
-    destination: 'Apple Maps', preferredProvider: 'Operator public observation', fallbackProvider: 'Open Apple Maps search',
+    destination: 'Apple Maps', preferredProvider: 'Operator public observation', fallbackProvider: 'Open Apple Maps search', provingProvider: 'Bright Data Browser API',
     productionStatus: 'manual_fallback', shape: 'manual', automaticFound: false, automaticNotFound: false,
-    blockerTypes: ['application shell without place evidence', 'interaction required', 'no live-validated structured provider'],
+    blockerTypes: ['Bright Data target permission restriction', 'application shell without place evidence', 'provider access expansion required'],
   },
   {
-    destination: 'Yelp', preferredProvider: 'Operator public observation', fallbackProvider: 'Open Yelp search',
+    destination: 'Yelp', preferredProvider: 'Operator public observation', fallbackProvider: 'Open Yelp search', provingProvider: 'Bright Data Browser API',
     productionStatus: 'manual_fallback', shape: 'manual', automaticFound: false, automaticNotFound: false,
-    blockerTypes: ['HTTP 403 or access restriction', 'challenge page', 'no live-validated provider adapter'],
+    blockerTypes: ['search endpoint HTTP 403', 'challenge page', 'direct discovered-profile path not yet live-validated'],
   },
   {
-    destination: 'Facebook', preferredProvider: 'Operator public observation', fallbackProvider: 'Open Facebook search',
+    destination: 'Facebook', preferredProvider: 'Operator public observation', fallbackProvider: 'Open Facebook search', provingProvider: 'Bright Data Browser API',
     productionStatus: 'manual_fallback', shape: 'manual', automaticFound: false, automaticNotFound: false,
-    blockerTypes: ['login wall', 'public result not inspectable', 'no live-validated provider adapter'],
+    blockerTypes: ['login wall', 'public result not inspectable', 'Browser API path not yet live-validated'],
   },
   {
-    destination: 'DuckDuckGo', preferredProvider: 'Operator public observation', fallbackProvider: 'Open DuckDuckGo search',
+    destination: 'DuckDuckGo', preferredProvider: 'Operator public observation', fallbackProvider: 'Open DuckDuckGo search', provingProvider: 'Bright Data SERP API',
     productionStatus: 'manual_fallback', shape: 'manual', automaticFound: false, automaticNotFound: false,
-    blockerTypes: ['current native acquisition not live-validated', 'Bright Data SERP adapter not yet production-integrated'],
+    blockerTypes: ['provider upstream 5xx', 'structured SERP path not yet repeatable', 'malformed or missing result region'],
   },
   {
-    destination: 'Instagram', preferredProvider: 'Operator public observation', fallbackProvider: 'Open Instagram search',
+    destination: 'Instagram', preferredProvider: 'Operator public observation', fallbackProvider: 'Open Instagram search', provingProvider: 'Bright Data Browser API',
     productionStatus: 'manual_fallback', shape: 'manual', automaticFound: false, automaticNotFound: false,
-    blockerTypes: ['login wall', 'public profile unavailable', 'no live-validated provider adapter'],
+    blockerTypes: ['login wall', 'public profile unavailable', 'Browser API path not yet live-validated'],
   },
 ]
 

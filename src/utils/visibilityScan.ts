@@ -307,7 +307,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
     evidenceCaptured: run.checks.filter((item) => item.evidenceCaptured).length,
     operatorReview: run.checks.filter((item) => ['awaiting_review', 'evidence_captured', 'interactive_review_required', 'failed'].includes(item.state)).length,
     interactiveReview: run.checks.filter((item) => item.state === 'interactive_review_required').length,
-    acquisitionFailures: run.checks.reduce((sum, item) => sum + item.captures.filter((capture) => ['failed', 'blocked'].includes(capture.outcome)).length + (item.id === website.id && item.state === 'failed' ? 1 : 0), 0),
+    acquisitionFailures: run.checks.reduce((sum, item) => sum + item.captures.filter((capture) => ['failed', 'blocked', 'unavailable'].includes(capture.outcome)).length + (item.id === website.id && item.state === 'failed' ? 1 : 0), 0),
     manualInterventionsRequired: run.checks.filter((item) => ['interactive_review_required', 'failed', 'not_checked'].includes(item.state)).length,
     providerEscalations: run.checks.filter((item) => item.captures.some((capture) => capture.method === 'rendered_browser')).length,
     candidateFindings: website.evidenceCaptured ? workspaceFindings(state).filter((fix) => ['website', 'ai_geo_readiness'].includes(fix.sourceArea || '') && !/^(website-h1|website-heading)$/.test(fix.id) && !state.manualFixes.some((manual) => manual.id === fix.id)).length : 0,

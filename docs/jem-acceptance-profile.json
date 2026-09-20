@@ -1,0 +1,25 @@
+{
+  "profile": {
+    "businessName": "JEM Photography",
+    "website": "https://www.jemcamera.com",
+    "streetAddress": "",
+    "city": "Sylvania",
+    "state": "OH",
+    "zip": "",
+    "phone": "419.410.4974",
+    "localMarket": "Sylvania, OH",
+    "targetLocation": "Sylvania OH"
+  },
+  "businessProfile": {
+    "schemaVersion": 1,
+    "values": {
+      "businessName": { "value": "JEM Photography", "source": "demo_profile", "confidence": "high", "status": "operator_reviewed" },
+      "website": { "value": "https://www.jemcamera.com", "source": "demo_profile", "confidence": "high", "status": "operator_reviewed" },
+      "city": { "value": "Sylvania", "source": "demo_profile", "confidence": "high", "status": "operator_reviewed" },
+      "state": { "value": "OH", "source": "demo_profile", "confidence": "high", "status": "operator_reviewed" },
+      "phone": { "value": "419.410.4974", "source": "demo_profile", "confidence": "high", "status": "operator_reviewed" },
+      "localMarket": { "value": "Sylvania, OH", "source": "demo_profile", "confidence": "high", "status": "operator_reviewed" },
+      "targetLocation": { "value": "Sylvania OH", "source": "demo_profile", "confidence": "high", "status": "operator_reviewed" }
+    }
+  }
+}

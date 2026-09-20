@@ -1,5 +1,6 @@
 import type { BrowserWebsiteEvidencePayload } from './websiteAudit.js'
 import type { BusinessResultCandidate } from './entityMatch.js'
+import type { SearchDestination } from './audit.js'
 
 export type AcquisitionMethod = 'server_fetch' | 'rendered_browser' | 'browser_assisted' | 'operator_observation'
 export interface RenderedResultCandidate {
@@ -24,7 +25,7 @@ export interface AcquisitionResult {
   provider: string
   method: AcquisitionMethod
   acquiredAt: string
-  outcome: 'success' | 'partial' | 'blocked' | 'failed'
+  outcome: 'success' | 'partial' | 'blocked' | 'failed' | 'unavailable'
   statusCode?: number
   html?: string
   visibleText?: string
@@ -40,7 +41,7 @@ export interface AcquisitionResult {
   /** Safe acquisition classification. Provider credentials and raw connection data are never stored here. */
   blocker?: string
   /** Public destination represented by a provider-normalized capture. */
-  checkedDestination?: 'Google Search' | 'Google Maps'
+  checkedDestination?: SearchDestination
   providerAttempts?: Array<{ provider: string; outcome: 'success' | 'unavailable'; blocker: string; elapsedMs: number }>
   notes: string[]
   confidence: 'captured' | 'operator_supplied' | 'unavailable'
