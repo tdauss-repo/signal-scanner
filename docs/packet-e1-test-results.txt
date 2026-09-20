@@ -1,0 +1,96 @@
+Packet E.1 final regression run; controlled tests, not live public navigation.
+
+$ npm run lint
+npm notice run business-scanner-tool@0.0.0 lint
+npm notice run eslint .
+
+EXIT 0
+
+$ npm run build
+npm notice run business-scanner-tool@0.0.0 build
+npm notice run tsc -b && vite build
+vite v8.1.3 building client environment for production...
+[2K
+transforming...✓ 70 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                           0.47 kB │ gzip:   0.29 kB
+dist/assets/index-DSze0urf.css           35.50 kB │ gzip:   7.32 kB
+dist/assets/visibilityScan-DPGnSSmZ.js   18.77 kB │ gzip:   6.92 kB
+dist/assets/index-BRSFsyx2.js           496.59 kB │ gzip: 136.89 kB
+
+✓ built in 149ms
+
+EXIT 0
+
+$ npm run test:profile-separation
+npm notice run business-scanner-tool@0.0.0 test:profile-separation
+npm notice run node --import tsx scripts/test-profile-separation.ts
+Profile separation migration and compatibility checks passed.
+
+EXIT 0
+
+$ npm run test:visibility-workflow
+npm notice run business-scanner-tool@0.0.0 test:visibility-workflow
+npm notice run node --import tsx scripts/test-visibility-workflow.ts
+Visibility workflow compatibility checks passed.
+
+EXIT 0
+
+$ npm run test:packet-a
+npm notice run business-scanner-tool@0.0.0 test:packet-a
+npm notice run node --import tsx scripts/test-packet-a.ts
+Packet A state-integrity checks passed.
+
+EXIT 0
+
+$ npm run test:packet-b
+npm notice run business-scanner-tool@0.0.0 test:packet-b
+npm notice run node --import tsx scripts/test-packet-b.ts
+Packet B sales-readiness checks passed.
+
+EXIT 0
+
+$ npm run test:packet-c
+npm notice run business-scanner-tool@0.0.0 test:packet-c
+npm notice run node --import tsx scripts/test-packet-c.ts
+Packet C: customer summary, review gates, freshness, isolation, JSON compatibility, and all four React surfaces passed for two separate profiles.
+
+EXIT 0
+
+$ npm run test:packet-d
+npm notice run business-scanner-tool@0.0.0 test:packet-d
+npm notice run node --import tsx scripts/test-packet-d.ts && node --import tsx scripts/test-live-https-integration.ts
+Packet D: detection, review/presentation, persistence, isolation, provider normalization/failure and customer surfaces PASS (synthetic, no network).
+D.2 full audit/client/mapping/review replay passed: reset/refusal, network/DNS/executor exclusion, healthy HTTPS, duplicates, H1, review gates and freshness. Historical capture + controlled transport; NOT a live rescan.
+
+EXIT 0
+
+$ npm run test:packet-e
+npm notice run business-scanner-tool@0.0.0 test:packet-e
+npm notice run node --import tsx scripts/test-packet-e.ts
+Packet E PASS: shared orchestration; live-shaped HTTPS + duplicates; escalation; evidence/review/manual gates; isolation; real progress; unsupported/failure semantics; business comparisons; empty Results; runtime configuration and persistence.
+
+EXIT 0
+
+$ npm run test:proving-001
+npm notice run business-scanner-tool@0.0.0 test:proving-001
+npm notice run node --import tsx scripts/test-website-audit.ts && node --import tsx scripts/test-website-evidence-contract.ts
+Website audit compatibility tests passed.
+Website evidence provenance contract tests passed.
+
+EXIT 0
+
+$ npm run test:proving-002
+npm notice run business-scanner-tool@0.0.0 test:proving-002
+npm notice run node --import tsx scripts/test-browser-website-observation.ts
+Browser-assisted website observation tests passed.
+
+EXIT 0
+
+$ npm run test:packet-e1
+npm notice run business-scanner-tool@0.0.0 test:packet-e1
+npm notice run node --import tsx scripts/test-packet-e1.ts
+Packet E.1 PASS: all 16 acceptance cases; real audit/client replay; Brand+Location; matching/conflicts/review provenance; semantic/JSON-LD extraction; robots/metadata; machine findings; UI gates; lifecycle/rollback; isolation. Controlled fixtures, not live Mary claims.
+
+EXIT 0

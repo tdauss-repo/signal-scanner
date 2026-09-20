@@ -1,3 +1,4 @@
+import { acquireGoogleMapsRuntime, acquireGoogleSearchRuntime, acquireRuntime } from './acquisitionRuntime.ts'
 import express from 'express'
 import type { ErrorRequestHandler } from 'express'
 import { discoverDirectoryCandidates } from './directoryCandidates.ts'
@@ -16,10 +17,35 @@ app.get('/api/health', (_request, response) => {
   response.json({ ok: true, service: 'business-scanner-tool-api' })
 })
 
+app.post('/api/acquire-public-presence', async (request, response) => {
+  try {
+    response.json(await acquireRuntime(String(request.body.url || ''), String(request.body.method || '')))
+  } catch (error) {
+    response.status(400).json({ error: error instanceof Error ? error.message : 'Public acquisition unavailable.' })
+  }
+})
+
+app.post('/api/acquire-google-search', async (request, response) => {
+  try {
+    response.json(await acquireGoogleSearchRuntime(String(request.body.url || '')))
+  } catch (error) {
+    response.status(400).json({ error: error instanceof Error ? error.message : 'Google acquisition unavailable.' })
+  }
+})
+
+app.post('/api/acquire-google-maps', async (request, response) => {
+  try {
+    response.json(await acquireGoogleMapsRuntime(String(request.body.url || '')))
+  } catch (error) {
+    response.status(400).json({ error: error instanceof Error ? error.message : 'Google Maps acquisition unavailable.' })
+  }
+})
+
 app.post('/api/audit-website', async (request, response) => {
   try {
     const body = request.body as Partial<WebsiteAuditRequest>
     const audit = await auditWebsite({
+      machineReadability: body.machineReadability === true,
       website: String(body.website ?? ''),
       businessName: String(body.businessName ?? ''),
       phone: String(body.phone ?? ''),

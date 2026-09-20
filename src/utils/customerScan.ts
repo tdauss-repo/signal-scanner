@@ -1,19 +1,28 @@
+import { matchesEvidenceFingerprint } from './evidenceFingerprint'
+import { currentMachineReadability, summarizeMachineReadability } from './machineReadability'
+import { scanAreaState, scanStateLabel } from './visibilityScanState'
+import type { ScanArea, ScanState } from '../types/visibilityScan'
 import type { AuditItem, AuditState, FixItem } from '../types/audit'
 import { effectivePackageFit, isStarterEligible, sortSalesActions } from './salesReadiness'
 import { primarySearchDestinations } from './searchVisibility'
 
 export const findingLifecycle = ['Detected', 'Evidence captured', 'Reviewed', 'Action proposed', 'Approved', 'Implemented', 'Re-scanned', 'Verified'] as const
 export type CustomerView = 'Scan' | 'Findings' | 'Action Plan' | 'Results'
-export type CustomerAreaStatus = 'Looking good' | 'Needs attention' | 'Opportunities identified' | 'Confirmation needed' | 'Scan in progress' | 'Not reviewed / Not checked'
+export type CustomerAreaStatus = (typeof scanStateLabel)[ScanState] | 'Looking good' | 'Needs attention' | 'Opportunities identified' | 'Confirmation needed' | 'Scan in progress' | 'Not reviewed / Not checked'
+export type VisibilitySnapshotOverall = 'Looking strong' | 'Mostly visible' | 'Some improvements recommended' | 'Needs attention' | 'Not fully verified' | 'Not yet scanned' | 'Scan still being completed'
+export type VisibilitySnapshotCategory = 'Looking good' | 'Some improvements' | 'Needs attention' | 'Not fully verified' | 'Not yet scanned'
 
 /** Existing Starter eligibility stays intact; other groups also need evidence and a checkable action. */
 export const canPresentFinding = (fix: FixItem) => {
   const fit = effectivePackageFit(fix)
-  return !/^(website-h1|website-heading)$/.test(fix.id) && fit !== 'excluded' && fix.reviewed === true &&
+  return !/^(website-h1|website-heading|website-homepage-clarity)$/.test(fix.id) && fit !== 'excluded' && fix.reviewed === true &&
     (fix.status === 'fail' || fix.status === 'partial') &&
     Boolean(fix.issue.trim() && fix.fix.trim() && (fix.evidenceSummary || fix.evidenceNote)?.trim() && fix.verificationMethod?.trim()) &&
     (fit !== 'starter' || isStarterEligible(fix))
 }
+
+/** Supporting observations stay available for explicit supplemental review, not initial selection. */
+export const isSupportingCustomerFinding = (fix: FixItem) => ['website-mobile-conversion', 'website-social-links', 'website-title'].includes(fix.id)
 
 /** A generated candidate may be reviewed, but is not thereby already reviewed. */
 export const canReviewFinding = (fix: FixItem) => canPresentFinding(
@@ -29,7 +38,7 @@ const stableReviewValue = (value: unknown): unknown => Array.isArray(value) ? va
 export const customerReviewKey = (state: AuditState, fix: FixItem) => JSON.stringify(stableReviewValue([
   state.profile, state.businessProfile, state.checks, state.notes, state.evidenceConfidence,
   state.websiteAudit, state.searchDestinationObservations, state.aiAnswerTests,
-  state.directories, state.salesReadiness, fix.intelligence ? { ...fix, reviewed: false } : fix,
+  state.directories, state.salesReadiness, ...(state.machineReadability ? [state.machineReadability] : []), fix.intelligence ? { ...fix, reviewed: false } : fix,
 ]))
 
 export const isPresentedFinding = (state: AuditState, fix: FixItem) =>
@@ -43,8 +52,10 @@ export const customerFindingGroup = (fix: FixItem) => {
 }
 
 export interface CustomerArea {
+  scanState?: ScanState
   title: string
   status: CustomerAreaStatus
+  snapshotStatus?: VisibilitySnapshotCategory
   detail: string
 }
 
@@ -82,13 +93,13 @@ export function summarizeCustomerScan(state: AuditState, items: AuditItem[], fix
       : completed.length < website.length ? 'Confirmation needed' : 'Looking good'
   const areas: CustomerArea[] = [
     { title: 'Website & Technical', status: websiteStatus,
-      detail: loading ? 'Analyzing the website. Other areas are reviewed separately.'
+      detail: loading ? 'Checking the website. Findings require review.'
         : websiteFailed ? 'The latest website check could not complete. Any earlier results still need review.'
           : completed.length ? `${completed.length} of ${website.length} website checks have results. ${good} look good.`
             : 'Website content and technical signals have not been checked yet.' },
     { title: 'Search & Maps', status: search.length === 0 ? unreviewed
         : searchCompleted.length < search.length ? 'Confirmation needed'
-          : searchCompleted.some((item) => item?.overallResult !== 'found_prominently') ? 'Opportunities identified' : !primaryComplete ? 'Confirmation needed' : 'Looking good',
+          : searchCompleted.some((item) => !['found_match', 'found_prominently'].includes(item?.overallResult || '')) ? 'Opportunities identified' : !primaryComplete ? 'Confirmation needed' : 'Looking good',
       detail: searchCompleted.length ? `${searchCompleted.length} destination observations reviewed. This describes only the recorded searches, not overall search coverage.`
         : 'Search and map results need a separate, destination-by-destination review.' },
     { title: 'Business Information', status: businessReviewed === 0 ? unreviewed : confirmations ? 'Confirmation needed'
@@ -101,10 +112,84 @@ export function summarizeCustomerScan(state: AuditState, items: AuditItem[], fix
       detail: ai.length ? `${ai.length} manual AI observations reviewed. Results describe those observations only; future mentions are not guaranteed.`
         : 'No reviewed AI observations. A website scan does not check AI answers.' },
   ]
+  // Keep the legacy status field compatible with saved callers; normalized state is canonical for Scan.
+  areas.forEach((area, index) => {
+    area.scanState = area.status === unreviewed ? 'not_checked' : area.status === 'Scan in progress' ? 'scanning'
+      : index === 0 && websiteFailed ? 'failed' : area.status === 'Looking good' ? 'checked_clear'
+        : ['Needs attention', 'Opportunities identified'].includes(area.status) ? 'needs_attention' : 'interactive_review_required'
+  })
+  const latestRun = state.visibilityRuns?.filter((run) => matchesEvidenceFingerprint(run.profileKey, state.profile)).at(-1)
+  if (latestRun) {
+    const keys: ScanArea[] = ['WebsiteTechnical', 'SearchMaps', 'BusinessInformation', 'AIDiscovery']
+    const activeDetails = ['Checking website…', 'Checking public search presence…', 'Comparing public business information…', 'Checking how clearly the website describes your business…']
+    areas.forEach((area, index) => {
+      // Manual AI observations remain useful; this runner makes no AI execution claims.
+      if (index === 3 && ai.length && !latestRun.machineReadability) return
+      const projection = { ...latestRun, checks: latestRun.checks.map((check) => {
+        const observation = check.queryId && check.destination ? state.searchDestinationObservations[check.queryId]?.[check.destination] : undefined
+        const conclusiveAutomation = observation?.automation?.assessment && !observation.automation.assessment.operatorReviewRequired
+        if (observation?.evidenceNotes.trim() && (observation.reviewed || conclusiveAutomation)) return { ...check, state: (['found_match', 'found_prominently'].includes(observation.overallResult) ? 'checked_clear' : needsReview.includes(observation.overallResult) ? 'interactive_review_required' : 'needs_attention') as ScanState }
+        if (check.id === 'identity-comparison' && state.salesReadiness.consistencyObservations?.length && state.salesReadiness.consistencyObservations.every((record) => record.reviewed)) return { ...check, state: (state.salesReadiness.consistencyObservations.some((record) => record.result !== 'Match') ? 'needs_attention' : 'checked_clear') as ScanState }
+        return check
+      }) }
+      let status = scanAreaState(projection, keys[index])
+      if (!loading && !latestRun.endedAt && ['queued', 'scanning'].includes(status)) status = 'interactive_review_required'
+      area.scanState = status
+      area.status = scanStateLabel[status]
+      const checks = latestRun.checks.filter((check) => check.area === keys[index])
+      const captured = checks.filter((check) => check.evidenceCaptured).length
+      area.detail = status === 'scanning' ? activeDetails[index]
+        : status === 'queued' ? 'Waiting for the preceding scan work.'
+          : status === 'not_checked' ? 'No automated evidence is available for this area. Manual review remains available.'
+            : status === 'failed' ? 'This check could not complete. This is not a finding about the business.'
+              : `${captured} checks captured evidence. ${checks.filter((check) => check.state === 'interactive_review_required').length} need a closer review. Findings require human review.`
+    })
+  }
+  const machine = currentMachineReadability(state)
+  if (state.machineReadability && !machine && !loading) {
+    areas[3].scanState = 'interactive_review_required'
+    areas[3].status = scanStateLabel.interactive_review_required
+    areas[3].detail = 'Business or website evidence changed. Rerun website readability checks before using earlier conclusions. AI answer testing remains separate.'
+  }
+  if (machine?.status === 'evidence_captured' && !loading) {
+    const readability = summarizeMachineReadability(state)
+    areas[3].scanState = readability.scanState
+    areas[3].status = readability.statusLabel
+    areas[3].detail = `${readability.evidence} website readability checks have evidence. ${readability.evaluated} evaluated; ${readability.reviewRequired} need review; ${readability.unavailable} unavailable. Business descriptions and recommended improvements remain available for review. AI answer testing was not performed by this scan.`
+  }
+  areas.forEach((area) => {
+    area.snapshotStatus = area.scanState === 'checked_clear' ? 'Looking good'
+      : area.scanState === 'needs_attention' ? 'Needs attention'
+        : area.scanState === 'not_checked' ? 'Not yet scanned'
+          : area.scanState && ['queued', 'scanning', 'evidence_captured', 'awaiting_review', 'interactive_review_required', 'failed'].includes(area.scanState) ? 'Not fully verified'
+            : area.status === 'Looking good' ? 'Looking good'
+              : ['Needs attention'].includes(area.status) ? 'Needs attention'
+                : area.status === 'Opportunities identified' ? 'Some improvements' : area.status === unreviewed ? 'Not yet scanned' : 'Not fully verified'
+  })
+  const latestChecks = latestRun?.checks || []
+  const positiveSearch = Object.values(state.searchDestinationObservations).flatMap((destinations) => Object.values(destinations))
+    .filter((observation) => observation && ['found_match', 'found_prominently'].includes(observation.overallResult)
+      && (observation.reviewed || observation.automation?.runId === latestRun?.id)).length
+  const machineGood = machine?.checks.filter((check) => check.result === 'observed').length || 0
+  const goodSignals = good + positiveSearch + machineGood
+  const areasStillToVerify = areas.filter((area) => ['Not fully verified', 'Not yet scanned'].includes(area.snapshotStatus!)).length
+  const active = loading || latestChecks.some((check) => ['queued', 'scanning'].includes(check.state))
+  const snapshotOverall: VisibilitySnapshotOverall = active ? 'Scan still being completed'
+    : areas.some((area) => area.snapshotStatus === 'Needs attention') ? 'Needs attention'
+      : findings.length || areas.some((area) => area.snapshotStatus === 'Some improvements') ? 'Some improvements recommended'
+        : areas.every((area) => area.snapshotStatus === 'Looking good') ? 'Looking strong'
+          : goodSignals > 0 ? 'Mostly visible' : latestRun ? 'Not fully verified' : 'Not yet scanned'
+  const snapshotDetail = snapshotOverall === 'Looking strong' ? 'The completed checks show clear, consistent visibility across the areas reviewed.'
+    : snapshotOverall === 'Mostly visible' ? 'Positive visibility signals were found, with some areas still to verify.'
+      : snapshotOverall === 'Some improvements recommended' ? 'The review found useful improvements alongside the signals that are already working.'
+        : snapshotOverall === 'Needs attention' ? 'The completed checks found supported visibility issues worth reviewing.'
+          : snapshotOverall === 'Not yet scanned' ? 'Run a visibility scan to begin checking the business across its public presence.'
+            : 'Some areas have not completed verification yet. Unavailable checks are not treated as business problems.'
   return {
     areas, findings, websiteCompleted: completed.length, websiteGood: good,
     confirmationCount: findings.filter((fix) => effectivePackageFit(fix) === 'owner_action').length,
     improvementCount: findings.filter((fix) => effectivePackageFit(fix) !== 'owner_action').length,
     awaitingReview: fixes.filter((fix) => fix.status !== 'pass' && !isPresentedFinding(state, fix)).length,
+    snapshot: { overall: snapshotOverall, detail: snapshotDetail, goodSignals, recommendedImprovements: findings.length, areasStillToVerify },
   }
 }

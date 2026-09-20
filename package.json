@@ -20,7 +20,20 @@
     "prove:acquisition": "node --import tsx scripts/prove-acquisition.ts",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:packet-e": "node --import tsx scripts/test-packet-e.ts",
+    "prove:visibility-scan": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/prove-visibility-scan.ts",
+    "server:configured": "node --env-file=.env.runtime.local --import tsx server/index.ts",
+    "dev:configured": "node --env-file=.env.runtime.local scripts/dev-all.mjs",
+    "test:packet-e1": "node --import tsx scripts/test-packet-e1.ts",
+    "test:packet-e1a": "node --import tsx scripts/test-packet-e1a.ts",
+    "test:public-presence-promotion": "node --import tsx scripts/test-public-presence-promotion.ts",
+    "test:operator-assisted-search": "node --import tsx scripts/test-operator-assisted-search.ts",
+    "prove:google-persistent-browser": "xvfb-run -a node --env-file=.env.runtime.local --import tsx scripts/prove-google-persistent-browser.ts",
+    "prove:brightdata-google": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/prove-brightdata-google.ts",
+    "prove:google-brightdata": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/prove-google-brightdata.ts",
+    "test:google-brightdata": "node --import tsx scripts/test-google-brightdata.ts",
+    "test:visibility-snapshot": "node --import tsx scripts/test-visibility-snapshot.ts"
   },
   "dependencies": {
     "express": "^5.2.1",

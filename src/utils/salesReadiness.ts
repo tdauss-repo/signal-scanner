@@ -22,6 +22,7 @@ export const seededCustomerQuestions = (profile: BusinessProfile): CustomerQuest
 }
 
 export const normalizeSalesReadiness = (state: Partial<SalesReadinessState> | undefined, profile: BusinessProfile): SalesReadinessState => ({
+  consistencyObservations: state?.consistencyObservations?.map((item) => ({ ...item })),
   entityClarity: state?.entityClarity === undefined ? seededEntityClarity(profile) : state.entityClarity.map((finding) => ({ ...finding })),
   customerQuestions: state?.customerQuestions === undefined ? seededCustomerQuestions(profile) : state.customerQuestions.map((question) => ({ ...question })),
 })

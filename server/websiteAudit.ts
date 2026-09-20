@@ -1,3 +1,5 @@
+import { captureMachineMetadata } from './machineReadabilityCapture.ts'
+import type { MachineReadabilityCapture } from '../src/types/machineReadability.ts'
 import type {
   LinkEvidence,
   WebsiteAuditBlockedResult,
@@ -13,6 +15,7 @@ export type {
 } from '../src/types/websiteAudit.ts'
 
 export interface WebsiteAuditRequest {
+  machineReadability?: boolean
   website: string
   businessName: string
   phone: string
@@ -787,9 +790,20 @@ export const auditWebsite = async (
     inspectTransportSecurity(fetchedBaseUrl),
   ])
 
+  let machineReadabilityCapture: MachineReadabilityCapture | undefined
+  if (request.machineReadability) {
+    const requestedRobotsUrl = new URL('/robots.txt', fetchedBaseUrl.origin).href
+    let robots: MachineReadabilityCapture['robots']
+    try {
+      const fetched = await fetchWithLimit(new URL(requestedRobotsUrl), 'GET')
+      robots = { requestedUrl: requestedRobotsUrl, finalUrl: fetched.response.url || requestedRobotsUrl, acquiredAt: new Date().toISOString(), status: fetched.response.status, text: fetched.body.slice(0, 64000), truncated: fetched.body.length > 64000 }
+    } catch (error) { robots = { requestedUrl: requestedRobotsUrl, acquiredAt: new Date().toISOString(), error: String(error) } }
+    machineReadabilityCapture = { ...captureMachineMetadata(body, fetchedUrl, response.headers), robots }
+  }
   const analyzedAt = new Date().toISOString()
 
   return {
+    ...(machineReadabilityCapture ? { machineReadabilityCapture } : {}),
     ok: true,
     acquisition: {
       captureVersion: 1,

@@ -72,7 +72,7 @@ export const aggregateReviewedSearchObservations = (
   const results = primary.map((item) => item.overallResult)
   const evidenceConfidence = conservativePrimaryConfidence(primary)
   const hasConflict = results.includes('found_conflicting_information')
-  const hasStrong = results.includes('found_prominently')
+  const hasStrong = results.includes('found_prominently') || results.includes('found_match')
   const hasWeak = results.some((result) =>
     ['found_weak', 'found_directory_only', 'not_found'].includes(result),
   )

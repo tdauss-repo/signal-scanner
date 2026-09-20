@@ -1,0 +1,2450 @@
+{
+  "status": "UNREVIEWED_PROVING_ATTEMPT",
+  "networkRestrictionReported": true,
+  "profile": {
+    "businessName": "Montessori Center of Downriver",
+    "website": "http://montessoridownriver.com/",
+    "streetAddress": "",
+    "city": "Southgate",
+    "state": "MI",
+    "zip": "",
+    "phone": "",
+    "knownListingUrl": "",
+    "operatorNote": "Provisional identity for user-requested proving; no owner confirmation inferred.",
+    "phoneNumbers": [],
+    "contactStructureNote": "",
+    "primaryCategory": "",
+    "secondaryCategories": "",
+    "industryTags": "",
+    "localMarket": "Southgate, MI",
+    "existingDirectoryUrls": "https://mmsoc.org/accredited-schools/",
+    "serviceArea": "",
+    "primaryServices": "",
+    "targetLocation": "",
+    "keywords": ""
+  },
+  "profileReviewState": {
+    "schemaVersion": 1,
+    "values": {
+      "businessName": {
+        "value": "Montessori Center of Downriver",
+        "source": "legacy_imported",
+        "recordedAt": "2026-09-19T00:03:15.162Z",
+        "confidence": "low",
+        "status": "legacy_imported"
+      },
+      "website": {
+        "value": "http://montessoridownriver.com/",
+        "source": "legacy_imported",
+        "recordedAt": "2026-09-19T00:03:15.162Z",
+        "confidence": "low",
+        "status": "legacy_imported"
+      },
+      "city": {
+        "value": "Southgate",
+        "source": "legacy_imported",
+        "recordedAt": "2026-09-19T00:03:15.162Z",
+        "confidence": "low",
+        "status": "legacy_imported"
+      },
+      "state": {
+        "value": "MI",
+        "source": "legacy_imported",
+        "recordedAt": "2026-09-19T00:03:15.162Z",
+        "confidence": "low",
+        "status": "legacy_imported"
+      },
+      "operatorNote": {
+        "value": "Provisional identity for user-requested proving; no owner confirmation inferred.",
+        "source": "legacy_imported",
+        "recordedAt": "2026-09-19T00:03:15.162Z",
+        "confidence": "low",
+        "status": "legacy_imported"
+      },
+      "localMarket": {
+        "value": "Southgate, MI",
+        "source": "legacy_imported",
+        "recordedAt": "2026-09-19T00:03:15.162Z",
+        "confidence": "low",
+        "status": "legacy_imported"
+      },
+      "existingDirectoryUrls": {
+        "value": "https://mmsoc.org/accredited-schools/",
+        "source": "legacy_imported",
+        "recordedAt": "2026-09-19T00:03:15.162Z",
+        "confidence": "low",
+        "status": "legacy_imported"
+      }
+    }
+  },
+  "run": {
+    "version": 2,
+    "profileReviewKey": "{\"schemaVersion\":1,\"values\":{\"businessName\":{\"value\":\"Montessori Center of Downriver\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"website\":{\"value\":\"http://montessoridownriver.com/\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"city\":{\"value\":\"Southgate\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"state\":{\"value\":\"MI\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"operatorNote\":{\"value\":\"Provisional identity for user-requested proving; no owner confirmation inferred.\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"localMarket\":{\"value\":\"Southgate, MI\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"existingDirectoryUrls\":{\"value\":\"https://mmsoc.org/accredited-schools/\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"}}}",
+    "id": "visibility-2026-09-19T00:03:15.163Z-d39057",
+    "profileKey": "{\"businessName\":\"Montessori Center of Downriver\",\"website\":\"http://montessoridownriver.com/\",\"streetAddress\":\"\",\"city\":\"Southgate\",\"state\":\"MI\",\"zip\":\"\",\"phone\":\"\",\"knownListingUrl\":\"\",\"operatorNote\":\"Provisional identity for user-requested proving; no owner confirmation inferred.\",\"phoneNumbers\":[],\"contactStructureNote\":\"\",\"primaryCategory\":\"\",\"secondaryCategories\":\"\",\"industryTags\":\"\",\"localMarket\":\"Southgate, MI\",\"existingDirectoryUrls\":\"https://mmsoc.org/accredited-schools/\",\"serviceArea\":\"\",\"primaryServices\":\"\",\"targetLocation\":\"\",\"keywords\":\"\"}",
+    "startedAt": "2026-09-19T00:03:15.163Z",
+    "checks": [
+      {
+        "id": "website-audit",
+        "area": "WebsiteTechnical",
+        "state": "failed",
+        "captures": [],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "startedAt": "2026-09-19T00:03:15.163Z",
+        "error": "Website hostname could not be resolved",
+        "endedAt": "2026-09-19T00:03:15.191Z",
+        "elapsedMs": 28
+      },
+      {
+        "id": "search-brand-canonical:Google Search",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://www.google.com/search?q=Montessori%20Center%20of%20Downriver",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.191Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.google.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://www.google.com/search?q=Montessori%20Center%20of%20Downriver",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.418Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.google.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Google Search",
+        "queryId": "search-brand-canonical",
+        "query": "Montessori Center of Downriver",
+        "queryMode": "brand",
+        "url": "https://www.google.com/search?q=Montessori%20Center%20of%20Downriver",
+        "startedAt": "2026-09-19T00:03:15.191Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.google.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.418Z",
+        "elapsedMs": 227
+      },
+      {
+        "id": "search-brand-canonical:Google Maps",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://www.google.com/maps/search/Montessori%20Center%20of%20Downriver",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.418Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.google.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://www.google.com/maps/search/Montessori%20Center%20of%20Downriver",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.419Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.google.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Google Maps",
+        "queryId": "search-brand-canonical",
+        "query": "Montessori Center of Downriver",
+        "queryMode": "brand",
+        "url": "https://www.google.com/maps/search/Montessori%20Center%20of%20Downriver",
+        "startedAt": "2026-09-19T00:03:15.418Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.google.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.419Z",
+        "elapsedMs": 1
+      },
+      {
+        "id": "search-brand-canonical:Bing Search",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.419Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.bing.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.420Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.bing.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Bing Search",
+        "queryId": "search-brand-canonical",
+        "query": "Montessori Center of Downriver",
+        "queryMode": "brand",
+        "url": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver",
+        "startedAt": "2026-09-19T00:03:15.419Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.bing.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.420Z",
+        "elapsedMs": 1
+      },
+      {
+        "id": "search-brand-canonical:Apple Maps",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://maps.apple.com/?q=Montessori%20Center%20of%20Downriver",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.420Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN maps.apple.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://maps.apple.com/?q=Montessori%20Center%20of%20Downriver",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.420Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN maps.apple.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Apple Maps",
+        "queryId": "search-brand-canonical",
+        "query": "Montessori Center of Downriver",
+        "queryMode": "brand",
+        "url": "https://maps.apple.com/?q=Montessori%20Center%20of%20Downriver",
+        "startedAt": "2026-09-19T00:03:15.420Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN maps.apple.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.420Z",
+        "elapsedMs": 0
+      },
+      {
+        "id": "search-brand-canonical:DuckDuckGo",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://duckduckgo.com/?q=Montessori%20Center%20of%20Downriver",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.420Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN duckduckgo.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://duckduckgo.com/?q=Montessori%20Center%20of%20Downriver",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.421Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN duckduckgo.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "DuckDuckGo",
+        "queryId": "search-brand-canonical",
+        "query": "Montessori Center of Downriver",
+        "queryMode": "brand",
+        "url": "https://duckduckgo.com/?q=Montessori%20Center%20of%20Downriver",
+        "startedAt": "2026-09-19T00:03:15.420Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN duckduckgo.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.421Z",
+        "elapsedMs": 1
+      },
+      {
+        "id": "search-brand-canonical:Yelp",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://www.yelp.com/search?find_desc=Montessori%20Center%20of%20Downriver",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.421Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.yelp.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://www.yelp.com/search?find_desc=Montessori%20Center%20of%20Downriver",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.421Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.yelp.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Yelp",
+        "queryId": "search-brand-canonical",
+        "query": "Montessori Center of Downriver",
+        "queryMode": "brand",
+        "url": "https://www.yelp.com/search?find_desc=Montessori%20Center%20of%20Downriver",
+        "startedAt": "2026-09-19T00:03:15.421Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.yelp.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.421Z",
+        "elapsedMs": 0
+      },
+      {
+        "id": "search-brand-canonical:Facebook",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://www.facebook.com/search/top?q=Montessori%20Center%20of%20Downriver",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.421Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.facebook.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://www.facebook.com/search/top?q=Montessori%20Center%20of%20Downriver",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.422Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.facebook.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Facebook",
+        "queryId": "search-brand-canonical",
+        "query": "Montessori Center of Downriver",
+        "queryMode": "brand",
+        "url": "https://www.facebook.com/search/top?q=Montessori%20Center%20of%20Downriver",
+        "startedAt": "2026-09-19T00:03:15.421Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.facebook.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.422Z",
+        "elapsedMs": 1
+      },
+      {
+        "id": "search-brand-canonical:Instagram",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://www.instagram.com/explore/search/keyword/?q=Montessori%20Center%20of%20Downriver",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.422Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.instagram.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://www.instagram.com/explore/search/keyword/?q=Montessori%20Center%20of%20Downriver",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.422Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.instagram.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Instagram",
+        "queryId": "search-brand-canonical",
+        "query": "Montessori Center of Downriver",
+        "queryMode": "brand",
+        "url": "https://www.instagram.com/explore/search/keyword/?q=Montessori%20Center%20of%20Downriver",
+        "startedAt": "2026-09-19T00:03:15.422Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.instagram.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.422Z",
+        "elapsedMs": 0
+      },
+      {
+        "id": "search-brand-market:Google Search",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://www.google.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.422Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.google.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://www.google.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.422Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.google.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Google Search",
+        "queryId": "search-brand-market",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "queryMode": "location",
+        "url": "https://www.google.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+        "startedAt": "2026-09-19T00:03:15.422Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.google.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.423Z",
+        "elapsedMs": 1
+      },
+      {
+        "id": "search-brand-market:Google Maps",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://www.google.com/maps/search/Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.423Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.google.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://www.google.com/maps/search/Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.423Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.google.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Google Maps",
+        "queryId": "search-brand-market",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "queryMode": "location",
+        "url": "https://www.google.com/maps/search/Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+        "startedAt": "2026-09-19T00:03:15.423Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.google.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.423Z",
+        "elapsedMs": 0
+      },
+      {
+        "id": "search-brand-market:Bing Search",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.423Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.bing.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.423Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.bing.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Bing Search",
+        "queryId": "search-brand-market",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "queryMode": "location",
+        "url": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+        "startedAt": "2026-09-19T00:03:15.423Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.bing.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.424Z",
+        "elapsedMs": 1
+      },
+      {
+        "id": "search-brand-market:Apple Maps",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://maps.apple.com/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.424Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN maps.apple.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://maps.apple.com/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.424Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN maps.apple.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Apple Maps",
+        "queryId": "search-brand-market",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "queryMode": "location",
+        "url": "https://maps.apple.com/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+        "startedAt": "2026-09-19T00:03:15.424Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN maps.apple.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.424Z",
+        "elapsedMs": 0
+      },
+      {
+        "id": "search-brand-market:DuckDuckGo",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://duckduckgo.com/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.424Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN duckduckgo.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://duckduckgo.com/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.424Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN duckduckgo.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "DuckDuckGo",
+        "queryId": "search-brand-market",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "queryMode": "location",
+        "url": "https://duckduckgo.com/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+        "startedAt": "2026-09-19T00:03:15.424Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN duckduckgo.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.425Z",
+        "elapsedMs": 1
+      },
+      {
+        "id": "search-brand-market:Yelp",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://www.yelp.com/search?find_desc=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.425Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.yelp.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://www.yelp.com/search?find_desc=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.425Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.yelp.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Yelp",
+        "queryId": "search-brand-market",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "queryMode": "location",
+        "url": "https://www.yelp.com/search?find_desc=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+        "startedAt": "2026-09-19T00:03:15.425Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.yelp.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.425Z",
+        "elapsedMs": 0
+      },
+      {
+        "id": "search-brand-market:Facebook",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://www.facebook.com/search/top?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.425Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.facebook.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://www.facebook.com/search/top?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.425Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.facebook.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Facebook",
+        "queryId": "search-brand-market",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "queryMode": "location",
+        "url": "https://www.facebook.com/search/top?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+        "startedAt": "2026-09-19T00:03:15.425Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.facebook.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.425Z",
+        "elapsedMs": 0
+      },
+      {
+        "id": "search-brand-market:Instagram",
+        "area": "SearchMaps",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://www.instagram.com/explore/search/keyword/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.426Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.instagram.com",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://www.instagram.com/explore/search/keyword/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.426Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN www.instagram.com",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "destination": "Instagram",
+        "queryId": "search-brand-market",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "queryMode": "location",
+        "url": "https://www.instagram.com/explore/search/keyword/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+        "startedAt": "2026-09-19T00:03:15.425Z",
+        "assessment": {
+          "matches": [],
+          "confidence": "unavailable",
+          "automaticObservation": false,
+          "ambiguityReasons": [
+            "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.instagram.com. This is not evidence of absence."
+          ],
+          "blocker": "acquisition_failure",
+          "tier3Candidate": false
+        },
+        "endedAt": "2026-09-19T00:03:15.426Z",
+        "elapsedMs": 1
+      },
+      {
+        "id": "public-directory-0",
+        "area": "BusinessInformation",
+        "state": "interactive_review_required",
+        "captures": [
+          {
+            "version": 1,
+            "requestedUrl": "https://mmsoc.org/accredited-schools/",
+            "method": "server_fetch",
+            "provider": "found-local-server",
+            "acquiredAt": "2026-09-19T00:03:15.426Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN mmsoc.org",
+            "visibleText": ""
+          },
+          {
+            "version": 1,
+            "requestedUrl": "https://mmsoc.org/accredited-schools/",
+            "method": "rendered_browser",
+            "provider": "playwright-chromium",
+            "acquiredAt": "2026-09-19T00:03:15.426Z",
+            "outcome": "failed",
+            "confidence": "unavailable",
+            "notes": [],
+            "error": "getaddrinfo EAI_AGAIN mmsoc.org",
+            "visibleText": ""
+          }
+        ],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "url": "https://mmsoc.org/accredited-schools/",
+        "startedAt": "2026-09-19T00:03:15.426Z",
+        "endedAt": "2026-09-19T00:03:15.426Z",
+        "elapsedMs": 0
+      },
+      {
+        "id": "identity-comparison",
+        "area": "BusinessInformation",
+        "state": "not_checked",
+        "captures": [],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "startedAt": "2026-09-19T00:03:15.427Z",
+        "endedAt": "2026-09-19T00:03:15.427Z",
+        "elapsedMs": 0
+      },
+      {
+        "id": "machine-readability",
+        "area": "AIDiscovery",
+        "state": "not_checked",
+        "captures": [],
+        "evidenceCaptured": false,
+        "interpreted": false,
+        "startedAt": "2026-09-19T00:03:15.427Z",
+        "endedAt": "2026-09-19T00:03:15.427Z",
+        "elapsedMs": 0
+      },
+      {
+        "id": "ai-answer-testing",
+        "area": "AIDiscovery",
+        "state": "not_checked",
+        "captures": [],
+        "evidenceCaptured": false,
+        "interpreted": false
+      }
+    ],
+    "businessEvidence": [],
+    "machineReadability": {
+      "version": 1,
+      "profileKey": "{\"businessName\":\"Montessori Center of Downriver\",\"website\":\"http://montessoridownriver.com/\",\"streetAddress\":\"\",\"city\":\"Southgate\",\"state\":\"MI\",\"zip\":\"\",\"phone\":\"\",\"knownListingUrl\":\"\",\"operatorNote\":\"Provisional identity for user-requested proving; no owner confirmation inferred.\",\"phoneNumbers\":[],\"contactStructureNote\":\"\",\"primaryCategory\":\"\",\"secondaryCategories\":\"\",\"industryTags\":\"\",\"localMarket\":\"Southgate, MI\",\"existingDirectoryUrls\":\"https://mmsoc.org/accredited-schools/\",\"serviceArea\":\"\",\"primaryServices\":\"\",\"targetLocation\":\"\",\"keywords\":\"\"}",
+      "profileReviewKey": "{\"schemaVersion\":1,\"values\":{\"businessName\":{\"value\":\"Montessori Center of Downriver\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"website\":{\"value\":\"http://montessoridownriver.com/\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"city\":{\"value\":\"Southgate\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"state\":{\"value\":\"MI\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"operatorNote\":{\"value\":\"Provisional identity for user-requested proving; no owner confirmation inferred.\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"localMarket\":{\"value\":\"Southgate, MI\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"existingDirectoryUrls\":{\"value\":\"https://mmsoc.org/accredited-schools/\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"}}}",
+      "analyzedAt": "2026-09-19T00:03:15.427Z",
+      "sourceUrl": "http://montessoridownriver.com/",
+      "status": "unavailable",
+      "checks": [],
+      "schemaTypes": [],
+      "entities": [],
+      "comparisons": [],
+      "evidenceReferences": [],
+      "conditions": [],
+      "answerTesting": "not_performed"
+    },
+    "endedAt": "2026-09-19T00:03:15.427Z",
+    "summary": {
+      "attempted": 20,
+      "successful": 0,
+      "evidenceCaptured": 0,
+      "operatorReview": 18,
+      "interactiveReview": 17,
+      "acquisitionFailures": 35,
+      "manualInterventionsRequired": 21,
+      "providerEscalations": 17,
+      "candidateFindings": 0,
+      "customerApprovedFindings": 0
+    }
+  },
+  "machineReadability": {
+    "version": 1,
+    "profileKey": "{\"businessName\":\"Montessori Center of Downriver\",\"website\":\"http://montessoridownriver.com/\",\"streetAddress\":\"\",\"city\":\"Southgate\",\"state\":\"MI\",\"zip\":\"\",\"phone\":\"\",\"knownListingUrl\":\"\",\"operatorNote\":\"Provisional identity for user-requested proving; no owner confirmation inferred.\",\"phoneNumbers\":[],\"contactStructureNote\":\"\",\"primaryCategory\":\"\",\"secondaryCategories\":\"\",\"industryTags\":\"\",\"localMarket\":\"Southgate, MI\",\"existingDirectoryUrls\":\"https://mmsoc.org/accredited-schools/\",\"serviceArea\":\"\",\"primaryServices\":\"\",\"targetLocation\":\"\",\"keywords\":\"\"}",
+    "profileReviewKey": "{\"schemaVersion\":1,\"values\":{\"businessName\":{\"value\":\"Montessori Center of Downriver\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"website\":{\"value\":\"http://montessoridownriver.com/\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"city\":{\"value\":\"Southgate\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"state\":{\"value\":\"MI\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"operatorNote\":{\"value\":\"Provisional identity for user-requested proving; no owner confirmation inferred.\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"localMarket\":{\"value\":\"Southgate, MI\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"},\"existingDirectoryUrls\":{\"value\":\"https://mmsoc.org/accredited-schools/\",\"source\":\"legacy_imported\",\"recordedAt\":\"2026-09-19T00:03:15.162Z\",\"confidence\":\"low\",\"status\":\"legacy_imported\"}}}",
+    "analyzedAt": "2026-09-19T00:03:15.427Z",
+    "sourceUrl": "http://montessoridownriver.com/",
+    "status": "unavailable",
+    "checks": [],
+    "schemaTypes": [],
+    "entities": [],
+    "comparisons": [],
+    "evidenceReferences": [],
+    "conditions": [],
+    "answerTesting": "not_performed"
+  },
+  "reviewableFindings": [],
+  "websiteAudit": {
+    "lastSuccessful": null,
+    "latestAttempt": {
+      "ok": false,
+      "acquisition": {
+        "captureVersion": 1,
+        "provider": "found-local-server",
+        "method": "server_fetch",
+        "outcome": "unavailable",
+        "requestedUrl": "http://montessoridownriver.com/",
+        "occurredAt": "2026-09-19T00:03:15.186Z",
+        "attemptSummary": {
+          "attemptedCount": 4,
+          "selectedUrl": "http://montessoridownriver.com/",
+          "selectedStrategy": "normal fetch (http://montessoridownriver.com/)",
+          "errorType": "dns_resolution",
+          "protocolFallbackTried": true,
+          "wwwFallbackTried": true
+        },
+        "recordOrigin": "captured"
+      },
+      "status": 0,
+      "error": "Website hostname could not be resolved",
+      "errorType": "dns_resolution",
+      "details": "The scanner could not resolve the website hostname. getaddrinfo EAI_AGAIN montessoridownriver.com",
+      "recommendedNextStep": "The scanner could not resolve this hostname from the backend environment. Confirm the site in a browser, then use Browser Observation Review if it remains reachable there.",
+      "requestedUrl": "http://montessoridownriver.com/",
+      "normalizedUrl": "http://montessoridownriver.com/",
+      "redirectUrl": "http://montessoridownriver.com/",
+      "finalUrl": "http://montessoridownriver.com/",
+      "redirectOccurred": false,
+      "redirectCount": 0,
+      "blocked": false,
+      "fetchStrategyUsed": "normal fetch (http://montessoridownriver.com/)",
+      "httpsFallbackTried": true,
+      "protocolFallbackTried": true,
+      "wwwFallbackTried": true,
+      "timestamp": "2026-09-19T00:03:15.186Z"
+    },
+    "manualObservation": {
+      "sourceUrl": "",
+      "recordedAt": "",
+      "acquisition": null,
+      "observedTitle": "",
+      "observedMetaDescription": "",
+      "visibleHomepageText": "",
+      "observedLinks": "",
+      "observedSchemaSnippet": "",
+      "notes": "",
+      "analyzedAt": ""
+    },
+    "browserObservation": null
+  },
+  "observations": {
+    "search-brand-canonical": {
+      "Google Search": {
+        "destination": "Google Search",
+        "query": "Montessori Center of Downriver",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.418Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "brand",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://www.google.com/search?q=Montessori%20Center%20of%20Downriver",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://www.google.com/search?q=Montessori%20Center%20of%20Downriver",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.191Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.google.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://www.google.com/search?q=Montessori%20Center%20of%20Downriver",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.418Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.google.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.google.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "Google Maps": {
+        "destination": "Google Maps",
+        "query": "Montessori Center of Downriver",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.419Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "brand",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://www.google.com/maps/search/Montessori%20Center%20of%20Downriver",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://www.google.com/maps/search/Montessori%20Center%20of%20Downriver",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.418Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.google.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://www.google.com/maps/search/Montessori%20Center%20of%20Downriver",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.419Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.google.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.google.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "Bing Search": {
+        "destination": "Bing Search",
+        "query": "Montessori Center of Downriver",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.420Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "brand",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.419Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.bing.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.420Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.bing.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.bing.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "Apple Maps": {
+        "destination": "Apple Maps",
+        "query": "Montessori Center of Downriver",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.420Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "brand",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://maps.apple.com/?q=Montessori%20Center%20of%20Downriver",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://maps.apple.com/?q=Montessori%20Center%20of%20Downriver",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.420Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN maps.apple.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://maps.apple.com/?q=Montessori%20Center%20of%20Downriver",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.420Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN maps.apple.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN maps.apple.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "DuckDuckGo": {
+        "destination": "DuckDuckGo",
+        "query": "Montessori Center of Downriver",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.421Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "brand",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://duckduckgo.com/?q=Montessori%20Center%20of%20Downriver",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://duckduckgo.com/?q=Montessori%20Center%20of%20Downriver",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.420Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN duckduckgo.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://duckduckgo.com/?q=Montessori%20Center%20of%20Downriver",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.421Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN duckduckgo.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN duckduckgo.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "Yelp": {
+        "destination": "Yelp",
+        "query": "Montessori Center of Downriver",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.421Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "brand",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://www.yelp.com/search?find_desc=Montessori%20Center%20of%20Downriver",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://www.yelp.com/search?find_desc=Montessori%20Center%20of%20Downriver",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.421Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.yelp.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://www.yelp.com/search?find_desc=Montessori%20Center%20of%20Downriver",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.421Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.yelp.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.yelp.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "Facebook": {
+        "destination": "Facebook",
+        "query": "Montessori Center of Downriver",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.422Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "brand",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://www.facebook.com/search/top?q=Montessori%20Center%20of%20Downriver",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://www.facebook.com/search/top?q=Montessori%20Center%20of%20Downriver",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.421Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.facebook.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://www.facebook.com/search/top?q=Montessori%20Center%20of%20Downriver",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.422Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.facebook.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.facebook.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "Instagram": {
+        "destination": "Instagram",
+        "query": "Montessori Center of Downriver",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.422Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "brand",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://www.instagram.com/explore/search/keyword/?q=Montessori%20Center%20of%20Downriver",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://www.instagram.com/explore/search/keyword/?q=Montessori%20Center%20of%20Downriver",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.422Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.instagram.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://www.instagram.com/explore/search/keyword/?q=Montessori%20Center%20of%20Downriver",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.422Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.instagram.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.instagram.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      }
+    },
+    "search-brand-market": {
+      "Google Search": {
+        "destination": "Google Search",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.422Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "location",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://www.google.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://www.google.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.422Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.google.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://www.google.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.422Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.google.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.google.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "Google Maps": {
+        "destination": "Google Maps",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.423Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "location",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://www.google.com/maps/search/Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://www.google.com/maps/search/Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.423Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.google.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://www.google.com/maps/search/Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.423Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.google.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.google.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "Bing Search": {
+        "destination": "Bing Search",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.423Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "location",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.423Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.bing.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.423Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.bing.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.bing.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "Apple Maps": {
+        "destination": "Apple Maps",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.424Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "location",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://maps.apple.com/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://maps.apple.com/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.424Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN maps.apple.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://maps.apple.com/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.424Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN maps.apple.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN maps.apple.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "DuckDuckGo": {
+        "destination": "DuckDuckGo",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.424Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "location",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://duckduckgo.com/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://duckduckgo.com/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.424Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN duckduckgo.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://duckduckgo.com/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.424Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN duckduckgo.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN duckduckgo.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "Yelp": {
+        "destination": "Yelp",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.425Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "location",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://www.yelp.com/search?find_desc=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://www.yelp.com/search?find_desc=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.425Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.yelp.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://www.yelp.com/search?find_desc=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.425Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.yelp.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.yelp.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "Facebook": {
+        "destination": "Facebook",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.425Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "location",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://www.facebook.com/search/top?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://www.facebook.com/search/top?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.425Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.facebook.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://www.facebook.com/search/top?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.425Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.facebook.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.facebook.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      },
+      "Instagram": {
+        "destination": "Instagram",
+        "query": "Montessori Center of Downriver Southgate, MI",
+        "overallResult": "manual_review_needed",
+        "observedResultTypes": [],
+        "observedAt": "2026-09-19T00:03:15.426Z",
+        "confidence": "manual_needs_confirmation",
+        "evidenceNotes": "",
+        "competitorsObserved": "",
+        "recommendedAction": "",
+        "provenance": "automated_acquisition",
+        "evidenceKind": "acquisition_failure",
+        "reviewed": false,
+        "automation": {
+          "runId": "visibility-2026-09-19T00:03:15.163Z-d39057",
+          "queryMode": "location",
+          "state": "interactive_review_required",
+          "inspectedUrl": "https://www.instagram.com/explore/search/keyword/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+          "captures": [
+            {
+              "version": 1,
+              "requestedUrl": "https://www.instagram.com/explore/search/keyword/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "server_fetch",
+              "provider": "found-local-server",
+              "acquiredAt": "2026-09-19T00:03:15.426Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.instagram.com",
+              "visibleText": ""
+            },
+            {
+              "version": 1,
+              "requestedUrl": "https://www.instagram.com/explore/search/keyword/?q=Montessori%20Center%20of%20Downriver%20Southgate%2C%20MI",
+              "method": "rendered_browser",
+              "provider": "playwright-chromium",
+              "acquiredAt": "2026-09-19T00:03:15.426Z",
+              "outcome": "failed",
+              "confidence": "unavailable",
+              "notes": [],
+              "error": "getaddrinfo EAI_AGAIN www.instagram.com",
+              "visibleText": ""
+            }
+          ],
+          "evidence": "",
+          "interpreted": false,
+          "automaticObservation": false,
+          "assessment": {
+            "matches": [],
+            "confidence": "unavailable",
+            "automaticObservation": false,
+            "ambiguityReasons": [
+              "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.instagram.com. This is not evidence of absence."
+            ],
+            "blocker": "acquisition_failure",
+            "tier3Candidate": false
+          }
+        }
+      }
+    }
+  },
+  "coverage": [
+    {
+      "destination": "Google Search",
+      "query": "Montessori Center of Downriver",
+      "queryMode": "brand",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.google.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 227
+    },
+    {
+      "destination": "Google Maps",
+      "query": "Montessori Center of Downriver",
+      "queryMode": "brand",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.google.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 1
+    },
+    {
+      "destination": "Bing Search",
+      "query": "Montessori Center of Downriver",
+      "queryMode": "brand",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.bing.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 1
+    },
+    {
+      "destination": "Apple Maps",
+      "query": "Montessori Center of Downriver",
+      "queryMode": "brand",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN maps.apple.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 0
+    },
+    {
+      "destination": "DuckDuckGo",
+      "query": "Montessori Center of Downriver",
+      "queryMode": "brand",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN duckduckgo.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 1
+    },
+    {
+      "destination": "Yelp",
+      "query": "Montessori Center of Downriver",
+      "queryMode": "brand",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.yelp.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 0
+    },
+    {
+      "destination": "Facebook",
+      "query": "Montessori Center of Downriver",
+      "queryMode": "brand",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.facebook.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 1
+    },
+    {
+      "destination": "Instagram",
+      "query": "Montessori Center of Downriver",
+      "queryMode": "brand",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.instagram.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 0
+    },
+    {
+      "destination": "Google Search",
+      "query": "Montessori Center of Downriver Southgate, MI",
+      "queryMode": "location",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.google.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 1
+    },
+    {
+      "destination": "Google Maps",
+      "query": "Montessori Center of Downriver Southgate, MI",
+      "queryMode": "location",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.google.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 0
+    },
+    {
+      "destination": "Bing Search",
+      "query": "Montessori Center of Downriver Southgate, MI",
+      "queryMode": "location",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.bing.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 1
+    },
+    {
+      "destination": "Apple Maps",
+      "query": "Montessori Center of Downriver Southgate, MI",
+      "queryMode": "location",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN maps.apple.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 0
+    },
+    {
+      "destination": "DuckDuckGo",
+      "query": "Montessori Center of Downriver Southgate, MI",
+      "queryMode": "location",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN duckduckgo.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 1
+    },
+    {
+      "destination": "Yelp",
+      "query": "Montessori Center of Downriver Southgate, MI",
+      "queryMode": "location",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.yelp.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 0
+    },
+    {
+      "destination": "Facebook",
+      "query": "Montessori Center of Downriver Southgate, MI",
+      "queryMode": "location",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.facebook.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 0
+    },
+    {
+      "destination": "Instagram",
+      "query": "Montessori Center of Downriver Southgate, MI",
+      "queryMode": "location",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "Acquisition did not obtain a public page: getaddrinfo EAI_AGAIN www.instagram.com. This is not evidence of absence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 1
+    },
+    {
+      "destination": "https://mmsoc.org/accredited-schools/",
+      "acquisitionTierReached": "tier_2_provider_entry",
+      "candidateFound": false,
+      "matchedFields": [],
+      "conflictingFields": [],
+      "confidence": "unavailable",
+      "automaticObservation": false,
+      "ambiguity": [
+        "No usable identity evidence."
+      ],
+      "tier3Candidate": false,
+      "tier1Attempted": true,
+      "tier1Outcome": "failed",
+      "tier2Attempted": true,
+      "tier2Outcome": "failed",
+      "usableEvidence": false,
+      "automaticInterpretation": false,
+      "operatorReviewRequired": true,
+      "interactiveReviewRequired": true,
+      "elapsedMs": 0
+    }
+  ],
+  "publicPresenceSummary": {
+    "attempted": 16,
+    "evidence": 0,
+    "automatic": 0,
+    "reviewed": 0,
+    "reviewRequired": 16,
+    "total": 16,
+    "label": "Needs review"
+  },
+  "derivedSummaryNote": "Coverage summary computed from the stored run and observations; no new acquisition or facts added."
+}

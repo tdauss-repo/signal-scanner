@@ -3,6 +3,7 @@ import type { WebsiteAcquisitionProvenance } from './websiteAudit.js'
 export type FindingLifecycle = 'Detected' | 'Evidence captured' | 'Reviewed' | 'Action proposed' | 'Approved' | 'Implemented' | 'Re-scanned' | 'Verified'
 
 export interface FindingIntelligence {
+  remediation?: RemediationPlan
   ruleVersion: 1
   checkId: string
   condition: string
@@ -27,5 +28,16 @@ export interface FindingIntelligence {
   }
   verification: { expectedState: string; method: string; criteria: string[] }
   // Packet D records detection, not approvals, implementation or verified outcomes.
+  lifecycle: FindingLifecycle
+}
+
+/** Proposal data only: recording this plan does not authorize or execute a change. */
+export interface RemediationPlan {
+  proposedChange: string
+  accessRequired: string[]
+  implementationMechanism: string
+  expectedPostChangeState: string
+  verificationMethod: string
+  rollbackRecovery: string
   lifecycle: FindingLifecycle
 }

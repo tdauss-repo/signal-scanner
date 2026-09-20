@@ -1,0 +1,27 @@
+{
+  "profile": {
+    "businessName": "Montessori Center of Downriver",
+    "website": "http://www.montessoridownriver.com/",
+    "streetAddress": "15575 Northline Road",
+    "city": "Southgate",
+    "state": "MI",
+    "zip": "48195",
+    "phone": "734-282-6465",
+    "localMarket": "Southgate, MI",
+    "targetLocation": "Southgate MI"
+  },
+  "businessProfile": {
+    "schemaVersion": 1,
+    "values": {
+      "businessName": { "value": "Montessori Center of Downriver", "source": "operator_entered", "confidence": "high", "status": "operator_reviewed" },
+      "website": { "value": "http://www.montessoridownriver.com/", "source": "operator_entered", "confidence": "high", "status": "operator_reviewed" },
+      "streetAddress": { "value": "15575 Northline Road", "source": "operator_entered", "confidence": "high", "status": "operator_reviewed" },
+      "city": { "value": "Southgate", "source": "operator_entered", "confidence": "high", "status": "operator_reviewed" },
+      "state": { "value": "MI", "source": "operator_entered", "confidence": "high", "status": "operator_reviewed" },
+      "zip": { "value": "48195", "source": "operator_entered", "confidence": "high", "status": "operator_reviewed" },
+      "phone": { "value": "734-282-6465", "source": "operator_entered", "confidence": "high", "status": "operator_reviewed" },
+      "localMarket": { "value": "Southgate, MI", "source": "operator_entered", "confidence": "high", "status": "operator_reviewed" },
+      "targetLocation": { "value": "Southgate MI", "source": "operator_entered", "confidence": "high", "status": "operator_reviewed" }
+    }
+  }
+}

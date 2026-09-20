@@ -1,3 +1,8 @@
+import { MachineReadabilityPanel } from './components/MachineReadabilityPanel'
+import { summarizeMachineReadability } from './utils/machineReadability'
+import { workspaceFindings } from './utils/workspaceFindings'
+import { restoreVisibilityRuns } from './utils/visibilityScanState'
+import { VisibilityRunReview } from './components/VisibilityRunReview'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { AIAnswerVisibilityTest } from './components/AIAnswerVisibilityTest'
@@ -19,7 +24,6 @@ import { SalesReadinessPanel } from './components/SalesReadinessPanel'
 import { CustomerScanView } from './components/CustomerScanView'
 import { CustomerFindingReview } from './components/CustomerFindingReview'
 import { canReviewFinding, customerReviewKey, isPresentedFinding } from './utils/customerScan'
-import { mergeIntelligentFindings } from './utils/findingIntelligence'
 import type { CustomerView } from './utils/customerScan'
 import { blankProfile, normalizeWorkspaceProfile } from './utils/workspaceProfile'
 import { buildAuditItems } from './data/auditCatalog'
@@ -27,8 +31,8 @@ import { applyCurrentCatalogMetadata, migrateSystemGeneratedFix } from './utils/
 import { defaultProfile } from './data/demoProfile'
 import type { AIAnswerObservation, AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem, SavedScanFile, SavedScanRecord, SearchDestinationObservation, SearchVisibilityQuery, VoiceAssistantObservation, VoicePromptTestState } from './types/audit'
 import type { ManualWebsiteObservation } from './types/websiteAudit'
-import { aiAnswerPlatforms, buildFixPlan, numericOverallScoreAreas, overallVisibilityCheckedCount, overallVisibilityScore, scoreItems, trafficStatusForScore } from './utils/scoring'
-import { analyzeBrowserWebsiteObservation, analyzeManualWebsiteObservation, mapAutoAuditToWebsiteChecks, mergeBrowserMappingWithServerPrecedence, runWebsiteAutoAudit } from './utils/websiteAutoAudit'
+import { aiAnswerPlatforms, numericOverallScoreAreas, overallVisibilityCheckedCount, overallVisibilityScore, scoreItems, trafficStatusForScore } from './utils/scoring'
+import { analyzeBrowserWebsiteObservation, analyzeManualWebsiteObservation, mergeBrowserMappingWithServerPrecedence } from './utils/websiteAutoAudit'
 import {
   browserWebsiteObservationFromPayload,
   captureBrowserWebsiteObservationProvenance,
@@ -62,8 +66,8 @@ import {
 } from './utils/businessProfileState'
 import { aggregateReviewedSearchObservations } from './utils/searchAggregation'
 import { summarizeAIVisibilityEvidence } from './utils/aiPresence'
-import { projectPublicObservationToProfiles, publicPresenceCoverage, publicPresenceQualityLabel, supportingPublicPresenceReviewedCount } from './utils/publicPresence'
-import { classifyAuditFixForSales, entityAction, normalizeSalesReadiness, questionAction, sortSalesActions } from './utils/salesReadiness'
+import { projectPublicObservationToProfiles, summarizePublicPresence } from './utils/publicPresence'
+import { entityAction, normalizeSalesReadiness, questionAction, sortSalesActions } from './utils/salesReadiness'
 
 const storageKey = 'local-signal-scanner-state'
 const activeViewStorageKey = 'business-scanner-active-view'
@@ -477,6 +481,7 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
       evidenceConfidence: parsed.evidenceConfidence ?? {},
       reportSummary: parsed.reportSummary ?? '',
       websiteAudit: normalizeWebsiteAuditWorkspaceState(parsed.websiteAudit),
+      visibilityRuns: restoreVisibilityRuns(parsed.visibilityRuns),
       manualFixes: (parsed.manualFixes ?? [])
         .map((fix) => ({
           ...fix,
@@ -633,9 +638,8 @@ function App() {
     const overallScore = overallVisibilityScore({
       website: website.score,
     })
-    const primaryQueryId = groups.searchVisibility[0]?.id
-    const coverage = publicPresenceCoverage(auditState.searchDestinationObservations, primaryQueryId ? [primaryQueryId] : [])
-    const publicPresence = { score: null, status: coverage.completed === 0 ? 'Gray' as const : coverage.completed < coverage.total ? 'Yellow' as const : 'Green' as const, earned: 0, possible: 0, checked: coverage.completed, unchecked: coverage.total - coverage.completed, statusLabel: coverage.completed === 0 ? 'Not tested' : coverage.completed < coverage.total ? 'Incomplete' : publicPresenceQualityLabel(auditState.searchDestinationObservations, primaryQueryId ? [primaryQueryId] : []) }
+    const coverage = summarizePublicPresence(auditState)
+    const publicPresence = { score: null, status: coverage.attempted === 0 ? 'Gray' as const : coverage.reviewRequired ? 'Yellow' as const : 'Green' as const, earned: 0, possible: 0, checked: coverage.attempted, unchecked: Math.max(0, coverage.total - coverage.attempted), statusLabel: coverage.label }
     const profileManagement = { score: null, status: 'Gray' as const, earned: 0, possible: 0, checked: currentDirectoryRows.length, statusLabel: 'Owner/admin access incomplete' }
 
     return {
@@ -652,7 +656,7 @@ function App() {
       'Public Presence': publicPresence,
       'Profile Management': profileManagement,
     }
-  }, [auditState.checks, auditState.directories.activeRows, auditState.profile, auditState.searchDestinationObservations, groups])
+  }, [auditState, groups])
 
   const aiVisibilityEvidence = useMemo(
     () => summarizeAIVisibilityEvidence(auditState.aiAnswerTests, auditState.profile),
@@ -660,38 +664,21 @@ function App() {
   )
 
   const publicPresenceDetails = useMemo(() => {
-    const primaryQueryId = groups.searchVisibility[0]?.id
-    const coverage = publicPresenceCoverage(auditState.searchDestinationObservations, primaryQueryId ? [primaryQueryId] : [])
-    return `${coverage.completed} of ${coverage.total} primary checks complete | ${supportingPublicPresenceReviewedCount(auditState.searchDestinationObservations, primaryQueryId)} supporting checks reviewed`
-  }, [auditState.searchDestinationObservations, groups.searchVisibility])
+    const coverage = summarizePublicPresence(auditState)
+    return `${coverage.attempted} attempted · ${coverage.evidence} with evidence · ${coverage.automatic} automatically matched · ${coverage.reviewRequired} need review · ${coverage.reviewed} reviewed (Brand and Location included)`
+  }, [auditState])
+
+  const readabilitySummary = summarizeMachineReadability(auditState)
 
   const dashboardCards = [
     { label: 'Overall' as const, result: scores.Overall, weight: 'weighted' },
     { label: 'Website SEO' as const, result: scores['Website SEO'] },
     { label: 'Public Presence' as const, result: scores['Public Presence'], displayValue: scores['Public Presence'].statusLabel, details: publicPresenceDetails },
     { label: 'Profile Management' as const, result: scores['Profile Management'] },
-    { label: 'AI Visibility' as const, result: { score: null, status: 'Gray' as const, earned: 0, possible: 0, checked: aiVisibilityEvidence.reviewedObservationCount, statusLabel: aiVisibilityEvidence.statusLabel } },
+    { label: 'AI Visibility' as const, result: { score: null, status: 'Gray' as const, earned: 0, possible: 0, checked: readabilitySummary.evaluated + aiVisibilityEvidence.reviewedObservationCount, statusLabel: auditState.machineReadability ? readabilitySummary.statusLabel : aiVisibilityEvidence.statusLabel }, details: `${readabilitySummary.detail} · ${aiVisibilityEvidence.reviewedObservationCount} AI answer observations reviewed` },
   ]
 
-  const fixes = useMemo(
-    () => mergeIntelligentFindings(auditState, [
-      ...buildFixPlan(
-        auditItems.filter(
-          (item) => item.area !== 'ai' && !item.id.startsWith('voice-prompt-'),
-        ),
-        auditState.checks,
-      ).map((fix) => ({
-        ...fix,
-        evidenceNote: auditState.notes[fix.id],
-        evidenceConfidence: auditState.evidenceConfidence[fix.id],
-      })).map(classifyAuditFixForSales),
-      ...auditState.manualFixes,
-    ]),
-    [
-      auditItems,
-      auditState,
-    ],
-  )
+  const fixes = useMemo(() => workspaceFindings(auditState, auditItems), [auditItems, auditState])
 
   const salesFixes = useMemo(() => sortSalesActions(fixes.map((fix) =>
     fix.intelligence && isPresentedFinding(auditState, fix) ? { ...fix, reviewed: true } : fix)), [fixes, auditState])
@@ -1253,68 +1240,15 @@ function App() {
     const requestGeneration = ++websiteRequestGeneration.current
     setWebsiteAuditLoading(true)
     setWebsiteAuditError('')
-
     try {
-      const result = await runWebsiteAutoAudit(auditState.profile)
+      const { applicationScanDependencies, runVisibilityScan } = await import('./utils/visibilityScan')
       if (requestGeneration !== websiteRequestGeneration.current) return
-
-      if (result.ok === false) {
-        const blockedNote = [
-          result.error,
-          result.details,
-          `Requested URL: ${result.requestedUrl}`,
-          `Final URL: ${result.finalUrl || result.redirectUrl}`,
-          `HTTP status: ${result.status}`,
-          `Error type: ${result.errorType}`,
-          `Redirect occurred: ${result.redirectOccurred ? 'Yes' : 'No'}`,
-          `Blocked/forbidden: ${result.blocked ? 'Yes' : 'No'}`,
-          `Redirect URL: ${result.redirectUrl}`,
-          `Timestamp: ${result.timestamp}`,
-          `Recommended next step: ${result.recommendedNextStep}`,
-        ].join('\n')
-
-        setAuditState((current) => ({
-          ...current,
-          websiteAudit: {
-            ...current.websiteAudit,
-            latestAttempt: result,
-          },
-          notes: {
-            ...current.notes,
-            'website-homepage-clarity': blockedNote,
-          },
-          lastUpdated: new Date().toISOString(),
-        }))
-        return
-      }
-
-      const mapping = mapAutoAuditToWebsiteChecks(result, auditState.profile)
-      setAuditState((current) => ({
-        ...current,
-        websiteAudit: {
-          ...current.websiteAudit,
-          lastSuccessful: result,
-          latestAttempt: result,
-        },
-        checks: { ...current.checks, ...mapping.statuses },
-        notes: { ...current.notes, ...mapping.notes },
-        evidenceConfidence: {
-          ...current.evidenceConfidence,
-          ...Object.keys(mapping.statuses).reduce(
-            (confidence, id) => ({
-              ...confidence,
-              [id]: 'scanner_detected_public_page',
-            }),
-            {} as Record<string, EvidenceConfidence>,
-          ),
-        },
-        lastUpdated: new Date().toISOString(),
-      }))
+      await runVisibilityScan(auditState, {
+        ...applicationScanDependencies,
+        cancelled: () => requestGeneration !== websiteRequestGeneration.current,
+      }, (update) => setAuditState((current) => requestGeneration === websiteRequestGeneration.current ? update(current) : current))
     } catch (error) {
-      if (requestGeneration !== websiteRequestGeneration.current) return
-      setWebsiteAuditError(
-        error instanceof Error ? error.message : 'Website audit failed.',
-      )
+      if (requestGeneration === websiteRequestGeneration.current) setWebsiteAuditError(String(error))
     } finally {
       if (requestGeneration === websiteRequestGeneration.current) setWebsiteAuditLoading(false)
     }
@@ -1774,16 +1708,17 @@ function App() {
               disabled={websiteAuditLoading}
             >
               {websiteAuditLoading
-                ? 'Running Website Auto-Audit...'
-                : 'Run Website Auto-Audit'}
+                ? 'Running visibility scan…'
+                : 'Run visibility scan'}
             </button>
             <p>
-              Fetches and analyzes only the entered business website homepage.
-              Third-party platform checks stay manual.
+              Runs the website audit, supported Public Presence acquisition, and public business information comparisons.
+              Evidence and findings still require operator review.
             </p>
+            <VisibilityRunReview state={auditState} />
             {websiteAuditError ? (
               <p className="error-text">
-                Scanner error - no website finding was recorded. {websiteAuditError}
+                Visibility scan interrupted; captured evidence remains available for review. {websiteAuditError}
               </p>
             ) : null}
             {latestWebsiteAttempt ? (
@@ -2062,7 +1997,7 @@ function App() {
 
     if (activeView === 'AI Visibility') {
       return (
-        <AIAnswerVisibilityTest
+        <><MachineReadabilityPanel state={auditState} /><AIAnswerVisibilityTest
           profile={auditState.profile}
           profileState={auditState.businessProfile}
           selectedPlatform={auditState.selectedAIPlatform}
@@ -2071,7 +2006,7 @@ function App() {
           onSelectedPlatformChange={setSelectedAIPlatform}
           onChange={setAIAnswerTest}
           onAddToActionPlan={addAIAnswerToActionPlan}
-        />
+        /></>
       )
     }
 
@@ -2220,7 +2155,7 @@ function App() {
               onClick={() => void runAutoAudit()}
               disabled={websiteAuditLoading}
             >
-              {websiteAuditLoading ? 'Running Scan...' : 'Run Website Scan'}
+              {websiteAuditLoading ? 'Running Scan...' : 'Run visibility scan'}
             </button>
           </div>
         </div>

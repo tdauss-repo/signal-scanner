@@ -1,0 +1,101 @@
+{
+  "profile": {
+    "businessName": "Montessori Center of Downriver",
+    "website": "http://www.montessoridownriver.com/",
+    "streetAddress": "15575 Northline Road",
+    "city": "Southgate",
+    "state": "MI",
+    "zip": "48195",
+    "phone": "734-282-6465",
+    "localMarket": "Southgate, MI"
+  },
+  "brand": [
+    {
+      "id": "brightdata-browser-knowledge-panel",
+      "kind": "semantic_card",
+      "fields": {
+        "name": "Montessori Center of Downriver",
+        "website": "http://www.montessoridownriver.com/",
+        "phone": "(734) 282-6465",
+        "streetAddress": "Address: 15575 Northline Rd",
+        "address": "Address: 15575 Northline Rd, Southgate, MI 48195",
+        "locality": "Southgate",
+        "region": "MI",
+        "postalCode": "48195",
+        "placeIdentity": "mary-google-place"
+      },
+      "evidence": []
+    }
+  ],
+  "location": [
+    {
+      "id": "brightdata-serp-knowledge-panel",
+      "kind": "semantic_card",
+      "fields": {
+        "name": "Montessori Center of Downriver",
+        "website": "http://www.montessoridownriver.com/",
+        "phone": "(734) 282-6465",
+        "streetAddress": "Address: 15575 Northline Rd",
+        "address": "Address: 15575 Northline Rd, Southgate, MI 48195",
+        "locality": "Southgate",
+        "region": "MI",
+        "postalCode": "48195",
+        "placeIdentity": "mary-google-place"
+      },
+      "evidence": []
+    },
+    {
+      "id": "brightdata-serp-local-mary",
+      "kind": "semantic_card",
+      "fields": {
+        "name": "Montessori Center of Downriver",
+        "website": "http://www.montessoridownriver.com/",
+        "phone": "734-282-6465",
+        "streetAddress": "15575 Northline Road",
+        "address": "15575 Northline Road, Southgate, MI 48195",
+        "locality": "Southgate",
+        "region": "MI",
+        "postalCode": "48195",
+        "placeIdentity": "mary-google-place"
+      },
+      "evidence": []
+    },
+    {
+      "id": "brightdata-serp-official-organic",
+      "kind": "result_link",
+      "resultUrl": "http://www.montessoridownriver.com/",
+      "fields": {
+        "name": "Montessori Center of Downriver - Child-Centered Education"
+      },
+      "evidence": []
+    },
+    {
+      "id": "brightdata-serp-creative-montessori",
+      "kind": "semantic_card",
+      "fields": {
+        "name": "Creative Montessori Center",
+        "website": "https://creative-montessori.example/",
+        "phone": "313-555-0100",
+        "streetAddress": "999 Other Road",
+        "locality": "Southgate",
+        "region": "MI",
+        "placeIdentity": "creative-montessori-place"
+      },
+      "evidence": []
+    },
+    {
+      "id": "brightdata-serp-creative-academy",
+      "kind": "semantic_card",
+      "fields": {
+        "name": "Creative Montessori Academy",
+        "website": "https://creative-montessori-academy.example/",
+        "streetAddress": "15100 Northline Road",
+        "locality": "Southgate",
+        "region": "MI",
+        "postalCode": "48195",
+        "placeIdentity": "creative-montessori-academy-place"
+      },
+      "evidence": []
+    }
+  ]
+}

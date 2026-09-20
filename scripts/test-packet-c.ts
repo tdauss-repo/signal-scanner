@@ -136,7 +136,7 @@ assert(!loadedMontessori.includes('JEM'))
 assert(!loadedMontessori.includes('419.'))
 assert(!loadedMontessori.includes('Sylvania'))
 assert(!loadedMontessori.includes('Business Seed'), 'Persisted internal tab must not open the Workbench on reload')
-assert(loadedMontessori.includes('Where you stand'))
+assert(loadedMontessori.includes('Visibility Snapshot'))
 storage.set('local-signal-scanner-state', JSON.stringify(jem))
 const loadedJem = renderApp() as string
 assert(loadedJem.includes('JEM Photography'))

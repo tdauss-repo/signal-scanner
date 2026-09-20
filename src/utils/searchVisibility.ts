@@ -78,13 +78,13 @@ const positiveResultTypes: SearchVisibilityObservedResultType[] = [
 ]
 
 const positiveOverallResults: SearchVisibilityResult[] = [
-  'found_prominently', 'found_weak', 'found_directory_only', 'found_conflicting_information',
+  'found_match', 'found_prominently', 'found_weak', 'found_directory_only', 'found_conflicting_information',
 ]
 
 export const resultTypesForDestination = (destination: SearchDestination): SearchVisibilityObservedResultType[] => {
   const mapTypes: SearchVisibilityObservedResultType[] = ['local_business_profile', 'business_name_correct', 'address_correct', 'phone_correct', 'website_correct', 'category_correct', 'not_found']
   if (destination === 'Google Maps' || destination === 'Apple Maps') return mapTypes
-  if (destination === 'Bing Search') return ['local_business_profile', ...mapTypes.slice(1)]
+  if (destination === 'Bing Search') return ['local_business_profile', 'official_website', 'directory_listing', 'social_profile', 'third_party_mention', ...mapTypes.slice(1)]
   if (destination === 'Yelp') return ['directory_listing', 'official_website', 'third_party_mention', 'not_found']
   if (destination === 'Facebook' || destination === 'Instagram') return ['social_profile', 'official_website', 'third_party_mention', 'not_found']
   return ['official_website', 'directory_listing', 'social_profile', 'third_party_mention', 'not_found']
@@ -177,16 +177,16 @@ export const searchVisibilityQueryToAuditItem = (query: SearchVisibilityQuery): 
 })
 
 export const searchVisibilityResultToCheckStatus = (result: SearchVisibilityResult): CheckStatus => {
-  if (result === 'found_prominently') return 'pass'
+  if (result === 'found_match' || result === 'found_prominently') return 'pass'
   if (result === 'found_weak' || result === 'found_directory_only' || result === 'found_conflicting_information') return 'partial'
   if (result === 'not_found') return 'fail'
   return 'unknown'
 }
 export const searchVisibilityResultLabel = (result: SearchVisibilityResult) => ({
-  not_checked: 'Not checked', found_prominently: 'Found prominently', found_weak: 'Found, but weakly', found_directory_only: 'Found through a directory/listing', found_conflicting_information: 'Found with conflicting information', not_found: 'Not found', manual_review_needed: 'Manual review needed', unable_to_verify: 'Unable to verify',
+  found_match: 'Matching business observed', not_checked: 'Not checked', found_prominently: 'Found prominently', found_weak: 'Found, but weakly', found_directory_only: 'Found through a directory/listing', found_conflicting_information: 'Found with conflicting information', not_found: 'Not found', manual_review_needed: 'Manual review needed', unable_to_verify: 'Unable to verify',
 }[result])
 export const findingPriorityForSearchObservation = (query: SearchVisibilityQuery, result: SearchVisibilityResult): SearchVisibilityFindingPriority => {
-  if (result === 'found_prominently') return 'No action needed'
+  if (result === 'found_match' || result === 'found_prominently') return 'No action needed'
   if (result === 'not_checked' || result === 'manual_review_needed' || result === 'unable_to_verify') return 'Low'
   if (result === 'not_found') return query.priority === 'High' ? 'High' : 'Medium'
   return query.priority === 'High' ? 'High' : query.priority === 'Medium' ? 'Medium' : 'Low'
@@ -196,9 +196,12 @@ export const actionPlanPriorityForSearchObservation = (query: SearchVisibilityQu
   return priority === 'No action needed' ? 'Low' : priority
 }
 export const recommendedActionForSearchObservation = (query: SearchVisibilityQuery, result: SearchVisibilityResult) => {
-  if (result === 'found_prominently') return 'Maintain the business’s supporting service, location, listing, and review signals.'
+  if (result === 'found_match' || result === 'found_prominently') return 'Maintain the business’s supporting service, location, listing, and review signals.'
   if (result === 'found_conflicting_information') return 'Resolve the conflicting business information across the website, listings, and supporting public sources.'
   if (result === 'not_found') return `Improve public signals for this ${query.role.toLowerCase()} query through website content, category consistency, citations, reviews, and local proof.`
   return 'Document the observed result types and strengthen matching business, service, and location signals where needed.'
 }
 export { duckDuckGoSearch }
+
+/** Shared destination links for manual and automated acquisition. */
+export const publicPresenceUrl = (destination: SearchDestination, query: string) => destination === 'Google Search' ? googleSearch(query) : destination === 'Google Maps' ? googleMapsSearch(query) : destination === 'Bing Search' ? bingSearch(query) : destination === 'Apple Maps' ? `https://maps.apple.com/?q=${encodeURIComponent(query)}` : destination === 'Yelp' ? `https://www.yelp.com/search?find_desc=${encodeURIComponent(query)}` : destination === 'Facebook' ? `https://www.facebook.com/search/top?q=${encodeURIComponent(query)}` : destination === 'Instagram' ? `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(query)}` : duckDuckGoSearch(query)

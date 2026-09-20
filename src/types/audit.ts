@@ -1,3 +1,5 @@
+import type { MachineReadabilityReport } from './machineReadability.js'
+import type { PresenceAutomation, VisibilityRun } from './visibilityScan.js'
 import type {
   BrowserWebsiteObservation,
   ManualWebsiteObservation,
@@ -6,6 +8,7 @@ import type {
 } from './websiteAudit.js'
 
 import type { FindingIntelligence } from './findingIntelligence.js'
+import type { OperatorAssistedBrowserEvidence } from './operatorAssistedSearch.js'
 
 export type TrafficStatus = 'Green' | 'Yellow' | 'Red' | 'Gray'
 
@@ -110,6 +113,8 @@ export interface AuditItem {
 }
 
 export interface AuditState {
+  machineReadability?: MachineReadabilityReport
+  visibilityRuns?: VisibilityRun[]
   checks: Record<string, CheckStatus>
   notes: Record<string, string>
   evidenceConfidence: Record<string, EvidenceConfidence>
@@ -242,12 +247,13 @@ export interface CorroborationRecord {
   recordedAt: string
   confidence: EvidenceConfidence
   result: CorroborationResult
-  provenance: 'operator_observation' | 'legacy_imported'
+  provenance: 'operator_observation' | 'legacy_imported' | 'automated_acquisition'
   notes: string
   reviewed: boolean
 }
 
 export interface SalesReadinessState {
+  consistencyObservations?: CorroborationRecord[]
   entityClarity: EntityClarityFinding[]
   customerQuestions: CustomerQuestion[]
 }
@@ -317,7 +323,7 @@ export interface DestinationEvidence {
   destination: string
   observedAt: string
   confidence: EvidenceConfidence
-  provenance: 'operator_observation' | 'legacy_imported'
+  provenance: 'operator_observation' | 'operator_assisted_browser' | 'legacy_imported' | 'automated_acquisition'
   evidenceKind: EvidenceKind
   reviewed: boolean
 }
@@ -351,6 +357,7 @@ export type SearchVisibilityRole =
 
 export type SearchVisibilityResult =
   | 'not_checked'
+  | 'found_match'
   | 'found_prominently'
   | 'found_weak'
   | 'found_directory_only'
@@ -391,6 +398,8 @@ export type SearchDestination =
   | 'Instagram'
 
 export interface SearchDestinationObservation extends DestinationEvidence {
+  automation?: PresenceAutomation
+  operatorAssisted?: OperatorAssistedBrowserEvidence
   destination: SearchDestination
   query: string
   overallResult: SearchVisibilityResult

@@ -1,3 +1,4 @@
+import type { MachineReadabilityCapture } from './machineReadability.js'
 export type WebsiteAcquisitionMethod =
   | 'server_fetch'
   | 'operator_observation'
@@ -55,6 +56,7 @@ export interface BrowserObservedLink {
 }
 
 export interface WebsiteAuditResult {
+  machineReadabilityCapture?: MachineReadabilityCapture
   ok: true
   acquisition: WebsiteAcquisitionProvenance
   normalizedUrl: string

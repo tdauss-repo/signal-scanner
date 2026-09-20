@@ -814,11 +814,12 @@ export const analyzeBrowserWebsiteObservation = (
   return { statuses, notes }
 }
 
-export const runWebsiteAutoAudit = async (profile: BusinessProfile) => {
+export const runWebsiteAutoAudit = async (profile: BusinessProfile, options: { machineReadability?: boolean } = {}) => {
   const response = await fetch('/api/audit-website', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
+      ...(options.machineReadability ? { machineReadability: true } : {}),
       website: profile.website,
       businessName: profile.businessName,
       phone: profile.phone,
