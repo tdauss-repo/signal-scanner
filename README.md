@@ -1,6 +1,15 @@
 # Business Scanner Tool
 
-Business Scanner Tool v02 is a private/internal sales cockpit for preparing local visibility conversations before and during customer meetings. Operators can enter a business profile, run available checks and guided scans, identify potential fixes, count verified gaps, recommend a starter cleanup package, and keep placeholders for monthly monitoring or website implementation upsells.
+Business Scanner Tool v02 is Found Local's private/internal operator system for preparing local visibility work. Operators can enter a business profile, run available checks and guided scans, review evidence, approve customer findings, prepare a bounded package, and export a sanitized Customer Visibility Review JSON payload.
+
+The Business Scanner Tool is not the polished customer-presentation surface. The current handoff is: reviewed scanner state → customer-safe JSON → Found Local Sites → customer presentation and sales conversation.
+
+## Document Authority
+
+- [`docs/FOUND_LOCAL_DOCTRINE.md`](docs/FOUND_LOCAL_DOCTRINE.md) governs product strategy, scope, boundaries, service design, and prioritization.
+- [`docs/architecture.md`](docs/architecture.md) is the current implementation Source of Truth for architecture, workflow, constraints, and operational state.
+
+If implementation drifts from the doctrine, record and address the conflict; do not change the doctrine silently to match implementation.
 
 The app keeps third-party platform checks manual with generated evidence links. It does not scrape Google, Apple, Bing, Yelp, Facebook, Instagram, ChatGPT, Gemini, Claude, Perplexity, Copilot, or Grok.
 

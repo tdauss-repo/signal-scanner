@@ -5,6 +5,7 @@ import type { ScanArea, ScanState } from '../types/visibilityScan'
 import type { AuditItem, AuditState, FixItem } from '../types/audit'
 import { effectivePackageFit, isStarterEligible, sortSalesActions } from './salesReadiness'
 import { primarySearchDestinations } from './searchVisibility'
+import { salesCockpitVisibility } from './salesVisibilityProjection'
 
 export const findingLifecycle = ['Detected', 'Evidence captured', 'Reviewed', 'Action proposed', 'Approved', 'Implemented', 'Re-scanned', 'Verified'] as const
 export type CustomerView = 'Scan' | 'Findings' | 'Action Plan' | 'Results'
@@ -43,6 +44,13 @@ export const customerReviewKey = (state: AuditState, fix: FixItem) => JSON.strin
 
 export const isPresentedFinding = (state: AuditState, fix: FixItem) =>
   canReviewFinding(fix) && state.customerFindingReviews?.[fix.id] === customerReviewKey(state, fix)
+
+/** A dismissal is an explicit operator disposition, not the absence of approval.
+ * It shares the approval fingerprint so changed evidence always returns a finding to review.
+ */
+export const isDismissedCustomerFinding = (state: AuditState, fix: FixItem) =>
+  canReviewFinding(fix) && !isPresentedFinding(state, fix) &&
+  state.customerFindingDismissals?.[fix.id] === customerReviewKey(state, fix)
 
 export const customerFindingGroup = (fix: FixItem) => {
   const fit = effectivePackageFit(fix)
@@ -87,6 +95,12 @@ export function summarizeCustomerScan(state: AuditState, items: AuditItem[], fix
   const findings = sortSalesActions([...new Map(
     fixes.filter((fix) => isPresentedFinding(state, fix)).map((fix) => [fix.id, { ...fix, reviewed: true }]),
   ).values()])
+  const confirmedIssues = sortSalesActions([...new Map(
+    fixes.filter(canReviewFinding).map((fix) => [fix.id, fix]),
+  ).values()])
+  const knownFixes = confirmedIssues.filter((fix) => ['starter', 'owner_action'].includes(effectivePackageFit(fix)))
+  const cockpitVisibility = salesCockpitVisibility(Object.entries(state.searchDestinationObservations).flatMap(([queryId, destinations]) => Object.values(destinations).filter(Boolean).map((observation) => ({ queryId, observation }))))
+  const recommendedPlan = findings.some(isStarterEligible) ? 'Starter Visibility Cleanup' : null
   const websiteFailed = scanError || state.websiteAudit.latestAttempt?.ok === false
   const websiteStatus: CustomerAreaStatus = loading ? 'Scan in progress' : websiteFailed ? 'Confirmation needed'
     : completed.length === 0 ? unreviewed : good < completed.length ? 'Needs attention'
@@ -190,6 +204,46 @@ export function summarizeCustomerScan(state: AuditState, items: AuditItem[], fix
     confirmationCount: findings.filter((fix) => effectivePackageFit(fix) === 'owner_action').length,
     improvementCount: findings.filter((fix) => effectivePackageFit(fix) !== 'owner_action').length,
     awaitingReview: fixes.filter((fix) => fix.status !== 'pass' && !isPresentedFinding(state, fix)).length,
+    cockpit: { confirmedIssues, knownFixes, deeperReview: cockpitVisibility.deeperReview, lookingGood: cockpitVisibility.lookingGood, searchRecommendations: cockpitVisibility.recommended, recommendedPlan },
     snapshot: { overall: snapshotOverall, detail: snapshotDetail, goodSignals, recommendedImprovements: findings.length, areasStillToVerify },
   }
+}
+
+export interface CustomerReviewReadiness {
+  state: 'ready' | 'not_ready'
+  candidateFindings: number
+  approvedFindings: number
+  dismissedFindings: number
+  awaitingDisposition: number
+  verifiedStrengths: number
+  needsReview: number
+  message: string
+}
+
+/**
+ * Readiness means the sanitized customer payload is useful and deliberately
+ * approved; it is not a claim that every destination completed verification.
+ * Unresolved acquisition remains visible and neutral rather than becoming a
+ * finding or an all-scans-must-pass blocker.
+ */
+export function customerReviewReadiness(state: AuditState, summary: ReturnType<typeof summarizeCustomerScan>): CustomerReviewReadiness {
+  const primaryCandidates = summary.cockpit.confirmedIssues.filter((fix) => !isSupportingCustomerFinding(fix))
+  const candidateFindings = primaryCandidates.length
+  const approvedFindings = primaryCandidates.filter((fix) => isPresentedFinding(state, fix)).length
+  const dismissedFindings = primaryCandidates.filter((fix) => isDismissedCustomerFinding(state, fix)).length
+  const awaitingDisposition = candidateFindings - approvedFindings - dismissedFindings
+  const verifiedStrengths = summary.cockpit.lookingGood.length || summary.snapshot.goodSignals
+  const needsReview = summary.cockpit.deeperReview.length
+  const allCandidatesAdjudicated = awaitingDisposition === 0
+  const ready = allCandidatesAdjudicated && (approvedFindings > 0 || candidateFindings === 0 && verifiedStrengths > 0)
+  const message = !allCandidatesAdjudicated
+    ? `${awaitingDisposition} primary candidate ${awaitingDisposition === 1 ? 'awaits' : 'await'} an operator decision before export.`
+    : ready
+    ? approvedFindings > 0
+      ? 'Every primary candidate has been reviewed. Approved findings can be exported with verified strengths and clearly labeled areas still to review.'
+      : 'The completed review contains verified strengths and no candidate issues awaiting approval.'
+    : candidateFindings > 0
+      ? 'No customer findings were approved. Complete enough evidence review to establish a verified strength or approve an appropriate customer finding.'
+      : 'Complete enough evidence review to establish a verified strength or an approved customer finding.'
+  return { state: ready ? 'ready' : 'not_ready', candidateFindings, approvedFindings, dismissedFindings, awaitingDisposition, verifiedStrengths, needsReview, message }
 }

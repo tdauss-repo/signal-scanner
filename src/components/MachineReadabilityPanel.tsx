@@ -9,7 +9,7 @@ export function MachineReadabilityPanel({ state }: { state: AuditState }) {
       <p>{report.sourceUrl} · {report.analyzedAt}</p><p>Parsed schema types: {report.schemaTypes.join(', ') || 'None parsed'}</p>
       {report.checks.map((check) => <details key={check.id}><summary>{check.group} — {check.id}: {check.result}</summary><p>{check.conclusion}</p><pre>{check.evidence.join('\n')}</pre></details>)}
       <details><summary>Parsed entity facts & reviewed profile comparisons</summary><pre>{JSON.stringify({ entities: report.entities, comparisons: report.comparisons }, null, 2)}</pre></details>
-      {findings.map((finding) => <article key={finding.id}><h3>{finding.issue}</h3><p>{finding.evidenceSummary}</p><p>{finding.intelligence?.delivery.technicalChange}</p><p>Verification: {finding.verificationMethod}</p><p>Rollback/recovery: {finding.intelligence?.remediation?.rollbackRecovery}</p><p>Review this candidate in Customer presentation review before sharing. No implementation is authorized.</p></article>)}
+      {findings.map((finding) => <article key={finding.id}><h3>{finding.issue}</h3><p>{finding.evidenceSummary}</p><p>{finding.intelligence?.delivery.technicalChange}</p><p>Verification: {finding.verificationMethod}</p><p>Rollback/recovery: {finding.intelligence?.remediation?.rollbackRecovery}</p><p>Review this candidate in Customer review approval before export. No implementation is authorized.</p></article>)}
     </>}
   </section>
 }

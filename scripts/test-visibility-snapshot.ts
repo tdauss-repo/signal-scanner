@@ -64,11 +64,13 @@ writeFileSync(renderPath, compiled.outputFiles[0].text)
 try {
   const { render } = await import(renderPath.href)
   const html = render({ state, items: [], fixes: [], view: 'Scan', loading: false, scanError: false, onScan() {}, onWorkbench() {}, onView() {} }) as string
-  assert(html.includes('Visibility Snapshot'))
-  assert(html.includes('Overall visibility'))
-  assert(html.includes('Review findings'))
-  assert(html.includes('Things looking good') && html.includes('Recommended improvements') && html.includes('Areas still to verify'))
+  assert(html.includes('Business Scanner Tool'))
+  assert(html.includes('Internal Found Local operator workflow'))
+  assert(html.includes('Customer Review Readiness') && html.includes('Not ready'))
+  assert(html.includes('Candidate findings') && html.includes('Approved findings') && html.includes('Dismissed findings') && html.includes('Awaiting review') && html.includes('Needs review'))
+  assert(html.includes('Review Findings'))
+  assert(!html.includes('Recommended Fix Package') && !html.includes('What&#x27;s already working'))
   assert(!html.includes('0–100') && !html.includes('SEO score'))
 } finally { unlinkSync(renderPath); stop() }
 
-console.log('Visibility Snapshot PASS: qualitative derivation, neutral acquisition failures, customer hierarchy, and eight-destination capability matrix.')
+console.log('Visibility Snapshot PASS: qualitative derivation, neutral acquisition failures, internal operator hierarchy, readiness visibility, and eight-destination capability matrix.')

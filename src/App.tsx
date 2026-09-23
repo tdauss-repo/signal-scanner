@@ -12,7 +12,7 @@ import {
   DirectoryAuditPanel,
   directoryRowToStatus,
 } from './components/DirectoryAuditPanel'
-import { FixPlan } from './components/FixPlan'
+import { PackagePreparationPanel } from './components/PackagePreparationPanel'
 import { BusinessProfilePanel } from './components/BusinessProfilePanel'
 import { IntakeForm } from './components/IntakeForm'
 import { ReportView } from './components/ReportView'
@@ -597,7 +597,7 @@ const parseImportedScanFile = (text: string): SavedScanRecord | null => {
 }
 
 function App() {
-  // Always open the customer-safe surface, regardless of the persisted Workbench tab.
+  // Always open the internal operator overview, regardless of the persisted Workbench tab.
   const [workbenchOpen, setWorkbenchOpen] = useState(false)
   const [customerView, setCustomerView] = useState<CustomerView>('Scan')
   const websiteRequestGeneration = useRef(0)
@@ -683,13 +683,22 @@ function App() {
   const salesFixes = useMemo(() => sortSalesActions(fixes.map((fix) =>
     fix.intelligence && isPresentedFinding(auditState, fix) ? { ...fix, reviewed: true } : fix)), [fixes, auditState])
 
-  const reviewCustomerFinding = (fix: FixItem, approved: boolean) => {
-    if (approved && !canReviewFinding(fix)) return
+  const reviewCustomerFinding = (fix: FixItem, disposition: 'approved' | 'dismissed' | 'pending') => {
+    if (disposition !== 'pending' && !canReviewFinding(fix)) return
     setAuditState((current) => {
       const reviews = { ...current.customerFindingReviews }
-      if (approved) reviews[fix.id] = customerReviewKey(current, fix)
-      else delete reviews[fix.id]
-      return { ...current, customerFindingReviews: reviews, lastUpdated: new Date().toISOString() }
+      const dismissals = { ...current.customerFindingDismissals }
+      if (disposition === 'approved') {
+        reviews[fix.id] = customerReviewKey(current, fix)
+        delete dismissals[fix.id]
+      } else if (disposition === 'dismissed') {
+        dismissals[fix.id] = customerReviewKey(current, fix)
+        delete reviews[fix.id]
+      } else {
+        delete reviews[fix.id]
+        delete dismissals[fix.id]
+      }
+      return { ...current, customerFindingReviews: reviews, customerFindingDismissals: dismissals, lastUpdated: new Date().toISOString() }
     })
   }
 
@@ -1567,62 +1576,7 @@ function App() {
             </div>
           </section>
 
-          <section className="panel sales-summary-card">
-            <p className="eyebrow">Sales Summary</p>
-            <p>
-              I identified {fixes.length} potential visibility gaps across
-              website SEO, listings, search visibility, and optional manual AI evidence
-              readiness. The recommended starter cleanup focuses on the
-              highest-impact fixes first.
-            </p>
-          </section>
-
-          <section className="recommended-section">
-            <div className="section-title-row">
-              <div>
-                <p className="eyebrow">Recommended Next Steps</p>
-                <h2>Offer path</h2>
-              </div>
-            </div>
-            <div className="recommended-grid">
-              <article className="panel recommended-card recommended-card-primary">
-                <span className="offer-badge">Recommended</span>
-                <h3>Starter Visibility Cleanup</h3>
-                <strong className="price-placeholder">$299 one-time</strong>
-                <ul className="package-list compact-package-list">
-                  <li>Correct/standardize business listing signals</li>
-                  <li>Improve website SEO clarity signals</li>
-                  <li>Strengthen service/location visibility</li>
-                  <li>Review AI answer/source accuracy</li>
-                  <li>Create prioritized cleanup plan</li>
-                </ul>
-              </article>
-
-              <article className="panel recommended-card">
-                <span className="offer-badge offer-badge-muted">Future option</span>
-                <h3>Future Monthly Monitoring</h3>
-                <strong className="price-placeholder">$70/month</strong>
-                <p>
-                  Monthly monitoring can re-check visibility gaps, listing
-                  consistency, search visibility, AI answer accuracy, reviews,
-                  and send an email report.
-                </p>
-              </article>
-
-              <article className="panel recommended-card">
-                <span className="offer-badge offer-badge-muted">Future option</span>
-                <h3>Website SEO Implementation</h3>
-                <strong className="price-placeholder">$500-$2,500+</strong>
-                <p>
-                  Larger follow-on work for service pages, FAQ content, schema,
-                  local SEO copy, CTA cleanup, and technical website
-                  improvements.
-                </p>
-              </article>
-            </div>
-          </section>
-
-          <FixPlan fixes={salesFixes} notes={auditState.notes} />
+          <PackagePreparationPanel state={auditState} fixes={salesFixes} />
         </div>
       )
     }
@@ -2094,6 +2048,10 @@ function App() {
       scanError={Boolean(websiteAuditError)}
       onScan={() => void runAutoAudit()}
       onWorkbench={() => setWorkbenchOpen(true)}
+      onReviewFindings={() => {
+        setActiveView('Overall')
+        setWorkbenchOpen(true)
+      }}
     />
   }
 
@@ -2116,7 +2074,7 @@ function App() {
         </div>
 
         <div className="sidebar-tools">
-          <button type="button" onClick={() => setWorkbenchOpen(false)}>Return to Scan View</button>
+          <button type="button" onClick={() => setWorkbenchOpen(false)}>Return to Operator Overview</button>
           <button type="button" onClick={() => setActiveView('Overall')}>Review customer findings</button>
         </div>
 
@@ -2140,15 +2098,15 @@ function App() {
           <span>Last Scan</span>
           <strong>{new Date(auditState.lastUpdated).toLocaleString()}</strong>
           <div className="sidebar-tools">
-            <span>Report Tools</span>
+            <span>Operator Tools</span>
             <button type="button" onClick={() => window.print()}>
-              Print Report
+              Print Internal Report
             </button>
             <button
               type="button"
               onClick={() => setActiveView('Overall')}
             >
-              View Action Plan
+              View Package
             </button>
             <button
               type="button"

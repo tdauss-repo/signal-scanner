@@ -137,6 +137,8 @@ export interface AuditState {
   salesReadiness: SalesReadinessState
   /** Explicit customer-presentation approvals, bound to the reviewed workspace evidence. */
   customerFindingReviews?: Record<string, string>
+  /** Explicit operator decisions not to promote a finding, bound to the same evidence as approvals. */
+  customerFindingDismissals?: Record<string, string>
 }
 
 export interface WebsiteAuditWorkspaceState {

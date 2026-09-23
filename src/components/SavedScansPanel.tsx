@@ -61,7 +61,7 @@ export function SavedScansPanel({
           New business scan
         </button>
         <label className="import-scan-button">
-          Import scan JSON
+          Import Full Scan JSON
           <input
             accept="application/json,.json"
             type="file"
@@ -135,7 +135,7 @@ export function SavedScansPanel({
                   className="secondary"
                   onClick={() => onExport(scan.id)}
                 >
-                  Export JSON
+                  Export Full Scan JSON
                 </button>
                 <button
                   type="button"

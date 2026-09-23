@@ -140,7 +140,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       } else website.error = result.error
     } catch (error) {
       website.state = 'failed'; website.error = String(error)
-      update((current) => ({ ...current, customerFindingReviews: {}, websiteAudit: { ...current.websiteAudit, latestAttempt: {
+      update((current) => ({ ...current, customerFindingReviews: {}, customerFindingDismissals: {}, websiteAudit: { ...current.websiteAudit, latestAttempt: {
         ok: false, acquisition: { captureVersion: 1, provider: 'found-local-client', method: 'server_fetch', outcome: 'unavailable', requestedUrl: profile.website, occurredAt: new Date().toISOString(), recordOrigin: 'captured' },
         status: 0, error: String(error), errorType: 'client_acquisition_error', details: '', recommendedNextStep: 'Retry or review manually.', requestedUrl: profile.website,
         redirectUrl: '', redirectOccurred: false, redirectCount: 0, blocked: false, fetchStrategyUsed: 'website API request', httpsFallbackTried: false, protocolFallbackTried: false, wwwFallbackTried: false, timestamp: new Date().toISOString(),

@@ -373,48 +373,6 @@ export function ReportView({
             </p>
           </section>
 
-          <section className="panel report-section report-package-section">
-            <p className="eyebrow">Recommended package</p>
-            <div className="report-package-grid">
-              <article className="recommended-card recommended-card-primary">
-                <span className="offer-badge">Recommended</span>
-                <h3>Starter Visibility Cleanup</h3>
-                <strong className="price-placeholder">$299 one-time</strong>
-                <p>
-                  Recommended because it fixes the highest-impact visibility
-                  signals first: listings, website clarity, contact details,
-                  service-area wording, and AI/search readability.
-                </p>
-                <ul className="package-list compact-package-list">
-                  <li>Correct/standardize business listing signals</li>
-                  <li>Improve website SEO clarity signals</li>
-                  <li>Strengthen service/location visibility</li>
-                  <li>Review AI answer/source accuracy</li>
-                  <li>Create a prioritized cleanup plan</li>
-                </ul>
-              </article>
-              <article className="recommended-card">
-                <span className="offer-badge offer-badge-muted">Future option</span>
-                <h3>Monthly Visibility Monitoring</h3>
-                <strong className="price-placeholder">$70/month</strong>
-                <p>
-                  Future option for monthly re-checks, listing drift review,
-                  search visibility snapshots, AI answer checks, and simple
-                  reporting.
-                </p>
-              </article>
-              <article className="recommended-card">
-                <span className="offer-badge offer-badge-muted">Future option</span>
-                <h3>Website SEO Implementation</h3>
-                <strong className="price-placeholder">$500-$2,500+</strong>
-                <p>
-                  Future option for larger website improvements such as service
-                  pages, FAQ content, schema implementation, local SEO copy, and
-                  technical cleanup.
-                </p>
-              </article>
-            </div>
-          </section>
         </div>
       ) : (
         <div className="panel internal-report">

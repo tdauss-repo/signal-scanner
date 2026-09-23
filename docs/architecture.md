@@ -1,37 +1,52 @@
 # Architecture
 
+## Document Authority
+
+[`FOUND_LOCAL_DOCTRINE.md`](FOUND_LOCAL_DOCTRINE.md) governs product strategy,
+scope, operator/customer boundaries, service design, and prioritization. This
+document is the implementation Source of Truth: it records current architecture,
+workflow, constraints, and operational state. When implementation conflicts
+with doctrine, the conflict must be surfaced as follow-up work rather than
+silently changing the doctrine.
+
 ## Overview
-The current repository is an initial frontend shell for Local Signal Scanner, built with React, TypeScript, and Vite. The architecture is intentionally simple at this stage and is designed to support a future split between a user-facing web app and a backend scanning service.
+The current repository contains Found Local's private/internal Business Scanner
+Tool, built with React, TypeScript, Vite, and a small Express API. It supports
+operator-managed business profiles, bounded evidence acquisition, findings
+review, customer-finding approval, package preparation, saved operational state,
+and a sanitized Customer Visibility Review JSON export.
+
+The scanner is not the external customer-presentation surface. Found Local
+Sites consumes the reviewed customer-safe JSON contract and presents the
+Customer Visibility Review. Scanner/provider/debug evidence remains internal.
 
 ## Current Stack
 - Frontend: React 19 with TypeScript
 - Build tool: Vite
 - Styling: CSS with component-level styles
-- Runtime: Browser-based client app
+- Runtime: Browser-based operator client plus a small Node/Express API
 
 ## Target Architecture
-The product will eventually follow a layered architecture:
+The product follows a bounded handoff architecture:
 
-1. Frontend application
-   - Renders the audit experience
-   - Collects business inputs
-   - Displays reports and recommendations
+1. Internal Business Scanner Tool
+   - Maintains reviewed business and operational state
+   - Acquires and reviews evidence
+   - Promotes approved customer findings
+   - Prepares packages and customer-safe exports
 
 2. API layer
-   - Accepts scan requests
-   - Orchestrates data collection and enrichment
-   - Returns structured audit results
+   - Supports bounded, authorized acquisition
+   - Returns structured evidence without redefining finding truth
 
-3. Data and integration services
-   - Website crawlers
-   - Listing and review data providers
-   - Search and SEO signal sources
-   - Optional AI summarization or recommendation services
+3. Customer Visibility Review / Sites
+   - Receives sanitized Customer Visibility Review JSON
+   - Presents strengths, confirmed issues, local relevance, and recommended work
+   - Does not receive raw provider, matcher, capture, or operator-only data
 
 4. Storage
-   - User sessions and saved audits
-   - Historical report snapshots
-   - Configuration for integrations and preferences
+   - Preserves saved scans and operator state
+   - Keeps internal evidence separate from customer presentation data
 
 ## Suggested Frontend Structure
 A future frontend structure could look like this:
@@ -42,25 +57,31 @@ A future frontend structure could look like this:
 - src/types: shared TypeScript models
 
 ## Data Flow
-A typical audit flow would be:
-1. User submits a business or website input.
-2. The frontend sends the request to the API layer.
-3. The backend gathers signals from multiple sources.
-4. The system normalizes and scores the results.
-5. The frontend renders a report with insights and recommended actions.
+A typical workflow is:
+1. An operator establishes the reviewed Business Profile.
+2. The scanner discovers and captures bounded evidence.
+3. The operator reviews evidence and approves customer findings.
+4. Found Local packages approved work and exports customer-safe JSON.
+5. Found Local Sites renders the external Customer Visibility Review.
+6. Sold work is executed and verified before it is presented as a result.
 
 ## Design Principles
-- Keep the user experience simple and guided
-- Make reports clear and actionable
+- Keep the operator workflow efficient and evidence-preserving
+- Keep customer presentation clear, local, and actionable
 - Separate UI rendering from data collection logic
+- Preserve the internal scanner / external presentation boundary
 - Design for future integrations without overcomplicating the initial version
 - Protect privacy and minimize unnecessary data collection
 
 ## Deployment Considerations
-The frontend can be deployed as a static site, while the scan engine and API services can be hosted separately as needed. This separation supports future scaling and easier maintenance.
+The internal scanner and bounded API may be operated separately from Found
+Local Sites. The customer-safe JSON contract is the handoff boundary; direct
+exposure of scanner state is not required.
 
 ## Evolution Path
-The current app is the foundation for a more complete product. Over time, the architecture can evolve from a single-page frontend into a connected experience with background scanning, saved reports, and richer integrations.
+The current scanner can evolve through stronger local-intent evidence,
+remediation verification, rescanning, and later monitoring without becoming a
+public self-service scanner or generic enterprise SEO platform.
 
 ## Proving Run Records
 

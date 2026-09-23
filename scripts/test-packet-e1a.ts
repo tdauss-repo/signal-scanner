@@ -125,7 +125,7 @@ try {
   const queue = review({ state: pristineState, fixes: findings, onReview() {} })
   assert(!queue.includes('Homepage SEO clarity'))
   assert(queue.includes('Supporting observations — operator review required'))
-  assert(queue.includes('Contact info visibility') && queue.includes('Approve evidence &amp; customer wording'))
+  assert(queue.includes('Contact info visibility') && queue.includes('Approve for customer export'))
   const aiCard = card({ label: 'AI Visibility', result: { score: null, status: 'Gray', earned: 0, possible: 0, checked: coverage.evaluated, statusLabel: coverage.statusLabel }, details: `${coverage.detail} · 0 AI answer observations reviewed` })
   assert(!aiCard.includes('0 checked'))
   assert(aiCard.includes(`${coverage.evaluated} evaluated`) && aiCard.includes(`${coverage.evidence} with evidence`))
