@@ -1,5 +1,5 @@
 import type { AuditState, FixItem } from '../types/audit'
-import { isPresentedFinding } from './customerScan'
+import { effectiveCustomerFinding, isPresentedFinding } from './customerScan'
 import { effectivePackageFit, isStarterEligible, sortSalesActions } from './salesReadiness'
 
 export type PackageAssignment = 'Starter Visibility Cleanup' | 'Customer/platform ownership required' | 'Separate scoping required' | 'Not included'
@@ -7,6 +7,7 @@ export type PackageAssignment = 'Starter Visibility Cleanup' | 'Customer/platfor
 export interface PackagePreparationItem {
   findingId: string
   finding: string
+  priority: FixItem['priority']
   remediationAction: string
   packageFit: NonNullable<FixItem['salesPackageFit']>
   packageAssignment: PackageAssignment
@@ -40,6 +41,7 @@ export const packageScopeForFinding = (fix: FixItem) => {
 const packageItem = (fix: FixItem): PackagePreparationItem => ({
   findingId: fix.id,
   finding: fix.intelligence?.customer.title || fix.issue,
+  priority: fix.priority,
   remediationAction: fix.intelligence?.customer.recommendation || fix.fix,
   packageFit: effectivePackageFit(fix),
   packageAssignment: assignmentFor(fix),
@@ -52,7 +54,7 @@ const packageItem = (fix: FixItem): PackagePreparationItem => ({
  */
 export function derivePackagePreparation(state: AuditState, fixes: FixItem[]): PackagePreparation {
   const approvedFindings = sortSalesActions([...new Map(
-    fixes.filter((fix) => isPresentedFinding(state, fix)).map((fix) => [fix.id, { ...fix, reviewed: true }]),
+    fixes.filter((fix) => isPresentedFinding(state, fix)).map((fix) => [fix.id, { ...effectiveCustomerFinding(state, fix), reviewed: true }]),
   ).values()])
   const starterItems = approvedFindings.filter(isStarterEligible).map(packageItem)
   const starterIds = new Set(starterItems.map((item) => item.findingId))

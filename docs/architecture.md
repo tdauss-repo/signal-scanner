@@ -60,7 +60,8 @@ A future frontend structure could look like this:
 A typical workflow is:
 1. An operator establishes the reviewed Business Profile.
 2. The scanner discovers and captures bounded evidence.
-3. The operator reviews evidence and approves customer findings.
+3. The operator reviews evidence, optionally refines customer-facing wording
+   without changing scanner evidence, and approves customer findings.
 4. Found Local packages approved work and exports customer-safe JSON.
 5. Found Local Sites renders the external Customer Visibility Review.
 6. Sold work is executed and verified before it is presented as a result.

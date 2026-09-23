@@ -78,8 +78,8 @@ const safeIssue = (fix: FixItem) => ({
   id: fix.id,
   title: fix.intelligence?.customer.title || fix.issue,
   label: effectivePackageFit(fix) === 'starter' ? 'Starter Visibility Cleanup' : 'Reviewed visibility improvement',
-  summary: fix.intelligence?.customer.found || 'A reviewed visibility issue was confirmed and is ready to address.',
-  foundLocalAction: fix.intelligence?.customer.recommendation || 'Review and correct this confirmed issue with the agreed scope.',
+  summary: fix.intelligence?.customer.found || fix.whyItMatters || 'A reviewed visibility issue was confirmed and is ready to address.',
+  foundLocalAction: fix.intelligence?.customer.recommendation || fix.fix || 'Review and correct this confirmed issue with the agreed scope.',
 })
 
 const reviewArea = (snapshotStatus: string | undefined) => ['Not fully verified', 'Not yet scanned'].includes(snapshotStatus || '')

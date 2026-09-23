@@ -139,6 +139,16 @@ export interface AuditState {
   customerFindingReviews?: Record<string, string>
   /** Explicit operator decisions not to promote a finding, bound to the same evidence as approvals. */
   customerFindingDismissals?: Record<string, string>
+  /** Optional customer-facing wording, valid only for the evidence identity it was written against. */
+  customerFindingRefinements?: Record<string, CustomerFindingRefinement>
+}
+
+export interface CustomerFindingRefinement {
+  evidenceKey: string
+  title?: string
+  priority?: 'High' | 'Medium' | 'Low'
+  summary?: string
+  recommendedAction?: string
 }
 
 export interface WebsiteAuditWorkspaceState {

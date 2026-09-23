@@ -34,6 +34,7 @@
     "prove:google-brightdata": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/prove-google-brightdata.ts",
     "test:google-brightdata": "node --import tsx scripts/test-google-brightdata.ts",
     "test:visibility-snapshot": "node --import tsx scripts/test-visibility-snapshot.ts",
+    "test:customer-finding-refinement": "node --import tsx scripts/test-customer-finding-refinement.ts",
     "prove:destination-brightdata": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/prove-destination-brightdata.ts",
     "test:destination-brightdata": "node --import tsx scripts/test-destination-brightdata.ts"
   },

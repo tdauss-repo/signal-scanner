@@ -2,7 +2,7 @@ import { matchesEvidenceFingerprint } from './evidenceFingerprint'
 import { currentMachineReadability, summarizeMachineReadability } from './machineReadability'
 import { scanAreaState, scanStateLabel } from './visibilityScanState'
 import type { ScanArea, ScanState } from '../types/visibilityScan'
-import type { AuditItem, AuditState, FixItem } from '../types/audit'
+import type { AuditItem, AuditState, CustomerFindingRefinement, FixItem } from '../types/audit'
 import { effectivePackageFit, isStarterEligible, sortSalesActions } from './salesReadiness'
 import { primarySearchDestinations } from './searchVisibility'
 import { salesCockpitVisibility } from './salesVisibilityProjection'
@@ -36,11 +36,99 @@ export const canReviewFinding = (fix: FixItem) => canPresentFinding(
 const stableReviewValue = (value: unknown): unknown => Array.isArray(value) ? value.map(stableReviewValue)
   : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, nested]) => [key, stableReviewValue(nested)])) : value
 
-export const customerReviewKey = (state: AuditState, fix: FixItem) => JSON.stringify(stableReviewValue([
+const customerEvidenceReviewValue = (state: AuditState, fix: FixItem) => [
   state.profile, state.businessProfile, state.checks, state.notes, state.evidenceConfidence,
   state.websiteAudit, state.searchDestinationObservations, state.aiAnswerTests,
   state.directories, state.salesReadiness, ...(state.machineReadability ? [state.machineReadability] : []), fix.intelligence ? { ...fix, reviewed: false } : fix,
-]))
+]
+
+/** Stable evidence identity shared by refinements, approvals, and dismissals. */
+export const customerFindingEvidenceKey = (state: AuditState, fix: FixItem) =>
+  JSON.stringify(stableReviewValue(customerEvidenceReviewValue(state, fix)))
+
+export const activeCustomerFindingRefinement = (state: AuditState, fix: FixItem) => {
+  const refinement = state.customerFindingRefinements?.[fix.id]
+  return refinement?.evidenceKey === customerFindingEvidenceKey(state, fix) ? refinement : undefined
+}
+
+export const hasStaleCustomerFindingRefinement = (state: AuditState, fix: FixItem) => {
+  const refinement = state.customerFindingRefinements?.[fix.id]
+  return Boolean(refinement && refinement.evidenceKey !== customerFindingEvidenceKey(state, fix))
+}
+
+export interface CustomerFindingWording {
+  title: string
+  priority: FixItem['priority']
+  summary: string
+  recommendedAction: string
+}
+
+export const defaultCustomerFindingWording = (fix: FixItem): CustomerFindingWording => ({
+  title: fix.intelligence?.customer.title || fix.issue,
+  priority: fix.priority,
+  summary: fix.intelligence?.customer.found || fix.whyItMatters || 'A reviewed visibility issue was confirmed and is ready to address.',
+  recommendedAction: fix.intelligence?.customer.recommendation || fix.fix,
+})
+
+export const effectiveCustomerFindingWording = (state: AuditState, fix: FixItem): CustomerFindingWording => {
+  const defaults = defaultCustomerFindingWording(fix)
+  const refinement = activeCustomerFindingRefinement(state, fix)
+  return refinement ? {
+    title: refinement.title || defaults.title,
+    priority: refinement.priority || defaults.priority,
+    summary: refinement.summary || defaults.summary,
+    recommendedAction: refinement.recommendedAction || defaults.recommendedAction,
+  } : defaults
+}
+
+export const buildCustomerFindingRefinement = (
+  state: AuditState,
+  fix: FixItem,
+  wording: CustomerFindingWording,
+): CustomerFindingRefinement | null => {
+  const defaults = defaultCustomerFindingWording(fix)
+  const title = wording.title.trim()
+  const summary = wording.summary.trim()
+  const recommendedAction = wording.recommendedAction.trim()
+  const refinement: CustomerFindingRefinement = { evidenceKey: customerFindingEvidenceKey(state, fix) }
+  if (title && title !== defaults.title) refinement.title = title
+  if (wording.priority !== defaults.priority) refinement.priority = wording.priority
+  if (summary && summary !== defaults.summary) refinement.summary = summary
+  if (recommendedAction && recommendedAction !== defaults.recommendedAction) refinement.recommendedAction = recommendedAction
+  return Object.keys(refinement).length > 1 ? refinement : null
+}
+
+/** Returns a presentation copy. Raw evidence and the source FixItem remain unchanged. */
+export const effectiveCustomerFinding = (state: AuditState, fix: FixItem): FixItem => {
+  const refinement = activeCustomerFindingRefinement(state, fix)
+  if (!refinement) return fix
+  const wording = effectiveCustomerFindingWording(state, fix)
+  return {
+    ...fix,
+    issue: wording.title,
+    priority: wording.priority,
+    whyItMatters: wording.summary,
+    fix: wording.recommendedAction,
+    intelligence: fix.intelligence ? {
+      ...fix.intelligence,
+      customer: {
+        ...fix.intelligence.customer,
+        title: wording.title,
+        found: wording.summary,
+        why: wording.summary,
+        recommendation: wording.recommendedAction,
+      },
+    } : undefined,
+  }
+}
+
+/** Legacy approvals retain their exact key when no valid refinement exists. */
+export const customerReviewKey = (state: AuditState, fix: FixItem) => {
+  const refinement = activeCustomerFindingRefinement(state, fix)
+  return refinement
+    ? JSON.stringify(stableReviewValue([...customerEvidenceReviewValue(state, fix), { customerRefinement: refinement }]))
+    : customerFindingEvidenceKey(state, fix)
+}
 
 export const isPresentedFinding = (state: AuditState, fix: FixItem) =>
   canReviewFinding(fix) && state.customerFindingReviews?.[fix.id] === customerReviewKey(state, fix)

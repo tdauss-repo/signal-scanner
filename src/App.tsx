@@ -23,8 +23,8 @@ import { VoiceReadinessPanel } from './components/VoiceReadinessPanel'
 import { SalesReadinessPanel } from './components/SalesReadinessPanel'
 import { CustomerScanView } from './components/CustomerScanView'
 import { CustomerFindingReview } from './components/CustomerFindingReview'
-import { canReviewFinding, customerReviewKey, isPresentedFinding } from './utils/customerScan'
-import type { CustomerView } from './utils/customerScan'
+import { buildCustomerFindingRefinement, canReviewFinding, customerReviewKey, isPresentedFinding } from './utils/customerScan'
+import type { CustomerFindingWording, CustomerView } from './utils/customerScan'
 import { blankProfile, normalizeWorkspaceProfile } from './utils/workspaceProfile'
 import { buildAuditItems } from './data/auditCatalog'
 import { applyCurrentCatalogMetadata, migrateSystemGeneratedFix } from './utils/catalogMetadata'
@@ -699,6 +699,21 @@ function App() {
         delete dismissals[fix.id]
       }
       return { ...current, customerFindingReviews: reviews, customerFindingDismissals: dismissals, lastUpdated: new Date().toISOString() }
+    })
+  }
+
+  const saveCustomerFindingRefinement = (fix: FixItem, wording: CustomerFindingWording) => {
+    if (!canReviewFinding(fix)) return
+    setAuditState((current) => {
+      const refinements = { ...current.customerFindingRefinements }
+      const refinement = buildCustomerFindingRefinement(current, fix, wording)
+      if (refinement) refinements[fix.id] = refinement
+      else delete refinements[fix.id]
+      const reviews = { ...current.customerFindingReviews }
+      const dismissals = { ...current.customerFindingDismissals }
+      delete reviews[fix.id]
+      delete dismissals[fix.id]
+      return { ...current, customerFindingRefinements: refinements, customerFindingReviews: reviews, customerFindingDismissals: dismissals, lastUpdated: new Date().toISOString() }
     })
   }
 
@@ -2153,7 +2168,7 @@ function App() {
             ))}
           </section>
 
-          {activeView === 'Overall' ? <CustomerFindingReview state={auditState} fixes={salesFixes} onReview={reviewCustomerFinding} /> : null}
+          {activeView === 'Overall' ? <CustomerFindingReview state={auditState} fixes={salesFixes} onReview={reviewCustomerFinding} onSaveRefinement={saveCustomerFindingRefinement} /> : null}
           {renderActiveView()}
         </div>
       </main>

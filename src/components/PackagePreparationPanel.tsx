@@ -15,6 +15,7 @@ export function PackagePreparationPanel({ state, fixes }: { state: AuditState; f
       <h3>Approved findings included</h3>
       {preparation.starterItems.map((item) => <article className="fix-item" key={item.findingId}>
         <div className="fix-title-cell"><p className="fix-area">Finding</p><h3>{item.finding}</h3></div>
+        <div className="fix-table-cell"><strong>Priority</strong><p>{item.priority}</p></div>
         <div className="fix-table-cell"><strong>Remediation action</strong><p>{item.remediationAction}</p></div>
         <div className="fix-table-cell"><strong>Package assignment</strong><p>{item.packageAssignment}</p></div>
         <div className="fix-table-cell"><strong>Included scope</strong><p>{item.includedScope}</p></div>
@@ -24,6 +25,7 @@ export function PackagePreparationPanel({ state, fixes }: { state: AuditState; f
       <h3>Not included / separate scope</h3>
       {preparation.separateScopeItems.map((item) => <article className="fix-item" key={item.findingId}>
         <div className="fix-title-cell"><p className="fix-area">Approved finding</p><h3>{item.finding}</h3></div>
+        <div className="fix-table-cell"><strong>Priority</strong><p>{item.priority}</p></div>
         <div className="fix-table-cell"><strong>Remediation action</strong><p>{item.remediationAction}</p></div>
         <div className="fix-table-cell"><strong>Package assignment</strong><p>{item.packageAssignment}</p></div>
       </article>)}
