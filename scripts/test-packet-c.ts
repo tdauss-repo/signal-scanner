@@ -65,7 +65,7 @@ assert.equal(summary.confirmationCount, 0)
 const serialized = JSON.parse(JSON.stringify(state)) as AuditState
 assert.equal(summarizeCustomerScan(serialized, items, [fix]).findings.length, 1, 'Review survives JSON persistence')
 assert.equal(summarizeCustomerScan({ ...state, lastUpdated: 'later' }, items, [fix]).findings.length, 1)
-assert.equal(summarizeCustomerScan({ ...state, notes: { changed: 'new evidence' } }, items, [fix]).findings.length, 0)
+assert.equal(summarizeCustomerScan({ ...state, notes: { changed: 'unrelated evidence' } }, items, [fix]).findings.length, 1, 'Unrelated workspace evidence does not stale a finding decision')
 assert.equal(summarizeCustomerScan(state, items, [{ ...fix, fix: 'Changed recommendation' }]).findings.length, 0)
 assert.equal(summarizeCustomerScan({ ...state, profile: defaultProfile }, items, [fix]).findings.length, 0, 'Copied approval cannot leak to another business')
 

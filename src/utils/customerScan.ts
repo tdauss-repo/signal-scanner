@@ -1,4 +1,4 @@
-import { matchesEvidenceFingerprint } from './evidenceFingerprint'
+import { evidenceFingerprint, matchesEvidenceFingerprint } from './evidenceFingerprint'
 import { currentMachineReadability, summarizeMachineReadability } from './machineReadability'
 import { scanAreaState, scanStateLabel, visibilityRunStatus } from './visibilityScanState'
 import type { ScanArea, ScanState } from '../types/visibilityScan'
@@ -32,30 +32,120 @@ export const canReviewFinding = (fix: FixItem) => canPresentFinding(
   fix.intelligence ? { ...fix, reviewed: true } : fix,
 )
 
-/** No timestamps/lastUpdated or presentation flags: reviewing one card must not invalidate another.
- * Actual evidence/profile changes invalidate all approvals conservatively, including after a rescan.
+const materialProfile = (state: AuditState) => {
+  const profile = reviewedBusinessProfile(state.profile, state.businessProfile)
+  return {
+    businessName: profile.businessName, website: profile.website,
+    streetAddress: profile.streetAddress, city: profile.city, state: profile.state, zip: profile.zip,
+    phone: profile.phone, primaryCategory: profile.primaryCategory,
+    secondaryCategories: profile.secondaryCategories, industryTags: profile.industryTags,
+    localMarket: profile.localMarket, serviceArea: profile.serviceArea,
+    primaryServices: profile.primaryServices, targetLocation: profile.targetLocation,
+  }
+}
+
+const materialProvenance = (fix: FixItem) => {
+  const provenance = fix.intelligence?.evidence.provenance
+  if (!provenance) return undefined
+  return {
+    captureVersion: provenance.captureVersion,
+    method: provenance.method,
+    outcome: provenance.outcome,
+    requestedUrl: provenance.requestedUrl,
+    sourceUrl: provenance.sourceUrl,
+    recordOrigin: provenance.recordOrigin,
+  }
+}
+
+/** Finding-scoped evidence semantics. Scan IDs, timestamps, providers, request
+ * attempts, lifecycle display state, and unrelated workspace evidence are
+ * deliberately absent. Substantive observations, status, interpretation,
+ * delivery assumptions, verification, and reviewed business context remain.
  */
-const stableReviewValue = (value: unknown): unknown => Array.isArray(value) ? value.map(stableReviewValue)
-  : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, nested]) => [key, stableReviewValue(nested)])) : value
+const materialFinding = (fix: FixItem) => ({
+  id: fix.id, priority: fix.priority, area: fix.area, sourceArea: fix.sourceArea,
+  issue: fix.issue, fix: fix.fix, status: fix.status,
+  evidenceNote: fix.evidenceNote, evidenceSummary: fix.evidenceSummary,
+  evidenceSources: fix.evidenceSources, evidenceConfidence: fix.evidenceConfidence,
+  salesConfidence: fix.salesConfidence, whyItMatters: fix.whyItMatters,
+  salesPackageFit: fix.salesPackageFit, dependencies: fix.dependencies,
+  verificationMethod: fix.verificationMethod,
+  intelligence: fix.intelligence ? {
+    ruleVersion: fix.intelligence.ruleVersion,
+    checkId: fix.intelligence.checkId,
+    condition: fix.intelligence.condition,
+    evidence: {
+      observations: fix.intelligence.evidence.observations,
+      confidence: fix.intelligence.evidence.confidence,
+      provenance: materialProvenance(fix),
+    },
+    customer: fix.intelligence.customer,
+    delivery: fix.intelligence.delivery,
+    verification: fix.intelligence.verification,
+    remediation: fix.intelligence.remediation,
+  } : undefined,
+})
 
-const customerEvidenceReviewValue = (state: AuditState, fix: FixItem) => [
-  state.profile, state.businessProfile, state.checks, state.notes, state.evidenceConfidence,
-  state.websiteAudit, state.searchDestinationObservations, state.aiAnswerTests,
-  state.directories, state.salesReadiness, ...(state.machineReadability ? [state.machineReadability] : []), fix.intelligence ? { ...fix, reviewed: false } : fix,
-]
+const materialEvidence = (state: AuditState, fix: FixItem) => ({ profile: materialProfile(state), finding: materialFinding(fix) })
+const materialEvidenceVersion = 'found-local-material-finding-v2'
 
-/** Stable evidence identity shared by refinements, approvals, and dismissals. */
+type ParsedDecisionKey = { material: unknown; refinement?: unknown; includesRefinement: boolean }
+
+const legacyMaterialProfile = (profile: unknown, businessProfile: unknown) => {
+  try {
+    return materialProfile({ profile, businessProfile } as AuditState)
+  } catch { return undefined }
+}
+
+const parseDecisionKey = (key: string | undefined, fixId: string): ParsedDecisionKey | undefined => {
+  if (!key) return undefined
+  try {
+    const parsed = JSON.parse(key) as unknown
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const record = parsed as Record<string, unknown>
+      if (record.version === materialEvidenceVersion && record.material) {
+        return { material: record.material, refinement: record.refinement, includesRefinement: 'refinement' in record }
+      }
+    }
+    if (!Array.isArray(parsed)) return undefined
+    const finding = [...parsed].reverse().find((entry) => entry && typeof entry === 'object' && (entry as Record<string, unknown>).id === fixId) as FixItem | undefined
+    const profile = legacyMaterialProfile(parsed[0], parsed[1])
+    if (!finding || !profile) return undefined
+    const tail = parsed.at(-1)
+    const refinement = tail && typeof tail === 'object' && 'customerRefinement' in tail
+      ? (tail as { customerRefinement: unknown }).customerRefinement : undefined
+    return {
+      material: { profile, finding: materialFinding(finding) },
+      refinement,
+      includesRefinement: refinement !== undefined,
+    }
+  } catch { return undefined }
+}
+
+const refinementDecisionValue = (refinement: CustomerFindingRefinement | undefined) => refinement ? {
+  title: refinement.title,
+  priority: refinement.priority,
+  summary: refinement.summary,
+  recommendedAction: refinement.recommendedAction,
+} : undefined
+
+/** Stable, finding-scoped evidence identity shared by refinements and decisions. */
 export const customerFindingEvidenceKey = (state: AuditState, fix: FixItem) =>
-  JSON.stringify(stableReviewValue(customerEvidenceReviewValue(state, fix)))
+  evidenceFingerprint({ version: materialEvidenceVersion, material: materialEvidence(state, fix) })
+
+export const matchesCustomerFindingEvidenceKey = (key: string | undefined, state: AuditState, fix: FixItem) => {
+  const parsed = parseDecisionKey(key, fix.id)
+  return Boolean(parsed && evidenceFingerprint(parsed.material) === evidenceFingerprint(materialEvidence(state, fix)))
+}
 
 export const activeCustomerFindingRefinement = (state: AuditState, fix: FixItem) => {
   const refinement = state.customerFindingRefinements?.[fix.id]
-  return refinement?.evidenceKey === customerFindingEvidenceKey(state, fix) ? refinement : undefined
+  return refinement && matchesCustomerFindingEvidenceKey(refinement.evidenceKey, state, fix) ? refinement : undefined
 }
 
 export const hasStaleCustomerFindingRefinement = (state: AuditState, fix: FixItem) => {
   const refinement = state.customerFindingRefinements?.[fix.id]
-  return Boolean(refinement && refinement.evidenceKey !== customerFindingEvidenceKey(state, fix))
+  return Boolean(refinement && !matchesCustomerFindingEvidenceKey(refinement.evidenceKey, state, fix))
 }
 
 export interface CustomerFindingWording {
@@ -114,6 +204,21 @@ export const effectiveCustomerFindingWording = (state: AuditState, fix: FixItem)
   } : defaults
 }
 
+/** Previous operator wording remains available for reconciliation but is not
+ * treated as active until rebound to the current material evidence. */
+export const historicalCustomerFindingWording = (state: AuditState, fix: FixItem): CustomerFindingWording => {
+  const defaults = defaultCustomerFindingWording(fix, state)
+  const refinement = state.customerFindingRefinements?.[fix.id]
+  const snapshot = state.customerFindingDecisionSnapshots?.[fix.id]?.customerWording
+  if (refinement) return {
+    title: refinement.title || snapshot?.title || defaults.title,
+    priority: refinement.priority || snapshot?.priority || defaults.priority,
+    summary: refinement.summary || snapshot?.summary || defaults.summary,
+    recommendedAction: refinement.recommendedAction || snapshot?.recommendedAction || defaults.recommendedAction,
+  }
+  return snapshot || defaults
+}
+
 export const buildCustomerFindingRefinement = (
   state: AuditState,
   fix: FixItem,
@@ -153,23 +258,93 @@ export const effectiveCustomerFinding = (state: AuditState, fix: FixItem): FixIt
   }
 }
 
-/** Legacy approvals retain their exact key when no valid refinement exists. */
+/** Decision identity adds the current effective operator wording to the same
+ * material evidence key. Legacy full-workspace keys are matched by extracting
+ * their finding/profile semantics, so harmless timestamp-only rescans do not
+ * force reconciliation after upgrade.
+ */
 export const customerReviewKey = (state: AuditState, fix: FixItem) => {
   const refinement = activeCustomerFindingRefinement(state, fix)
   return refinement
-    ? JSON.stringify(stableReviewValue([...customerEvidenceReviewValue(state, fix), { customerRefinement: refinement }]))
+    ? evidenceFingerprint({ version: materialEvidenceVersion, material: materialEvidence(state, fix), refinement: refinementDecisionValue(refinement) })
     : customerFindingEvidenceKey(state, fix)
 }
 
+export const matchesCustomerReviewKey = (key: string | undefined, state: AuditState, fix: FixItem) => {
+  const parsed = parseDecisionKey(key, fix.id)
+  if (!parsed || evidenceFingerprint(parsed.material) !== evidenceFingerprint(materialEvidence(state, fix))) return false
+  const activeRefinement = refinementDecisionValue(activeCustomerFindingRefinement(state, fix))
+  if (!activeRefinement) return !parsed.includesRefinement
+  return parsed.includesRefinement && evidenceFingerprint(refinementDecisionValue(parsed.refinement as CustomerFindingRefinement)) === evidenceFingerprint(activeRefinement)
+}
+
 export const isPresentedFinding = (state: AuditState, fix: FixItem) =>
-  canReviewFinding(fix) && state.customerFindingReviews?.[fix.id] === customerReviewKey(state, fix)
+  canReviewFinding(fix) && !hasStaleCustomerFindingRefinement(state, fix) &&
+  matchesCustomerReviewKey(state.customerFindingReviews?.[fix.id], state, fix)
 
 /** A dismissal is an explicit operator disposition, not the absence of approval.
  * It shares the approval fingerprint so changed evidence always returns a finding to review.
  */
 export const isDismissedCustomerFinding = (state: AuditState, fix: FixItem) =>
-  canReviewFinding(fix) && !isPresentedFinding(state, fix) &&
-  state.customerFindingDismissals?.[fix.id] === customerReviewKey(state, fix)
+  canReviewFinding(fix) && !hasStaleCustomerFindingRefinement(state, fix) && !isPresentedFinding(state, fix) &&
+  matchesCustomerReviewKey(state.customerFindingDismissals?.[fix.id], state, fix)
+
+export const hasStaleCustomerFindingApproval = (state: AuditState, fix: FixItem) =>
+  Boolean(state.customerFindingReviews?.[fix.id] && !isPresentedFinding(state, fix))
+
+export const hasStaleCustomerFindingDismissal = (state: AuditState, fix: FixItem) =>
+  Boolean(state.customerFindingDismissals?.[fix.id] && !isDismissedCustomerFinding(state, fix))
+
+export const previousCustomerFindingDisposition = (state: AuditState, fix: FixItem): 'approved' | 'dismissed' | undefined =>
+  hasStaleCustomerFindingApproval(state, fix) ? 'approved'
+    : hasStaleCustomerFindingDismissal(state, fix) ? 'dismissed' : undefined
+
+export const findingNeedsReconfirmation = (state: AuditState, fix: FixItem) =>
+  Boolean(previousCustomerFindingDisposition(state, fix) || hasStaleCustomerFindingRefinement(state, fix))
+
+/** Atomically rebinds preserved wording and approval to the latest material evidence. */
+export const reconfirmCustomerFinding = (state: AuditState, fix: FixItem): AuditState => {
+  const wording = historicalCustomerFindingWording(state, fix)
+  const refinements = { ...state.customerFindingRefinements }
+  const refinement = buildCustomerFindingRefinement(state, fix, wording)
+  if (refinement) refinements[fix.id] = refinement
+  else delete refinements[fix.id]
+  const withRefinement = { ...state, customerFindingRefinements: refinements }
+  const key = customerReviewKey(withRefinement, fix)
+  return {
+    ...withRefinement,
+    customerFindingReviews: { ...state.customerFindingReviews, [fix.id]: key },
+    customerFindingDismissals: Object.fromEntries(Object.entries(state.customerFindingDismissals || {}).filter(([id]) => id !== fix.id)),
+    customerFindingDecisionSnapshots: {
+      ...state.customerFindingDecisionSnapshots,
+      [fix.id]: { evidenceKey: key, disposition: 'approved', finding: structuredClone(fix), customerWording: wording },
+    },
+  }
+}
+
+export interface FindingReconciliation {
+  finding: FixItem
+  previousDisposition: 'approved' | 'dismissed'
+  absentFromLatestScan: boolean
+}
+
+/** Includes materially changed current findings and snapshot-backed findings
+ * that no longer appear in the latest candidate set. Historical decisions are
+ * shown for operator resolution and never treated as current customer truth.
+ */
+export const findingsNeedingReconciliation = (state: AuditState, currentFixes: FixItem[]): FindingReconciliation[] => {
+  const currentIds = new Set(currentFixes.map((fix) => fix.id))
+  const reconciliations = currentFixes.flatMap((finding) => {
+    const previousDisposition = previousCustomerFindingDisposition(state, finding)
+    return previousDisposition ? [{ finding, previousDisposition, absentFromLatestScan: false }] : []
+  })
+  for (const [id, snapshot] of Object.entries(state.customerFindingDecisionSnapshots || {})) {
+    if (currentIds.has(id)) continue
+    const hasDecision = Boolean(state.customerFindingReviews?.[id] || state.customerFindingDismissals?.[id])
+    if (hasDecision) reconciliations.push({ finding: snapshot.finding, previousDisposition: snapshot.disposition, absentFromLatestScan: true })
+  }
+  return reconciliations
+}
 
 export const customerFindingGroup = (fix: FixItem) => {
   const fit = effectivePackageFit(fix)

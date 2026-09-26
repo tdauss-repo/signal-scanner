@@ -91,15 +91,15 @@ assert.equal(derivePackagePreparation(dismissedState, [secure]).items.length, 0)
 
 // Evidence change + reapproval does not silently reactivate the old scope.
 const changed = structuredClone(state)
-changed.notes['website-https'] = 'New evidence changes the approved identity.'
-changed.customerFindingReviews![secure.id] = customerReviewKey(changed, secure)
-assert.equal(hasStalePackageScopeOverride(changed, secure), true)
-assert.equal(activePackageScopeOverride(changed, secure), undefined)
-const changedPreparation = derivePackagePreparation(changed, fixes)
+const changedSecure = { ...secure, evidenceSummary: 'New material HTTPS evidence changes the approved identity.' }
+changed.customerFindingReviews![secure.id] = customerReviewKey(changed, changedSecure)
+assert.equal(hasStalePackageScopeOverride(changed, changedSecure), true)
+assert.equal(activePackageScopeOverride(changed, changedSecure), undefined)
+const changedPreparation = derivePackagePreparation(changed, [changedSecure, local, schema, description])
 const staleItem = changedPreparation.items.find((item) => item.findingId === secure.id)!
 assert.equal(staleItem.staleOverride, true)
 assert.equal(changedPreparation.starterItems.some((item) => item.findingId === secure.id), false, 'stale override blocks active package scope until reconciled')
-assert.equal(buildCustomerVisibilityReviewExport(changed, [], fixes).confirmedIssues.find((issue) => issue.id === secure.id)?.label, 'Package scope requires review')
+assert.equal(buildCustomerVisibilityReviewExport(changed, [], [changedSecure, local, schema, description]).confirmedIssues.find((issue) => issue.id === secure.id)?.label, 'Package scope requires review')
 
 // Older serialized workspaces without overrides retain defaults safely.
 const legacy = JSON.parse(JSON.stringify(makeState())) as AuditState

@@ -5,10 +5,13 @@ import {
   canReviewFinding,
   defaultCustomerFindingWording,
   effectiveCustomerFindingWording,
+  findingsNeedingReconciliation,
   hasStaleCustomerFindingRefinement,
+  historicalCustomerFindingWording,
   isDismissedCustomerFinding,
   isPresentedFinding,
   isSupportingCustomerFinding,
+  previousCustomerFindingDisposition,
   type CustomerFindingWording,
 } from '../utils/customerScan'
 
@@ -20,24 +23,39 @@ interface FindingCardProps {
   allowRefinement: boolean
   onReview: (fix: FixItem, disposition: Disposition) => void
   onSaveRefinement: (fix: FixItem, wording: CustomerFindingWording) => void
+  onConfirmFinding?: (fix: FixItem) => void
 }
 
-function FindingCard({ state, fix, allowRefinement, onReview, onSaveRefinement }: FindingCardProps) {
+function FindingCard({ state, fix, allowRefinement, onReview, onSaveRefinement, onConfirmFinding }: FindingCardProps) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState<CustomerFindingWording>(() => effectiveCustomerFindingWording(state, fix))
+  const [draft, setDraft] = useState<CustomerFindingWording>(() => historicalCustomerFindingWording(state, fix))
   const approved = isPresentedFinding(state, fix)
   const dismissed = isDismissedCustomerFinding(state, fix)
+  const previousDisposition = previousCustomerFindingDisposition(state, fix)
+  const needsDispositionReconfirmation = Boolean(previousDisposition)
+  const staleWording = hasStaleCustomerFindingRefinement(state, fix)
   const defaults = defaultCustomerFindingWording(fix, state)
   const effective = effectiveCustomerFindingWording(state, fix)
+  const historical = historicalCustomerFindingWording(state, fix)
   const refinement = activeCustomerFindingRefinement(state, fix)
   const startEditing = () => {
-    setDraft(effectiveCustomerFindingWording(state, fix))
+    setDraft(needsDispositionReconfirmation || staleWording ? historical : effectiveCustomerFindingWording(state, fix))
     setEditing(true)
+  }
+  const dispositionLabel = needsDispositionReconfirmation ? 'Needs reconfirmation'
+    : approved ? 'Approved for customer export' : dismissed ? 'Dismissed from customer review' : 'Awaiting review'
+  const confirm = () => {
+    if (onConfirmFinding) onConfirmFinding(fix)
+    else {
+      onSaveRefinement(fix, historical)
+      onReview(fix, 'approved')
+    }
   }
 
   if (!allowRefinement) return <article className="customer-review-row">
     <h3>{fix.issue}</h3><p>{fix.evidenceSummary || fix.evidenceNote}</p>
-    <p><strong>Operator disposition:</strong> {approved ? 'Approved for customer export' : dismissed ? 'Dismissed from customer review' : 'Awaiting review'}</p>
+    <p><strong>Operator disposition:</strong> {dispositionLabel}</p>
+    {needsDispositionReconfirmation ? <p className="customer-refinement-warning">Previous disposition: {previousDisposition === 'approved' ? 'Approved' : 'Dismissed'}. The supporting evidence changed and requires a current decision.</p> : null}
     <p><strong>Recommendation:</strong> {fix.fix}</p><p><strong>Why it matters:</strong> {fix.whyItMatters || 'Not recorded. The customer view will say this still needs discussion.'}</p>
     <p><strong>Verification:</strong> {fix.verificationMethod}</p>
     {approved || dismissed ? <button type="button" onClick={() => onReview(fix, 'pending')}>Reopen finding for review</button>
@@ -75,7 +93,7 @@ function FindingCard({ state, fix, allowRefinement, onReview, onSaveRefinement }
 
     <div className="customer-finding-refinement">
       <div className="customer-refinement-heading"><div><p className="eyebrow">Customer-facing refinement</p><h3>{effective.title}</h3></div>{!editing ? <button className="secondary" type="button" onClick={startEditing}>Edit customer wording</button> : null}</div>
-      {hasStaleCustomerFindingRefinement(state, fix) ? <p className="customer-refinement-warning" role="status">The saved customer wording belongs to older evidence and is no longer active. Review this finding again before saving or approving.</p> : null}
+      {staleWording ? <div className="customer-refinement-warning" role="status"><p>The supporting evidence changed since this wording was saved. Review the latest evidence and confirm or update the customer wording.</p><dl className="customer-wording-summary"><div><dt>Previous title</dt><dd>{historical.title}</dd></div><div><dt>Previous priority</dt><dd>{historical.priority}</dd></div><div><dt>Previous summary</dt><dd>{historical.summary}</dd></div><div><dt>Previous action</dt><dd>{historical.recommendedAction}</dd></div></dl></div> : null}
       {editing ? <div className="customer-refinement-form">
         <label>Customer-facing title<input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
         <label>Priority<select value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value as FixItem['priority'] })}><option>High</option><option>Medium</option><option>Low</option></select></label>
@@ -87,30 +105,34 @@ function FindingCard({ state, fix, allowRefinement, onReview, onSaveRefinement }
         <div><dt>Why it matters / summary</dt><dd>{effective.summary}</dd></div>
         <div><dt>Recommended action</dt><dd>{effective.recommendedAction}</dd></div>
       </dl>}
-      <p className="customer-small">{refinement ? 'Operator-refined wording is active for the current evidence.' : 'Scanner-generated customer wording will be used unless an operator saves a refinement.'}</p>
+      <p className="customer-small">{refinement ? 'Operator-refined wording is active for the current evidence.' : staleWording ? 'Previous operator wording is preserved above but is not active for the latest evidence.' : 'Scanner-generated customer wording will be used unless an operator saves a refinement.'}</p>
     </div>
 
-    <p><strong>Operator disposition:</strong> {approved ? 'Approved for customer export' : dismissed ? 'Dismissed from customer review' : 'Awaiting review'}</p>
-    {approved || dismissed ? <button type="button" onClick={() => onReview(fix, 'pending')}>Reopen finding for review</button>
-      : <><button type="button" onClick={() => onReview(fix, 'approved')}>Approve for customer export</button><button type="button" onClick={() => onReview(fix, 'dismissed')}>Dismiss from customer review</button></>}
+    <p><strong>Operator disposition:</strong> {dispositionLabel}</p>
+    {needsDispositionReconfirmation ? <><p className="customer-refinement-warning">Previous disposition: {previousDisposition === 'approved' ? 'Approved' : 'Dismissed'}. Current status: Needs reconfirmation.</p><button type="button" onClick={confirm}>Confirm current wording</button><button className="secondary" type="button" onClick={startEditing}>Edit wording</button><button className="secondary" type="button" onClick={() => onReview(fix, 'dismissed')}>Dismiss finding</button></>
+      : approved || dismissed ? <button type="button" onClick={() => onReview(fix, 'pending')}>Reopen finding for review</button>
+        : <><button type="button" onClick={() => onReview(fix, 'approved')}>Approve for customer export</button><button type="button" onClick={() => onReview(fix, 'dismissed')}>Dismiss from customer review</button></>}
   </article>
 }
 
-export function CustomerFindingReview({ state, fixes, onReview, onSaveRefinement }: {
+export function CustomerFindingReview({ state, fixes, onReview, onSaveRefinement, onConfirmFinding }: {
   state: AuditState
   fixes: FixItem[]
   onReview: (fix: FixItem, disposition: Disposition) => void
   onSaveRefinement: (fix: FixItem, wording: CustomerFindingWording) => void
+  onConfirmFinding?: (fix: FixItem) => void
 }) {
   const candidates = fixes.filter(canReviewFinding)
   const primary = candidates.filter((fix) => !isSupportingCustomerFinding(fix))
   const supporting = candidates.filter(isSupportingCustomerFinding)
+  const absentReconciliations = findingsNeedingReconciliation(state, fixes).filter((item) => item.absentFromLatestScan)
   return <section className="panel customer-review-panel">
     <div className="panel-header"><p className="eyebrow">Customer review approval</p><h2>Adjudicate findings for customer export</h2><p>Scanner evidence remains read-only. Refine only the customer-facing interpretation, then approve or dismiss the finding. Approval includes the effective wording in Customer Review JSON; neither decision authorizes remediation.</p></div>
-    {primary.map((fix) => <FindingCard key={fix.id} state={state} fix={fix} allowRefinement onReview={onReview} onSaveRefinement={onSaveRefinement} />)}
+    {primary.map((fix) => <FindingCard key={fix.id} state={state} fix={fix} allowRefinement onReview={onReview} onSaveRefinement={onSaveRefinement} onConfirmFinding={onConfirmFinding} />)}
+    {absentReconciliations.length ? <div className="finding-reconciliation-history"><h3>Previous findings needing resolution</h3>{absentReconciliations.map(({ finding, previousDisposition }) => <article className="customer-review-row" key={finding.id}><p className="eyebrow">Previous finding · not current customer truth</p><h3>{state.customerFindingDecisionSnapshots?.[finding.id]?.customerWording.title || finding.issue}</h3><p>The latest scan no longer produces this candidate. Its previous decision is preserved so it does not disappear silently.</p><p><strong>Previous disposition:</strong> {previousDisposition === 'approved' ? 'Approved' : 'Dismissed'}</p><p><strong>Current status:</strong> Needs operator resolution</p><button type="button" onClick={() => onReview(finding, 'pending')}>Acknowledge latest evidence and clear prior disposition</button></article>)}</div> : null}
     {supporting.length ? <details><summary>Supporting observations — operator review required</summary>
       <p>Contact, social and title observations need a specific defect case before joining the initial customer package. Review and supplement the evidence before approval.</p>
-      {supporting.map((fix) => <FindingCard key={fix.id} state={state} fix={fix} allowRefinement={false} onReview={onReview} onSaveRefinement={onSaveRefinement} />)}
+      {supporting.map((fix) => <FindingCard key={fix.id} state={state} fix={fix} allowRefinement={false} onReview={onReview} onSaveRefinement={onSaveRefinement} onConfirmFinding={onConfirmFinding} />)}
     </details> : null}
     {!candidates.length ? <p>No eligible findings yet. Findings need a failure/partial result, evidence, a recommendation, and a verification method. Continue evidence review in the Workbench.</p> : null}
   </section>

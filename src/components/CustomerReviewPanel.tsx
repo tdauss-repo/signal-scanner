@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { AuditItem, AuditState, FixItem } from '../types/audit'
-import { customerReviewReadiness, hasStaleCustomerFindingRefinement, isPresentedFinding, summarizeCustomerScan } from '../utils/customerScan'
+import { customerReviewReadiness, findingsNeedingReconciliation, hasStaleCustomerFindingRefinement, summarizeCustomerScan } from '../utils/customerScan'
 import { buildCustomerVisibilityReviewExport, customerVisibilityReviewAdditionalWork, customerVisibilityReviewCustomerActions, customerVisibilityReviewFilename, customerVisibilityReviewQaText, serializeCustomerVisibilityReview } from '../utils/customerVisibilityReviewExport'
-import { derivePackagePreparation, hasStalePackageScopeOverride } from '../utils/packagePreparation'
+import { derivePackagePreparation } from '../utils/packagePreparation'
 import { profileCompleteness, profileProjectionWarnings } from '../utils/profileCompleteness'
 import { copyText } from '../utils/copyText'
 
@@ -22,7 +22,8 @@ export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: 
   const review = buildCustomerVisibilityReviewExport(state, items, fixes)
   const preparation = derivePackagePreparation(state, fixes)
   const stale = fixes.filter((fix) => hasStaleCustomerFindingRefinement(state, fix))
-  const stalePackageScopes = fixes.filter((fix) => isPresentedFinding(state, fix) && hasStalePackageScopeOverride(state, fix))
+  const decisionReconciliations = findingsNeedingReconciliation(state, fixes)
+  const packageReconciliations = preparation.reconciliationItems.filter((item) => !item.approvalNeedsReconfirmation)
   const blockingProfile = completeness.missing.filter((item) => ['name', 'category', 'website', 'market'].includes(item.id))
   const wordingWarnings = review.confirmedIssues.filter((issue) => !issue.title.trim() || !issue.summary.trim() || !issue.foundLocalAction.trim())
     .map((issue) => `${issue.id} is missing customer-safe wording.`)
@@ -33,7 +34,8 @@ export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: 
     ...profileProjectionWarnings(state),
     ...blockingProfile.map((item) => `${item.label} is missing.`),
     ...stale.map((fix) => `${fix.issue} has stale customer wording and must be reviewed again.`),
-    ...stalePackageScopes.map((fix) => `${fix.issue} has stale package scope and must be reconciled in Package Preparation.`),
+    ...(decisionReconciliations.length ? [`${decisionReconciliations.length} finding${decisionReconciliations.length === 1 ? '' : 's'} ${decisionReconciliations.length === 1 ? 'needs' : 'need'} operator disposition reconfirmation.`] : []),
+    ...(packageReconciliations.length ? [`${packageReconciliations.length} finding${packageReconciliations.length === 1 ? '' : 's'} ${packageReconciliations.length === 1 ? 'needs' : 'need'} package scope reconfirmation.`] : []),
     ...(readiness.scanIncomplete ? ['The active visibility scan has not reached a terminal state.'] : []),
     ...(readiness.awaitingDisposition ? [`${readiness.awaitingDisposition} primary finding${readiness.awaitingDisposition === 1 ? '' : 's'} still await operator disposition.`] : []),
     ...wordingWarnings,

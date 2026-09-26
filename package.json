@@ -39,6 +39,7 @@
     "test:acceptance-blockers": "node --import tsx scripts/test-acceptance-blockers.ts",
     "test:customer-review-clipboard": "node --import tsx scripts/test-customer-review-clipboard.ts",
     "test:package-scope-overrides": "node --import tsx scripts/test-package-scope-overrides.ts",
+    "test:evidence-refresh-reconciliation": "node --import tsx scripts/test-evidence-refresh-reconciliation.tsx",
     "prove:destination-brightdata": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/prove-destination-brightdata.ts",
     "test:destination-brightdata": "node --import tsx scripts/test-destination-brightdata.ts"
   },

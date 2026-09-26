@@ -74,14 +74,23 @@ Review → Verification`:
 3. **Review** combines the evidence summary, business-information gaps,
    candidate findings, optional customer-wording refinement, and explicit
    approve/dismiss/reopen decisions. Raw evidence remains immutable and
-   detailed provider data is a Workbench drill-down.
+   detailed provider data is a Workbench drill-down. Approval, dismissal, and
+   customer wording are bound to a finding-scoped material-evidence identity:
+   substantive observations, interpretation, reviewed business context, and
+   verification remain significant, while scan timestamps, run IDs, provider
+   request metadata, and unrelated findings do not. Materially refreshed
+   evidence retains the previous decision as history and requires explicit
+   operator reconfirmation; it is never presented as a current approval.
 4. **Package** derives scope only from explicitly approved effective customer
    findings. Its existing defaults remain available until the operator assigns
    an approved finding to Starter, separate scope, customer/third-party action,
    or no proposed scope and optionally refines the customer-safe delivery and
    line-item wording. Overrides are bound to the finding evidence identity;
-   stale overrides cannot enter active package scope. Internal scope notes stay
-   inside the operator workspace.
+   stale overrides cannot enter active package scope. Previous scope remains
+   visible in a separate reconciliation queue until the current finding and
+   its delivery scope are reconfirmed. Snapshot-backed decisions also keep a
+   prior finding visible when it no longer appears in the latest candidate set.
+   Internal scope notes stay inside the operator workspace.
 5. **Customer Review** is the final operator quality gate. Its human-readable
    QA frame, copyable review text, and sanitized version 1.0 JSON are all built
    from the same customer-safe projection of reviewed identity, area-specific

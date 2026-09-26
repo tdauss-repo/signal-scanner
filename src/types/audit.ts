@@ -143,6 +143,8 @@ export interface AuditState {
   customerFindingRefinements?: Record<string, CustomerFindingRefinement>
   /** Operator delivery-scope decisions, valid only for the approved finding identity they reference. */
   packageScopeOverrides?: Record<string, PackageScopeOverride>
+  /** Last explicit finding decision, retained only for operator reconciliation after evidence refresh. */
+  customerFindingDecisionSnapshots?: Record<string, CustomerFindingDecisionSnapshot>
   /** Load-time identity conflicts retained after the compatibility profile is safely reconciled. */
   profileProjectionConflicts?: string[]
 }
@@ -153,6 +155,18 @@ export interface CustomerFindingRefinement {
   priority?: 'High' | 'Medium' | 'Low'
   summary?: string
   recommendedAction?: string
+}
+
+export interface CustomerFindingDecisionSnapshot {
+  evidenceKey: string
+  disposition: 'approved' | 'dismissed'
+  finding: FixItem
+  customerWording: {
+    title: string
+    priority: FixItem['priority']
+    summary: string
+    recommendedAction: string
+  }
 }
 
 export type PackageScopeClassification = 'starter' | 'separate' | 'customer_action' | 'not_included'

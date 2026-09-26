@@ -113,12 +113,12 @@ assert.equal(derivePackagePreparation(dismissedState, [rawFinding]).starterItems
 assert.equal(buildCustomerVisibilityReviewExport(dismissedState, [], [rawFinding]).confirmedIssues.length, 0)
 
 const changedEvidenceState = structuredClone(state)
-changedEvidenceState.notes = { 'website-service-area-copy': 'Materially changed evidence.' }
-assert.equal(activeCustomerFindingRefinement(changedEvidenceState, rawFinding), undefined)
-assert.equal(hasStaleCustomerFindingRefinement(changedEvidenceState, rawFinding), true)
-assert.equal(isPresentedFinding(changedEvidenceState, rawFinding), false, 'evidence changes invalidate approval and refinement together')
-assert.equal(derivePackagePreparation(changedEvidenceState, [rawFinding]).starterItems.length, 0)
-assert.equal(buildCustomerVisibilityReviewExport(changedEvidenceState, [], [rawFinding]).confirmedIssues.length, 0)
+const changedFinding = { ...rawFinding, evidenceSummary: 'Materially changed evidence.', evidenceNote: 'Materially changed evidence.' }
+assert.equal(activeCustomerFindingRefinement(changedEvidenceState, changedFinding), undefined)
+assert.equal(hasStaleCustomerFindingRefinement(changedEvidenceState, changedFinding), true)
+assert.equal(isPresentedFinding(changedEvidenceState, changedFinding), false, 'material finding evidence changes invalidate approval and refinement together')
+assert.equal(derivePackagePreparation(changedEvidenceState, [changedFinding]).starterItems.length, 0)
+assert.equal(buildCustomerVisibilityReviewExport(changedEvidenceState, [], [changedFinding]).confirmedIssues.length, 0)
 
 const persisted = JSON.parse(JSON.stringify(state)) as AuditState
 assert.equal(activeCustomerFindingRefinement(persisted, rawFinding)?.title, maryWording.title, 'saved-scan JSON round-trip preserves current refinement')

@@ -1,5 +1,5 @@
 import type { AuditState, FixItem, PackageScopeClassification, PackageScopeOverride } from '../types/audit'
-import { customerReviewKey, effectiveCustomerFinding, isPresentedFinding } from './customerScan'
+import { customerReviewKey, effectiveCustomerFinding, hasStaleCustomerFindingApproval, historicalCustomerFindingWording, isPresentedFinding, matchesCustomerReviewKey } from './customerScan'
 import { effectivePackageFit, sortSalesActions } from './salesReadiness'
 
 export type PackageAssignment = string
@@ -17,11 +17,16 @@ export interface PackagePreparationItem {
   internalScopeNote: string
   overridden: boolean
   staleOverride: boolean
+  approvalNeedsReconfirmation?: boolean
+  canConfirmScope?: boolean
+  findingAbsentFromLatestScan?: boolean
 }
 
 export interface PackagePreparation {
   approvedFindings: FixItem[]
   items: PackagePreparationItem[]
+  confirmedItems: PackagePreparationItem[]
+  reconciliationItems: PackagePreparationItem[]
   starterItems: PackagePreparationItem[]
   separateScopeItems: PackagePreparationItem[]
   customerActionItems: PackagePreparationItem[]
@@ -69,12 +74,12 @@ export const defaultPackageScope = (fix: FixItem): PackageScopeInput => {
 export const activePackageScopeOverride = (state: AuditState, fix: FixItem) => {
   if (!isPresentedFinding(state, fix)) return undefined
   const override = state.packageScopeOverrides?.[fix.id]
-  return override?.evidenceKey === customerReviewKey(state, fix) ? override : undefined
+  return override && matchesCustomerReviewKey(override.evidenceKey, state, fix) ? override : undefined
 }
 
 export const hasStalePackageScopeOverride = (state: AuditState, fix: FixItem) => {
   const override = state.packageScopeOverrides?.[fix.id]
-  return Boolean(override && override.evidenceKey !== customerReviewKey(state, fix))
+  return Boolean(override && !matchesCustomerReviewKey(override.evidenceKey, state, fix))
 }
 
 export const buildPackageScopeOverride = (state: AuditState, fix: FixItem, input: PackageScopeInput): PackageScopeOverride | null => {
@@ -115,6 +120,30 @@ const packageItem = (state: AuditState, sourceFix: FixItem): PackagePreparationI
   }
 }
 
+const reconciliationItem = (state: AuditState, sourceFix: FixItem, findingAbsentFromLatestScan = false): PackagePreparationItem => {
+  const wording = historicalCustomerFindingWording(state, sourceFix)
+  const previous = state.packageScopeOverrides?.[sourceFix.id]
+  const defaults = defaultPackageScope({ ...sourceFix, issue: wording.title, priority: wording.priority, fix: wording.recommendedAction, whyItMatters: wording.summary })
+  const scope = previous || defaults
+  const approvalNeedsReconfirmation = findingAbsentFromLatestScan || hasStaleCustomerFindingApproval(state, sourceFix)
+  return {
+    findingId: sourceFix.id,
+    finding: wording.title,
+    priority: wording.priority,
+    remediationAction: scope.deliveryDescription,
+    packageFit: fitFor(scope.scopeClassification),
+    scopeClassification: scope.scopeClassification,
+    packageAssignment: scope.packageAssignment,
+    includedScope: scope.includedScope,
+    internalScopeNote: previous?.internalNote || '',
+    overridden: Boolean(previous),
+    staleOverride: Boolean(previous),
+    approvalNeedsReconfirmation,
+    canConfirmScope: !approvalNeedsReconfirmation && isPresentedFinding(state, sourceFix),
+    findingAbsentFromLatestScan,
+  }
+}
+
 /**
  * Creates operator package scope from explicit customer-finding approvals only.
  * Candidate, dismissed, stale approvals, neutral, and provider-failure states cannot enter.
@@ -126,6 +155,15 @@ export function derivePackagePreparation(state: AuditState, fixes: FixItem[]): P
   const approvedFindings = approvedSourceFindings.map((fix) => ({ ...effectiveCustomerFinding(state, fix), reviewed: true }))
   const items = approvedSourceFindings.map((fix) => packageItem(state, fix))
   const activeItems = items.filter((item) => !item.staleOverride)
+  const reconciliationSource = fixes.filter((fix) => hasStaleCustomerFindingApproval(state, fix) || isPresentedFinding(state, fix) && hasStalePackageScopeOverride(state, fix))
+  const currentIds = new Set(fixes.map((fix) => fix.id))
+  const absentApproved = Object.entries(state.customerFindingDecisionSnapshots || {})
+    .filter(([id, snapshot]) => !currentIds.has(id) && snapshot.disposition === 'approved' && Boolean(state.customerFindingReviews?.[id]))
+    .map(([, snapshot]) => snapshot.finding)
+  const reconciliationItems = [
+    ...sortSalesActions(reconciliationSource).map((fix) => reconciliationItem(state, fix)),
+    ...sortSalesActions(absentApproved).map((fix) => reconciliationItem(state, fix, true)),
+  ]
   const starterItems = activeItems.filter((item) => item.scopeClassification === 'starter')
   const separateScopeItems = activeItems.filter((item) => item.scopeClassification === 'separate')
   const customerActionItems = activeItems.filter((item) => item.scopeClassification === 'customer_action')
@@ -133,6 +171,8 @@ export function derivePackagePreparation(state: AuditState, fixes: FixItem[]): P
   return {
     approvedFindings,
     items,
+    confirmedItems: activeItems,
+    reconciliationItems,
     starterItems,
     separateScopeItems,
     customerActionItems,

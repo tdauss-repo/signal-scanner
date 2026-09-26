@@ -21,7 +21,7 @@ import { VoiceReadinessPanel } from './components/VoiceReadinessPanel'
 import { SalesReadinessPanel } from './components/SalesReadinessPanel'
 import { CustomerScanView } from './components/CustomerScanView'
 import { CustomerFindingReview } from './components/CustomerFindingReview'
-import { buildCustomerFindingRefinement, canReviewFinding, customerReviewKey, isPresentedFinding } from './utils/customerScan'
+import { buildCustomerFindingRefinement, canReviewFinding, customerReviewKey, effectiveCustomerFindingWording, isPresentedFinding, reconfirmCustomerFinding } from './utils/customerScan'
 import type { CustomerFindingWording, CustomerView } from './utils/customerScan'
 import { normalizeWorkspaceProfile } from './utils/workspaceProfile'
 import { createIsolatedBusinessWorkspace } from './utils/workspaceIsolation'
@@ -669,17 +669,33 @@ function App() {
       const reviews = { ...current.customerFindingReviews }
       const dismissals = { ...current.customerFindingDismissals }
       if (disposition === 'approved') {
-        reviews[fix.id] = customerReviewKey(current, fix)
+        const key = customerReviewKey(current, fix)
+        reviews[fix.id] = key
         delete dismissals[fix.id]
+        return {
+          ...current, customerFindingReviews: reviews, customerFindingDismissals: dismissals,
+          customerFindingDecisionSnapshots: { ...current.customerFindingDecisionSnapshots, [fix.id]: { evidenceKey: key, disposition, finding: structuredClone(fix), customerWording: effectiveCustomerFindingWording(current, fix) } },
+          lastUpdated: new Date().toISOString(),
+        }
       } else if (disposition === 'dismissed') {
-        dismissals[fix.id] = customerReviewKey(current, fix)
+        const key = customerReviewKey(current, fix)
+        dismissals[fix.id] = key
         delete reviews[fix.id]
+        return {
+          ...current, customerFindingReviews: reviews, customerFindingDismissals: dismissals,
+          customerFindingDecisionSnapshots: { ...current.customerFindingDecisionSnapshots, [fix.id]: { evidenceKey: key, disposition, finding: structuredClone(fix), customerWording: effectiveCustomerFindingWording(current, fix) } },
+          lastUpdated: new Date().toISOString(),
+        }
       } else {
         delete reviews[fix.id]
         delete dismissals[fix.id]
       }
       return { ...current, customerFindingReviews: reviews, customerFindingDismissals: dismissals, lastUpdated: new Date().toISOString() }
     })
+  }
+
+  const confirmCustomerFinding = (fix: FixItem) => {
+    setAuditState((current) => ({ ...reconfirmCustomerFinding(current, fix), lastUpdated: new Date().toISOString() }))
   }
 
   const saveCustomerFindingRefinement = (fix: FixItem, wording: CustomerFindingWording) => {
@@ -2044,6 +2060,7 @@ function App() {
       onWorkbench={() => setWorkbenchOpen(true)}
       onReview={reviewCustomerFinding}
       onSaveRefinement={saveCustomerFindingRefinement}
+      onConfirmFinding={confirmCustomerFinding}
       onSavePackageScope={savePackageScope}
       currentScanId={currentScanId}
       dirty={hasUnsavedChanges}
@@ -2154,7 +2171,7 @@ function App() {
             ))}
           </section>
 
-          {activeView === 'Overall' ? <CustomerFindingReview state={auditState} fixes={salesFixes} onReview={reviewCustomerFinding} onSaveRefinement={saveCustomerFindingRefinement} /> : null}
+          {activeView === 'Overall' ? <CustomerFindingReview state={auditState} fixes={salesFixes} onReview={reviewCustomerFinding} onSaveRefinement={saveCustomerFindingRefinement} onConfirmFinding={confirmCustomerFinding} /> : null}
           {renderActiveView()}
         </div>
       </main>
