@@ -27,6 +27,14 @@ export interface ScanDependencies {
   /** Dedicated Google Maps provider with the same unconfigured fallback contract. */
   acquireGoogleMaps?(url: string): Promise<AcquisitionResult | undefined>
   cancelled?: () => boolean
+  /** Test/runtime override. Application defaults keep each operation and the entire run bounded. */
+  operationTimeoutMs?: number
+  overallTimeoutMs?: number
+}
+const defaultOperationTimeoutMs = 30_000
+const defaultOverallTimeoutMs = 180_000
+class VisibilityScanTimeoutError extends Error {
+  constructor(message: string) { super(message); this.name = 'VisibilityScanTimeoutError' }
 }
 export const applicationScanDependencies: ScanDependencies = {
   automationVersion: 2,
@@ -79,9 +87,25 @@ export function mergeAutomatedObservation(previous: SearchDestinationObservation
 export async function runVisibilityScan(initial: AuditState, dependencies: ScanDependencies, onUpdate: (update: StateUpdate) => void = () => undefined): Promise<VisibilityRun> {
   const enhanced = dependencies.automationVersion === 2
   const startedAt = new Date().toISOString()
-  const run: VisibilityRun = { version: enhanced ? 2 : 1, ...(enhanced ? { profileReviewKey: evidenceFingerprint(initial.businessProfile) } : {}), id: `visibility-${startedAt}-${Math.random().toString(36).slice(2, 8)}`, profileKey: scanProfileKey(initial.profile), startedAt, checks: [], businessEvidence: [] }
+  const run: VisibilityRun = { version: enhanced ? 2 : 1, ...(enhanced ? { profileReviewKey: evidenceFingerprint(initial.businessProfile) } : {}), id: `visibility-${startedAt}-${Math.random().toString(36).slice(2, 8)}`, profileKey: scanProfileKey(initial.profile), startedAt, status: 'running', checks: [], businessEvidence: [] }
   const profile = structuredClone(initial.profile)
   let state = structuredClone(initial)
+  const deadline = Date.now() + Math.max(1, dependencies.overallTimeoutMs ?? defaultOverallTimeoutMs)
+  const operationTimeoutMs = Math.max(1, dependencies.operationTimeoutMs ?? defaultOperationTimeoutMs)
+  const awaitBounded = async <T>(work: () => Promise<T>, label: string): Promise<T> => {
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) throw new VisibilityScanTimeoutError(`The visibility scan reached its overall time limit before ${label} could complete.`)
+    const timeoutMs = Math.min(operationTimeoutMs, remaining)
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    try {
+      return await Promise.race([
+        work(),
+        new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new VisibilityScanTimeoutError(`${label} timed out after ${timeoutMs} ms.`)), timeoutMs) }),
+      ])
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout)
+    }
+  }
   const alive = () => !dependencies.cancelled?.()
   const update = (fn: StateUpdate) => {
     if (!alive()) return
@@ -113,6 +137,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
   directoryUrls.forEach((url, index) => run.checks.push({ ...check(`public-directory-${index}`, 'BusinessInformation'), url, ...(index >= 8 ? { state: 'interactive_review_required' as const, error: 'This run is bounded to eight recorded public directories. Review this additional source manually.' } : {}) }))
   const machine = check('machine-readability', 'AIDiscovery', enhanced)
   run.checks.push(information, ...(enhanced ? [machine] : []), check(enhanced ? 'ai-answer-testing' : 'ai-discovery', 'AIDiscovery', false))
+  try {
   publish()
   const start = (item: VisibilityCheck) => { item.state = 'scanning'; item.startedAt = new Date().toISOString(); publish() }
   const end = (item: VisibilityCheck) => { item.endedAt = new Date().toISOString(); item.elapsedMs = Date.parse(item.endedAt) - Date.parse(item.startedAt!); publish() }
@@ -120,7 +145,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
   if (website.state !== 'not_checked' && alive()) {
     start(website)
     try {
-      const result = await dependencies.website(profile)
+      const result = await awaitBounded(() => dependencies.website(profile), 'the website acquisition')
       if (!alive()) return run
       update((current) => {
         const mapping = result.ok ? mapAutoAuditToWebsiteChecks(result, profile) : undefined
@@ -162,7 +187,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
     const dedicatedProvider = item.destination === 'Google Search' ? googleProvider : item.destination === 'Google Maps' ? googleMapsProvider : undefined
     if (dedicatedProvider) {
       try {
-        const capture = await dedicatedProvider(item.url!)
+        const capture = await awaitBounded(() => dedicatedProvider(item.url!), `${item.destination || 'destination'} acquisition`)
         if (!alive()) return run
         if (capture) {
           captures.push(capture)
@@ -175,7 +200,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
             const region = reviewedProfileValue(profile, initial.businessProfile, 'state')
             if (name && city && region) {
               const enrichedUrl = publicPresenceUrl('Google Maps', `${name} ${city} ${region}`)
-              const enriched = await dedicatedProvider(enrichedUrl)
+              const enriched = await awaitBounded(() => dedicatedProvider(enrichedUrl), 'Google Maps location enrichment')
               if (!alive()) return run
               if (enriched) {
                 captures.push({ ...enriched, notes: [...enriched.notes, 'One bounded reviewed-location query enrichment followed an unusable plain Brand Maps acquisition.'] })
@@ -194,7 +219,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       for (const method of ['server_fetch', 'rendered_browser'] as const) {
         if (!alive()) return run
         try {
-          const capture = await dependencies.acquire(item.url!, method)
+          const capture = await awaitBounded(() => dependencies.acquire(item.url!, method), `${item.destination || 'public destination'} ${method}`)
           if (!alive()) return run
           if (!capture) { item.error = 'Rendered acquisition unavailable; interactive review required.'; break }
           captures.push(capture)
@@ -301,6 +326,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
     end(machine)
   }
   run.endedAt = new Date().toISOString()
+  run.status = run.checks.some((item) => ['failed', 'interactive_review_required', 'not_checked'].includes(item.state)) ? 'completed_with_review' : 'completed'
   run.summary = {
     attempted: run.checks.filter((item) => item.startedAt).length,
     successful: run.checks.filter((item) => item.evidenceCaptured).length,
@@ -316,4 +342,37 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
   }
   publish()
   return run
+  } catch (error) {
+    if (!alive()) return run
+    const endedAt = new Date().toISOString()
+    const message = error instanceof Error ? error.message : String(error)
+    run.checks.forEach((item) => {
+      if (item.state === 'scanning') {
+        item.state = 'interactive_review_required'
+        item.error = `The scan stopped before this check completed: ${message}`
+        item.endedAt = endedAt
+        item.elapsedMs = item.startedAt ? Date.parse(endedAt) - Date.parse(item.startedAt) : undefined
+      } else if (item.state === 'queued') {
+        item.state = 'not_checked'
+        item.error = 'This check did not begin before the scan stopped.'
+      }
+    })
+    run.endedAt = endedAt
+    run.status = 'failed'
+    run.failure = message
+    run.summary = {
+      attempted: run.checks.filter((item) => item.startedAt).length,
+      successful: run.checks.filter((item) => item.evidenceCaptured).length,
+      evidenceCaptured: run.checks.filter((item) => item.evidenceCaptured).length,
+      operatorReview: run.checks.filter((item) => ['awaiting_review', 'evidence_captured', 'interactive_review_required', 'failed'].includes(item.state)).length,
+      interactiveReview: run.checks.filter((item) => item.state === 'interactive_review_required').length,
+      acquisitionFailures: run.checks.reduce((sum, item) => sum + item.captures.filter((capture) => ['failed', 'blocked', 'unavailable'].includes(capture.outcome)).length + (item.id === website.id && item.state === 'failed' ? 1 : 0), 0),
+      manualInterventionsRequired: run.checks.filter((item) => ['interactive_review_required', 'failed', 'not_checked'].includes(item.state)).length,
+      providerEscalations: run.checks.filter((item) => item.captures.some((capture) => capture.method === 'rendered_browser')).length,
+      candidateFindings: 0,
+      customerApprovedFindings: 0,
+    }
+    publish()
+    return run
+  }
 }

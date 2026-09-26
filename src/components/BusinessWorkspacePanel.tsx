@@ -9,6 +9,7 @@ interface Props {
   scans: SavedScanRecord[]
   onProfileChange: (profile: BusinessProfile) => void
   onSaveCurrent: () => void
+  saveNotice: { kind: 'success' | 'error'; text: string } | null
   onSaveAsNew: () => void
   onLoad: (id: string) => void
   onDuplicate: (id: string) => void
@@ -61,6 +62,7 @@ export function BusinessWorkspacePanel(props: Props) {
         <label>Phone<input value={profile.phone} onChange={updateField(profile, props.onProfileChange, 'phone')} /></label>
         <label className="full-width-label">Primary category / business type<input value={profile.primaryCategory} onChange={updateField(profile, props.onProfileChange, 'primaryCategory')} /></label>
       </div>
+      {!profile.primaryCategory.trim() ? <p className="business-required-message" role="status">Primary category is required before scanning so Found Local can interpret results for the correct type of local business.</p> : null}
       <details className="business-secondary-details"><summary>Additional business context</summary><p>These reviewed details help Found Local interpret local visibility in the right business context.</p><div className="form-grid">
         <label>Secondary categories<textarea value={profile.secondaryCategories} onChange={updateField(profile, props.onProfileChange, 'secondaryCategories')} /></label>
         <label>Programs / services<textarea value={profile.primaryServices} onChange={updateField(profile, props.onProfileChange, 'primaryServices')} /></label>
@@ -73,6 +75,7 @@ export function BusinessWorkspacePanel(props: Props) {
         <label className="full-width-label">Internal operator note<textarea value={profile.operatorNote} onChange={updateField(profile, props.onProfileChange, 'operatorNote')} /></label>
       </div></details>
       <div className="business-form-actions"><button type="button" onClick={props.onSaveCurrent}>Save Business</button><button className="customer-primary" type="button" disabled={!completeness.readyToScan} onClick={props.onGoScan}>Continue to Scan →</button></div>
+      {props.saveNotice ? <p className={`business-save-notice business-save-notice-${props.saveNotice.kind}`} role="status">{props.saveNotice.text}</p> : null}
     </section>
   </div>
 }

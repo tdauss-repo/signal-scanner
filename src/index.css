@@ -45,3 +45,13 @@ button {
 a {
   color: inherit;
 }
+
+.operator-failure {
+  max-width: 720px;
+  margin: 10vh auto;
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}

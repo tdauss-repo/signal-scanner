@@ -65,7 +65,8 @@ import {
   reviewedBusinessProfile,
 } from './utils/businessProfileState'
 import { aggregateReviewedSearchObservations } from './utils/searchAggregation'
-import { businessProfileProjectionWarnings } from './utils/profileCompleteness'
+import { businessProfileProjectionWarnings, profileCompleteness } from './utils/profileCompleteness'
+import { workspaceStorageFailureMessage, writeStorageJson, writeStorageText } from './utils/browserStorage'
 import { summarizeAIVisibilityEvidence } from './utils/aiPresence'
 import { projectPublicObservationToProfiles, summarizePublicPresence } from './utils/publicPresence'
 import { entityAction, normalizeSalesReadiness, questionAction, sortSalesActions } from './utils/salesReadiness'
@@ -586,6 +587,7 @@ function App() {
   const [activeView, setActiveView] = useState<ActiveView>(loadActiveView)
   const [savedScans, setSavedScans] = useState<SavedScanRecord[]>(loadSavedScans)
   const [currentScanId, setCurrentScanId] = useState(loadCurrentScanId)
+  const [workspaceSaveNotice, setWorkspaceSaveNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
 
   const auditItems = useMemo(
     () =>
@@ -701,19 +703,19 @@ function App() {
     : true
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(auditState))
+    writeStorageJson(localStorage, storageKey, auditState)
   }, [auditState])
 
   useEffect(() => {
-    localStorage.setItem(activeViewStorageKey, activeView)
+    writeStorageText(localStorage, activeViewStorageKey, activeView)
   }, [activeView])
 
   useEffect(() => {
-    localStorage.setItem(savedScansStorageKey, JSON.stringify(savedScans))
+    writeStorageJson(localStorage, savedScansStorageKey, savedScans)
   }, [savedScans])
 
   useEffect(() => {
-    localStorage.setItem(currentScanIdStorageKey, currentScanId)
+    writeStorageText(localStorage, currentScanIdStorageKey, currentScanId)
   }, [currentScanId])
 
   const updateState = (next: Partial<AuditState>) => {
@@ -728,6 +730,7 @@ function App() {
     websiteRequestGeneration.current += 1
     setWebsiteAuditLoading(false)
     setWebsiteAuditError('')
+    setWorkspaceSaveNotice(null)
     setAuditState((current) => {
       const recordedAt = new Date().toISOString()
       return {
@@ -1105,21 +1108,26 @@ function App() {
   }
 
   const saveScanRecord = (record: SavedScanRecord) => {
-    setSavedScans((current) => {
-      const withoutCurrent = current.filter((scan) => scan.id !== record.id)
-      return [record, ...withoutCurrent].sort((a, b) =>
-        b.updatedAt.localeCompare(a.updatedAt),
-      )
-    })
+    const withoutCurrent = savedScans.filter((scan) => scan.id !== record.id)
+    const nextScans = [record, ...withoutCurrent].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    const workspaceWrite = writeStorageJson(localStorage, storageKey, record.payload)
+    const collectionWrite = workspaceWrite.ok ? writeStorageJson(localStorage, savedScansStorageKey, nextScans) : workspaceWrite
+    if (!workspaceWrite.ok || !collectionWrite.ok) {
+      setWorkspaceSaveNotice({ kind: 'error', text: workspaceStorageFailureMessage(workspaceWrite.error || collectionWrite.error) })
+      return null
+    }
+    writeStorageText(localStorage, currentScanIdStorageKey, record.id)
+    setSavedScans(nextScans)
     setCurrentScanId(record.id)
     setAuditState(record.payload)
+    setWorkspaceSaveNotice({ kind: 'success', text: `Saved ${record.businessName}.` })
     return record
   }
 
   const saveCurrentScan = () => {
     const existing = savedScans.find((scan) => scan.id === currentScanId)
     const record = savedScanFromWorkspace(auditState, existing)
-    saveScanRecord(record)
+    return Boolean(saveScanRecord(record))
   }
 
   const saveAsNewScan = () => {
@@ -1134,8 +1142,7 @@ function App() {
       'Loading another scan will replace the current workspace. Save the current scan first?',
     )
     if (!shouldSave) return false
-    saveCurrentScan()
-    return true
+    return saveCurrentScan()
   }
 
   const loadSavedScan = (id: string) => {
@@ -1239,6 +1246,10 @@ function App() {
   }
 
   const runAutoAudit = async () => {
+    if (!profileCompleteness(auditState).readyToScan) {
+      setWebsiteAuditError('Business name, website, and primary category are required before scanning.')
+      return
+    }
     const requestGeneration = ++websiteRequestGeneration.current
     setWebsiteAuditLoading(true)
     setWebsiteAuditError('')
@@ -2025,6 +2036,7 @@ function App() {
       scans={savedScans}
       onProfileChange={updateProfileFromOperator}
       onSaveCurrent={saveCurrentScan}
+      saveNotice={workspaceSaveNotice}
       onSaveAsNew={saveAsNewScan}
       onLoad={loadSavedScan}
       onDuplicate={duplicateSavedScan}

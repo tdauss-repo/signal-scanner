@@ -1,6 +1,6 @@
 import { matchesEvidenceFingerprint } from './evidenceFingerprint'
 import { currentMachineReadability, summarizeMachineReadability } from './machineReadability'
-import { scanAreaState, scanStateLabel } from './visibilityScanState'
+import { scanAreaState, scanStateLabel, visibilityRunStatus } from './visibilityScanState'
 import type { ScanArea, ScanState } from '../types/visibilityScan'
 import type { AuditItem, AuditState, CustomerFindingRefinement, FixItem } from '../types/audit'
 import { effectivePackageFit, isStarterEligible, sortSalesActions } from './salesReadiness'
@@ -336,6 +336,7 @@ export interface CustomerReviewReadiness {
   awaitingDisposition: number
   verifiedStrengths: number
   needsReview: number
+  scanIncomplete: boolean
   message: string
 }
 
@@ -353,9 +354,13 @@ export function customerReviewReadiness(state: AuditState, summary: ReturnType<t
   const awaitingDisposition = candidateFindings - approvedFindings - dismissedFindings
   const verifiedStrengths = summary.cockpit.lookingGood.length || summary.snapshot.goodSignals
   const needsReview = summary.cockpit.deeperReview.length
+  const latestRun = state.visibilityRuns?.filter((run) => matchesEvidenceFingerprint(run.profileKey, state.profile)).at(-1)
+  const scanIncomplete = visibilityRunStatus(latestRun) === 'running'
   const allCandidatesAdjudicated = awaitingDisposition === 0
-  const ready = allCandidatesAdjudicated && (approvedFindings > 0 || candidateFindings === 0 && verifiedStrengths > 0)
-  const message = !allCandidatesAdjudicated
+  const ready = !scanIncomplete && allCandidatesAdjudicated && (approvedFindings > 0 || candidateFindings === 0 && verifiedStrengths > 0)
+  const message = scanIncomplete
+    ? 'The active visibility scan must reach a terminal state before customer export.'
+    : !allCandidatesAdjudicated
     ? `${awaitingDisposition} primary candidate ${awaitingDisposition === 1 ? 'awaits' : 'await'} an operator decision before export.`
     : ready
     ? approvedFindings > 0
@@ -364,5 +369,5 @@ export function customerReviewReadiness(state: AuditState, summary: ReturnType<t
     : candidateFindings > 0
       ? 'No customer findings were approved. Complete enough evidence review to establish a verified strength or approve an appropriate customer finding.'
       : 'Complete enough evidence review to establish a verified strength or an approved customer finding.'
-  return { state: ready ? 'ready' : 'not_ready', candidateFindings, approvedFindings, dismissedFindings, awaitingDisposition, verifiedStrengths, needsReview, message }
+  return { state: ready ? 'ready' : 'not_ready', candidateFindings, approvedFindings, dismissedFindings, awaitingDisposition, verifiedStrengths, needsReview, scanIncomplete, message }
 }

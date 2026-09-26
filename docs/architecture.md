@@ -63,11 +63,14 @@ Review → Verification`:
 1. **Business** presents one consolidated reviewed-business form. Seed and
    reviewed-profile provenance remain internal compatibility concepts, while a
    compact Change business control owns saved workspaces and Full Scan JSON.
-   Only business name and website are required to begin. Reviewed profile facts
-   are authoritative for customer projection; a new workspace clears prior
-   evidence, decisions, and customer wording.
+   Business name, website, and primary category are required to begin. Reviewed
+   profile facts are authoritative for customer projection; a new workspace
+   clears prior evidence, decisions, and customer wording.
 2. **Scan** runs bounded acquisition and shows operational progress and evidence
-   health. Acquisition failure remains neutral.
+   health. Each run records an explicit running/completed/completed-with-review/
+   failed lifecycle, individual operations and the overall run are time-bounded,
+   and unfinished checks are terminalized before Review becomes available.
+   Acquisition failure remains neutral.
 3. **Review** combines the evidence summary, business-information gaps,
    candidate findings, optional customer-wording refinement, and explicit
    approve/dismiss/reopen decisions. Raw evidence remains immutable and

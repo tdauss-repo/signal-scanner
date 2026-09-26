@@ -4,6 +4,7 @@ import type { AcquisitionResult } from './acquisition.js'
 import type { CorroborationRecord, SearchDestination } from './audit.js'
 
 export type ScanState = 'queued' | 'scanning' | 'evidence_captured' | 'awaiting_review' | 'interactive_review_required' | 'checked_clear' | 'needs_attention' | 'failed' | 'not_checked'
+export type VisibilityRunStatus = 'running' | 'completed' | 'completed_with_review' | 'failed'
 export type ScanArea = 'WebsiteTechnical' | 'SearchMaps' | 'BusinessInformation' | 'AIDiscovery'
 export interface PresenceAutomation {
   assessment?: SearchEntityAssessment
@@ -42,6 +43,9 @@ export interface VisibilityRun {
   profileKey: string
   startedAt: string
   endedAt?: string
+  /** Optional for saved-scan compatibility; derived from timestamps when absent. */
+  status?: VisibilityRunStatus
+  failure?: string
   interrupted?: boolean
   checks: VisibilityCheck[]
   businessEvidence: CorroborationRecord[]

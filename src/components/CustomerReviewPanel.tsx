@@ -23,6 +23,7 @@ export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: 
     ...profileProjectionWarnings(state),
     ...blockingProfile.map((item) => `${item.label} is missing.`),
     ...stale.map((fix) => `${fix.issue} has stale customer wording and must be reviewed again.`),
+    ...(readiness.scanIncomplete ? ['The active visibility scan has not reached a terminal state.'] : []),
     ...(readiness.awaitingDisposition ? [`${readiness.awaitingDisposition} primary finding${readiness.awaitingDisposition === 1 ? '' : 's'} still await operator disposition.`] : []),
     ...wordingWarnings,
     ...packageWarnings,

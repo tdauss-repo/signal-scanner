@@ -32,7 +32,7 @@ export function profileCompleteness(state: AuditState) {
   })
   const missing = items.filter((item) => item.state === 'missing')
   const needsReview = items.filter((item) => item.state === 'needs_review')
-  return { profile, model, items, missing, needsReview, readyToScan: Boolean(profile.businessName.trim() && profile.website.trim()) }
+  return { profile, model, items, missing, needsReview, readyToScan: Boolean(profile.businessName.trim() && profile.website.trim() && profile.primaryCategory.trim()) }
 }
 
 export const businessProfileProjectionWarnings = (profile: AuditState['profile'], businessProfile: AuditState['businessProfile']) => {
