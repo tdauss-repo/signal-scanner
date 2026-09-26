@@ -4,9 +4,18 @@ import { customerReviewReadiness, hasStaleCustomerFindingRefinement, summarizeCu
 import { buildCustomerVisibilityReviewExport, customerVisibilityReviewFilename, customerVisibilityReviewQaText, serializeCustomerVisibilityReview } from '../utils/customerVisibilityReviewExport'
 import { derivePackagePreparation } from '../utils/packagePreparation'
 import { profileCompleteness, profileProjectionWarnings } from '../utils/profileCompleteness'
+import { copyText } from '../utils/copyText'
+
+export function ManualCopyFallback({ label, content }: { label: string; content: string }) {
+  return <section className="customer-manual-copy" aria-label="Manual copy fallback">
+    <strong>Automatic copy is unavailable. Select the text below and copy manually.</strong>
+    <label>{label}<textarea readOnly spellCheck={false} value={content} onFocus={(event) => event.currentTarget.select()} /></label>
+  </section>
+}
 
 export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: AuditState; items: AuditItem[]; fixes: FixItem[]; onReview: () => void }) {
   const [status, setStatus] = useState('')
+  const [manualCopy, setManualCopy] = useState<{ label: string; content: string } | null>(null)
   const summary = summarizeCustomerScan(state, items, fixes)
   const readiness = customerReviewReadiness(state, summary)
   const completeness = profileCompleteness(state)
@@ -31,14 +40,15 @@ export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: 
   const ready = readiness.state === 'ready' && warnings.length === 0
   const json = serializeCustomerVisibilityReview(review)
   const qaText = customerVisibilityReviewQaText(review, ready)
-  const copyJson = async () => {
-    if (!ready) return
-    try { await navigator.clipboard.writeText(json); setStatus('Customer Review JSON copied.') }
-    catch { setStatus('Copy is unavailable in this browser. Download the JSON instead.') }
-  }
-  const copyReviewText = async () => {
-    try { await navigator.clipboard.writeText(qaText); setStatus('Customer Review QA text copied.') }
-    catch { setStatus('Copy is unavailable in this browser.') }
+  const copyForOperator = async (content: string, label: string, successMessage: string) => {
+    const result = await copyText(content)
+    if (result.copied) {
+      setManualCopy(null)
+      setStatus(successMessage)
+      return
+    }
+    setManualCopy({ label, content })
+    setStatus('Automatic copy is unavailable. Select the text below and copy manually.')
   }
   const download = () => {
     if (!ready) return
@@ -54,10 +64,11 @@ export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: 
       <div><p className="customer-eyebrow">Final quality gate</p><h2>{ready ? 'Ready for customer presentation' : 'Not ready'}</h2><p>{warnings[0] || readiness.message}</p></div>
       <dl><div><dt>Candidate findings</dt><dd>{readiness.candidateFindings}</dd></div><div><dt>Approved</dt><dd>{readiness.approvedFindings}</dd></div><div><dt>Dismissed</dt><dd>{readiness.dismissedFindings}</dd></div><div><dt>Awaiting review</dt><dd>{readiness.awaitingDisposition}</dd></div><div><dt>Verified strengths</dt><dd>{readiness.verifiedStrengths}</dd></div><div><dt>Needs review</dt><dd>{readiness.needsReview}</dd></div></dl>
       {warnings.length ? <div className="customer-review-warnings"><strong>Resolve before export</strong><ul>{warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div> : null}
-      <div className="customer-readiness-actions">{ready ? <><button className="customer-text-button" type="button" onClick={() => void copyJson()}>Copy Customer Review JSON</button><button className="customer-primary" type="button" onClick={download}>Export Customer Review JSON</button></> : <button className="customer-primary" type="button" onClick={onReview}>Return to Review</button>}</div>{status ? <p role="status">{status}</p> : null}
+      <div className="customer-readiness-actions">{ready ? <><button className="customer-text-button" type="button" onClick={() => void copyForOperator(json, 'Customer Review JSON', 'Customer Review JSON copied')}>Copy Customer Review JSON</button><button className="customer-primary" type="button" onClick={download}>Export Customer Review JSON</button></> : <button className="customer-primary" type="button" onClick={onReview}>Return to Review</button>}</div>{status ? <p role="status">{status}</p> : null}
     </section>
+    {manualCopy ? <ManualCopyFallback label={manualCopy.label} content={manualCopy.content} /> : null}
     <section className="panel customer-qa-frame" aria-label="Customer Review operator QA">
-      <div className="customer-qa-heading"><div><p className="eyebrow">Customer Review — operator QA</p><h2>Exact customer-safe preview</h2><p>This frame and the Sites JSON below use the same projection.</p></div><button className="customer-primary" type="button" onClick={() => void copyReviewText()}>Copy Review Text</button></div>
+      <div className="customer-qa-heading"><div><p className="eyebrow">Customer Review — operator QA</p><h2>Exact customer-safe preview</h2><p>This frame and the Sites JSON below use the same projection.</p></div><button className="customer-primary" type="button" onClick={() => void copyForOperator(qaText, 'Customer Review text', 'Review text copied')}>Copy Review Text</button></div>
       <div className="customer-qa-section"><h3>Business</h3><p><strong>{review.business.name}</strong><br />{review.business.category}<br />{[review.business.city, review.business.state].filter(Boolean).join(', ')}<br />{review.business.website}</p></div>
       <div className="customer-qa-section"><h3>What’s working</h3>{review.verifiedStrengths.length ? <ul>{review.verifiedStrengths.map((strength) => <li key={strength.title}><strong>{strength.title}</strong><span>{strength.summary}</span></li>)}</ul> : <p>No verified strengths are included yet.</p>}</div>
       <div className="customer-qa-section"><h3>Recommended improvements</h3>{review.confirmedIssues.length ? <ol className="customer-qa-findings">{review.confirmedIssues.map((issue) => <li key={issue.id}><h4>{issue.title}</h4><strong>Why it matters</strong><p>{issue.summary}</p><strong>Found Local will</strong><p>{issue.foundLocalAction}</p></li>)}</ol> : <p>No approved customer improvements.</p>}</div>

@@ -37,6 +37,7 @@
     "test:customer-finding-refinement": "node --import tsx scripts/test-customer-finding-refinement.ts",
     "test:operator-workflow-reconciliation": "node --import tsx scripts/test-operator-workflow-reconciliation.ts",
     "test:acceptance-blockers": "node --import tsx scripts/test-acceptance-blockers.ts",
+    "test:customer-review-clipboard": "node --import tsx scripts/test-customer-review-clipboard.ts",
     "prove:destination-brightdata": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/prove-destination-brightdata.ts",
     "test:destination-brightdata": "node --import tsx scripts/test-destination-brightdata.ts"
   },

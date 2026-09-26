@@ -217,6 +217,9 @@
 .customer-refinement-form textarea { min-height: 110px; }
 .customer-refinement-warning { padding: 10px 12px; border-left: 3px solid #9a6518; background: #fff8e8; }
 .customer-qa-frame { overflow: hidden; }
+.customer-manual-copy { display: grid; gap: 10px; padding: 18px 22px; border: 1px solid #d9b56d; border-radius: 12px; background: #fff8e8; color: #68450e; }
+.customer-manual-copy label { display: grid; gap: 7px; font-size: 13px; font-weight: 700; }
+.customer-manual-copy textarea { min-height: 220px; resize: vertical; padding: 12px; border: 1px solid #c6aa70; border-radius: 8px; background: #fff; color: #17212b; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.45; }
 .customer-qa-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px; border-bottom: 1px solid #dfe7e0; background: #f0f5f0; }
 .customer-qa-heading h2 { margin: 4px 0; }
 .customer-qa-heading p { margin: 0; color: var(--customer-muted); }
