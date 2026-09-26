@@ -119,7 +119,7 @@ for (const view of ['Business', 'Scan', 'Review', 'Package', 'Customer Review', 
   }
   if (view === 'Scan') assert(html.includes('Operational scan') && html.includes('Evidence health'))
   if (view === 'Review') assert(html.includes(fix.issue) && html.includes('Evidence summary') && html.includes('Business information to confirm') && html.includes('Continue to Package'))
-  if (view === 'Package') assert(html.includes('Package Preparation') && html.includes('Customer/platform ownership required') && html.includes('Continue to Customer Review'))
+  if (view === 'Package') assert(html.includes('Package Preparation') && html.includes('Customer / third-party action required') && html.includes('Continue to Customer Review'))
   if (view === 'Customer Review') assert(html.includes('Final quality gate') && html.includes('Customer Review — operator QA') && html.includes('Copy Review Text'))
   if (view === 'Verification') assert(html.includes('No implementation has been recorded yet.'))
 }

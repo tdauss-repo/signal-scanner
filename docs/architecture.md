@@ -76,11 +76,20 @@ Review → Verification`:
    approve/dismiss/reopen decisions. Raw evidence remains immutable and
    detailed provider data is a Workbench drill-down.
 4. **Package** derives scope only from explicitly approved effective customer
-   findings.
+   findings. Its existing defaults remain available until the operator assigns
+   an approved finding to Starter, separate scope, customer/third-party action,
+   or no proposed scope and optionally refines the customer-safe delivery and
+   line-item wording. Overrides are bound to the finding evidence identity;
+   stale overrides cannot enter active package scope. Internal scope notes stay
+   inside the operator workspace.
 5. **Customer Review** is the final operator quality gate. Its human-readable
    QA frame, copyable review text, and sanitized version 1.0 JSON are all built
    from the same customer-safe projection of reviewed identity, area-specific
-   status, approved effective findings, and approved-only package scope.
+   status, approved effective findings, and approved-only effective package
+   scope. The version 1.0 contract keeps Starter line items in
+   `recommendedPackage.included`; separate assignments use each approved
+   issue's existing customer-safe package label and delivery-action fields, so
+   separate work is not misrepresented as Starter scope.
 6. **Verification** records completed outcomes only after execution and a
    follow-up check.
 

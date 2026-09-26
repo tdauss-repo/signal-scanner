@@ -70,6 +70,7 @@ import { workspaceStorageFailureMessage, writeStorageJson, writeStorageText } fr
 import { summarizeAIVisibilityEvidence } from './utils/aiPresence'
 import { projectPublicObservationToProfiles, summarizePublicPresence } from './utils/publicPresence'
 import { entityAction, normalizeSalesReadiness, questionAction, sortSalesActions } from './utils/salesReadiness'
+import { buildPackageScopeOverride, type PackageScopeInput } from './utils/packagePreparation'
 
 const storageKey = 'local-signal-scanner-state'
 const activeViewStorageKey = 'business-scanner-active-view'
@@ -693,6 +694,18 @@ function App() {
       delete reviews[fix.id]
       delete dismissals[fix.id]
       return { ...current, customerFindingRefinements: refinements, customerFindingReviews: reviews, customerFindingDismissals: dismissals, lastUpdated: new Date().toISOString() }
+    })
+  }
+
+  const savePackageScope = (fix: FixItem, input: PackageScopeInput) => {
+    setAuditState((current) => {
+      const override = buildPackageScopeOverride(current, fix, input)
+      if (!override) return current
+      return {
+        ...current,
+        packageScopeOverrides: { ...current.packageScopeOverrides, [fix.id]: override },
+        lastUpdated: new Date().toISOString(),
+      }
     })
   }
 
@@ -1575,7 +1588,7 @@ function App() {
             </div>
           </section>
 
-          <PackagePreparationPanel state={auditState} fixes={salesFixes} />
+          <PackagePreparationPanel state={auditState} fixes={salesFixes} onSaveScope={savePackageScope} />
         </div>
       )
     }
@@ -2031,6 +2044,7 @@ function App() {
       onWorkbench={() => setWorkbenchOpen(true)}
       onReview={reviewCustomerFinding}
       onSaveRefinement={saveCustomerFindingRefinement}
+      onSavePackageScope={savePackageScope}
       currentScanId={currentScanId}
       dirty={hasUnsavedChanges}
       scans={savedScans}

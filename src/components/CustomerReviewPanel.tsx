@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import type { AuditItem, AuditState, FixItem } from '../types/audit'
-import { customerReviewReadiness, hasStaleCustomerFindingRefinement, summarizeCustomerScan } from '../utils/customerScan'
-import { buildCustomerVisibilityReviewExport, customerVisibilityReviewFilename, customerVisibilityReviewQaText, serializeCustomerVisibilityReview } from '../utils/customerVisibilityReviewExport'
-import { derivePackagePreparation } from '../utils/packagePreparation'
+import { customerReviewReadiness, hasStaleCustomerFindingRefinement, isPresentedFinding, summarizeCustomerScan } from '../utils/customerScan'
+import { buildCustomerVisibilityReviewExport, customerVisibilityReviewAdditionalWork, customerVisibilityReviewCustomerActions, customerVisibilityReviewFilename, customerVisibilityReviewQaText, serializeCustomerVisibilityReview } from '../utils/customerVisibilityReviewExport'
+import { derivePackagePreparation, hasStalePackageScopeOverride } from '../utils/packagePreparation'
 import { profileCompleteness, profileProjectionWarnings } from '../utils/profileCompleteness'
 import { copyText } from '../utils/copyText'
 
@@ -22,6 +22,7 @@ export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: 
   const review = buildCustomerVisibilityReviewExport(state, items, fixes)
   const preparation = derivePackagePreparation(state, fixes)
   const stale = fixes.filter((fix) => hasStaleCustomerFindingRefinement(state, fix))
+  const stalePackageScopes = fixes.filter((fix) => isPresentedFinding(state, fix) && hasStalePackageScopeOverride(state, fix))
   const blockingProfile = completeness.missing.filter((item) => ['name', 'category', 'website', 'market'].includes(item.id))
   const wordingWarnings = review.confirmedIssues.filter((issue) => !issue.title.trim() || !issue.summary.trim() || !issue.foundLocalAction.trim())
     .map((issue) => `${issue.id} is missing customer-safe wording.`)
@@ -32,6 +33,7 @@ export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: 
     ...profileProjectionWarnings(state),
     ...blockingProfile.map((item) => `${item.label} is missing.`),
     ...stale.map((fix) => `${fix.issue} has stale customer wording and must be reviewed again.`),
+    ...stalePackageScopes.map((fix) => `${fix.issue} has stale package scope and must be reconciled in Package Preparation.`),
     ...(readiness.scanIncomplete ? ['The active visibility scan has not reached a terminal state.'] : []),
     ...(readiness.awaitingDisposition ? [`${readiness.awaitingDisposition} primary finding${readiness.awaitingDisposition === 1 ? '' : 's'} still await operator disposition.`] : []),
     ...wordingWarnings,
@@ -40,6 +42,8 @@ export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: 
   const ready = readiness.state === 'ready' && warnings.length === 0
   const json = serializeCustomerVisibilityReview(review)
   const qaText = customerVisibilityReviewQaText(review, ready)
+  const additionalWork = customerVisibilityReviewAdditionalWork(review)
+  const customerActions = customerVisibilityReviewCustomerActions(review)
   const copyForOperator = async (content: string, label: string, successMessage: string) => {
     const result = await copyText(content)
     if (result.copied) {
@@ -71,9 +75,9 @@ export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: 
       <div className="customer-qa-heading"><div><p className="eyebrow">Customer Review — operator QA</p><h2>Exact customer-safe preview</h2><p>This frame and the Sites JSON below use the same projection.</p></div><button className="customer-primary" type="button" onClick={() => void copyForOperator(qaText, 'Customer Review text', 'Review text copied')}>Copy Review Text</button></div>
       <div className="customer-qa-section"><h3>Business</h3><p><strong>{review.business.name}</strong><br />{review.business.category}<br />{[review.business.city, review.business.state].filter(Boolean).join(', ')}<br />{review.business.website}</p></div>
       <div className="customer-qa-section"><h3>What’s working</h3>{review.verifiedStrengths.length ? <ul>{review.verifiedStrengths.map((strength) => <li key={strength.title}><strong>{strength.title}</strong><span>{strength.summary}</span></li>)}</ul> : <p>No verified strengths are included yet.</p>}</div>
-      <div className="customer-qa-section"><h3>Recommended improvements</h3>{review.confirmedIssues.length ? <ol className="customer-qa-findings">{review.confirmedIssues.map((issue) => <li key={issue.id}><h4>{issue.title}</h4><strong>Why it matters</strong><p>{issue.summary}</p><strong>Found Local will</strong><p>{issue.foundLocalAction}</p></li>)}</ol> : <p>No approved customer improvements.</p>}</div>
+      <div className="customer-qa-section"><h3>Recommended improvements</h3>{review.confirmedIssues.length ? <ol className="customer-qa-findings">{review.confirmedIssues.map((issue) => <li key={issue.id}><h4>{issue.title}</h4><span>{issue.label}</span><strong>Why it matters</strong><p>{issue.summary}</p><strong>Found Local will</strong><p>{issue.foundLocalAction}</p></li>)}</ol> : <p>No approved customer improvements.</p>}</div>
       <div className="customer-qa-section"><h3>Still being verified</h3>{review.needsReview.length ? <ul>{review.needsReview.map((item) => <li key={item}>{item}</li>)}</ul> : <p>Nothing currently listed.</p>}</div>
-      <div className="customer-qa-section"><h3>Recommended package</h3><p><strong>{review.recommendedPackage.name}</strong></p><p>{review.recommendedPackage.summary}</p><h4>Included</h4>{review.recommendedPackage.included.length ? <ul>{review.recommendedPackage.included.map((item) => <li key={item}>{item}</li>)}</ul> : <p>No approved package scope.</p>}</div>
+      <div className="customer-qa-section"><h3>Recommended package</h3><p><strong>{review.recommendedPackage.name}</strong></p><p>{review.recommendedPackage.summary}</p><h4>Included</h4>{review.recommendedPackage.included.length ? <ul>{review.recommendedPackage.included.map((item) => <li key={item}>{item}</li>)}</ul> : <p>No approved package scope.</p>}{additionalWork.length ? <><h4>Additional recommended work</h4><ul>{additionalWork.map((item) => <li key={item}>{item}</li>)}</ul></> : null}{customerActions.length ? <><h4>Customer / third-party action required</h4><ul>{customerActions.map((item) => <li key={item}>{item}</li>)}</ul></> : null}</div>
       <div className={`customer-qa-readiness customer-qa-readiness-${ready ? 'ready' : 'not-ready'}`}><strong>Readiness</strong><span>{ready ? 'READY FOR CUSTOMER PRESENTATION' : 'NOT READY FOR CUSTOMER PRESENTATION'}</span></div>
     </section>
     <section className="panel"><div className="panel-header"><p className="eyebrow">Area states</p><h2>Customer-safe coverage</h2></div><div className="operator-area-list">{review.scanAreas.map((area) => <div key={area.id}><span className={`scan-state scan-state-${area.state === 'good' ? 'good' : area.state === 'issue' ? 'issue' : 'review'}`}>{area.state === 'good' ? '✓' : area.state === 'issue' ? '!' : '•'}</span><span><strong>{area.name}</strong><small>{area.state} · {area.summary}</small></span></div>)}</div>{review.needsReview.length ? <p>Neutral Needs Review: {review.needsReview.join(', ')}</p> : null}</section>

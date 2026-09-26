@@ -68,7 +68,8 @@ const separateState = makeState()
 separateState.customerFindingReviews = { [separate.id]: customerReviewKey(separateState, separate) }
 const separatePreparation = derivePackagePreparation(separateState, [separate])
 assert.equal(separatePreparation.recommendedPackage, null, 'approved non-Starter work alone does not justify Starter')
-assert.equal(separatePreparation.separateScopeItems[0]?.packageAssignment, 'Customer/platform ownership required')
+assert.equal(separatePreparation.customerActionItems[0]?.packageAssignment, 'None')
+assert.equal(separatePreparation.customerActionItems[0]?.scopeClassification, 'customer_action')
 
 const jemState = makeState(normalizeWorkspaceProfile({ businessName: 'JEM Photography', primaryCategory: 'Photography studio', city: 'Detroit', state: 'MI', website: 'https://jem.example/' }))
 assert.equal(derivePackagePreparation(jemState, fixes).recommendedPackage, null, 'JEM zero-approved state remains neutral')

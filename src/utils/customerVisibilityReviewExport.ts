@@ -1,7 +1,6 @@
 import type { AuditItem, AuditState, FixItem } from '../types/audit'
 import { summarizeCustomerScan, type VisibilitySnapshotOverall } from './customerScan'
-import { effectivePackageFit } from './salesReadiness'
-import { derivePackagePreparation } from './packagePreparation'
+import { derivePackagePreparation, type PackagePreparationItem } from './packagePreparation'
 import { reviewedBusinessProfile } from './businessProfileState'
 
 export type CustomerVisibilityReviewAreaId = 'website' | 'search_maps' | 'business_information' | 'ai_discovery'
@@ -77,12 +76,18 @@ const issueArea = (fix: FixItem): CustomerVisibilityReviewAreaId => {
   return 'website'
 }
 
-const safeIssue = (fix: FixItem) => ({
+const packageLabel = (item: PackagePreparationItem) => item.staleOverride ? 'Package scope requires review'
+  : item.scopeClassification === 'starter' ? 'Starter Visibility Cleanup'
+  : item.scopeClassification === 'separate' ? item.packageAssignment
+    : item.scopeClassification === 'customer_action' ? 'Customer / third-party action required'
+      : 'Not included in proposed scope'
+
+const safeIssue = (fix: FixItem, item: PackagePreparationItem) => ({
   id: fix.id,
   title: fix.intelligence?.customer.title || fix.issue,
-  label: effectivePackageFit(fix) === 'starter' ? 'Starter Visibility Cleanup' : 'Reviewed visibility improvement',
+  label: packageLabel(item),
   summary: fix.intelligence?.customer.found || fix.whyItMatters || 'A reviewed visibility issue was confirmed and is ready to address.',
-  foundLocalAction: fix.intelligence?.customer.recommendation || fix.fix || 'Review and correct this confirmed issue with the agreed scope.',
+  foundLocalAction: item.remediationAction || fix.intelligence?.customer.recommendation || fix.fix || 'Review and correct this confirmed issue with the agreed scope.',
 })
 
 const areaTitle: Record<CustomerVisibilityReviewAreaId, string> = {
@@ -96,7 +101,8 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
   // candidate list remains useful in-product, but does not bypass approval here.
   const packagePreparation = derivePackagePreparation(state, fixes)
   const confirmedFixes = packagePreparation.approvedFindings
-  const confirmedIssues = confirmedFixes.map(safeIssue)
+  const packageItems = new Map(packagePreparation.items.map((item) => [item.findingId, item]))
+  const confirmedIssues = confirmedFixes.map((fix) => safeIssue(fix, packageItems.get(fix.id)!))
   const needsReview = [...new Set(summary.cockpit.deeperReview.map((entry) => entry.displayDestination))]
   const areaIssues = new Map<CustomerVisibilityReviewAreaId, number>()
   for (const fix of confirmedFixes) {
@@ -152,6 +158,13 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
 
 export const serializeCustomerVisibilityReview = (review: CustomerVisibilityReviewExport) => JSON.stringify(review, null, 2)
 
+export const customerVisibilityReviewAdditionalWork = (review: CustomerVisibilityReviewExport) => [...new Set(
+  review.confirmedIssues.filter((issue) => !['Starter Visibility Cleanup', 'Customer / third-party action required', 'Not included in proposed scope', 'Package scope requires review'].includes(issue.label)).map((issue) => issue.label),
+)]
+
+export const customerVisibilityReviewCustomerActions = (review: CustomerVisibilityReviewExport) =>
+  review.confirmedIssues.filter((issue) => issue.label === 'Customer / third-party action required').map((issue) => issue.title)
+
 /**
  * Human-readable operator QA derived only from the same customer-safe
  * projection serialized for Sites. It intentionally adds no scanner evidence
@@ -161,6 +174,8 @@ export const customerVisibilityReviewQaText = (
   review: CustomerVisibilityReviewExport,
   ready: boolean,
 ) => {
+  const additionalWork = customerVisibilityReviewAdditionalWork(review)
+  const customerActions = customerVisibilityReviewCustomerActions(review)
   const lines = [
     'CUSTOMER REVIEW — OPERATOR QA',
     '',
@@ -194,6 +209,10 @@ export const customerVisibilityReviewQaText = (
     '',
     'Included:',
     ...(review.recommendedPackage.included.length ? review.recommendedPackage.included.map((item) => `- ${item}`) : ['- No approved package scope.']),
+    '',
+    'Additional recommended work:',
+    ...(additionalWork.length ? additionalWork.map((item) => `- ${item}`) : ['- None.']),
+    ...(customerActions.length ? ['', 'Customer / third-party action required:', ...customerActions.map((item) => `- ${item}`)] : []),
     '',
     'Readiness:',
     ready ? 'READY FOR CUSTOMER PRESENTATION' : 'NOT READY FOR CUSTOMER PRESENTATION',

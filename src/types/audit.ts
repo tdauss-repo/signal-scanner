@@ -141,6 +141,8 @@ export interface AuditState {
   customerFindingDismissals?: Record<string, string>
   /** Optional customer-facing wording, valid only for the evidence identity it was written against. */
   customerFindingRefinements?: Record<string, CustomerFindingRefinement>
+  /** Operator delivery-scope decisions, valid only for the approved finding identity they reference. */
+  packageScopeOverrides?: Record<string, PackageScopeOverride>
   /** Load-time identity conflicts retained after the compatibility profile is safely reconciled. */
   profileProjectionConflicts?: string[]
 }
@@ -151,6 +153,18 @@ export interface CustomerFindingRefinement {
   priority?: 'High' | 'Medium' | 'Low'
   summary?: string
   recommendedAction?: string
+}
+
+export type PackageScopeClassification = 'starter' | 'separate' | 'customer_action' | 'not_included'
+export type PackageAssignmentChoice = 'Starter Visibility Cleanup' | 'Custom / separate project' | 'None'
+
+export interface PackageScopeOverride {
+  evidenceKey: string
+  scopeClassification: PackageScopeClassification
+  packageAssignment: string
+  deliveryDescription: string
+  includedScope: string
+  internalNote?: string
 }
 
 export interface WebsiteAuditWorkspaceState {

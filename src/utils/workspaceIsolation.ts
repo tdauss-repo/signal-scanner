@@ -49,6 +49,7 @@ export const createIsolatedBusinessWorkspace = (
   customerFindingReviews: undefined,
   customerFindingDismissals: undefined,
   customerFindingRefinements: undefined,
+  packageScopeOverrides: undefined,
   profileProjectionConflicts: undefined,
   lastUpdated: recordedAt,
 })
