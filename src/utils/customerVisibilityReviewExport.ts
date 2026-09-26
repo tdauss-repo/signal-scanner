@@ -2,6 +2,7 @@ import type { AuditItem, AuditState, FixItem } from '../types/audit'
 import { summarizeCustomerScan, type VisibilitySnapshotOverall } from './customerScan'
 import { effectivePackageFit } from './salesReadiness'
 import { derivePackagePreparation } from './packagePreparation'
+import { reviewedBusinessProfile } from './businessProfileState'
 
 export type CustomerVisibilityReviewAreaId = 'website' | 'search_maps' | 'business_information' | 'ai_discovery'
 export type CustomerVisibilityReviewAreaState = 'good' | 'review' | 'issue'
@@ -64,14 +65,16 @@ const overallHeadline: Record<CustomerVisibilityReviewOverallState, string> = {
   not_fully_verified: 'Not fully verified yet',
 }
 
-const issueAreas = (fix: FixItem): CustomerVisibilityReviewAreaId[] => {
-  const text = `${fix.id} ${fix.area} ${fix.issue}`.toLowerCase()
-  const areas = new Set<CustomerVisibilityReviewAreaId>()
-  if (fix.sourceArea === 'website' || /website|https|meta|homepage|title|description/.test(text)) areas.add('website')
-  if (fix.sourceArea === 'public_presence' || fix.sourceArea === 'profile_management' || /listing|map|search|phone|address|duplicate/.test(text)) areas.add('search_maps')
-  if (fix.sourceArea === 'entity_clarity' || fix.sourceArea === 'customer_question' || /business identity|machine-readable|schema|structured data|category/.test(text)) areas.add('business_information')
-  if (fix.sourceArea === 'ai_geo_readiness' || /machine-readable|schema|structured data|search & ai|ai discovery/.test(text)) areas.add('ai_discovery')
-  return areas.size ? [...areas] : ['website']
+const issueArea = (fix: FixItem): CustomerVisibilityReviewAreaId => {
+  if (fix.sourceArea === 'public_presence' || fix.sourceArea === 'profile_management') return 'search_maps'
+  if (fix.sourceArea === 'entity_clarity' || fix.sourceArea === 'customer_question') return 'business_information'
+  if (fix.sourceArea === 'ai_geo_readiness') return 'ai_discovery'
+  if (fix.sourceArea === 'website') return 'website'
+  const area = fix.area.toLowerCase()
+  if (/listing|map|public presence|search/.test(area)) return 'search_maps'
+  if (/entity|business information|profile/.test(area)) return 'business_information'
+  if (/ai|machine/.test(area)) return 'ai_discovery'
+  return 'website'
 }
 
 const safeIssue = (fix: FixItem) => ({
@@ -82,7 +85,9 @@ const safeIssue = (fix: FixItem) => ({
   foundLocalAction: fix.intelligence?.customer.recommendation || fix.fix || 'Review and correct this confirmed issue with the agreed scope.',
 })
 
-const reviewArea = (snapshotStatus: string | undefined) => ['Not fully verified', 'Not yet scanned'].includes(snapshotStatus || '')
+const areaTitle: Record<CustomerVisibilityReviewAreaId, string> = {
+  website: 'Website & Technical', search_maps: 'Search & Maps', business_information: 'Business Information', ai_discovery: 'AI Discovery',
+}
 
 /** Builds a presentation-only export from reviewed, explicitly approved findings. */
 export function buildCustomerVisibilityReviewExport(state: AuditState, items: AuditItem[], fixes: FixItem[]): CustomerVisibilityReviewExport {
@@ -94,11 +99,15 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
   const confirmedIssues = confirmedFixes.map(safeIssue)
   const needsReview = [...new Set(summary.cockpit.deeperReview.map((entry) => entry.displayDestination))]
   const areaIssues = new Map<CustomerVisibilityReviewAreaId, number>()
-  for (const fix of confirmedFixes) for (const area of issueAreas(fix)) areaIssues.set(area, (areaIssues.get(area) || 0) + 1)
-  const scanAreas = areaDefinitions.map((definition, index) => {
+  for (const fix of confirmedFixes) {
+    const area = issueArea(fix)
+    areaIssues.set(area, (areaIssues.get(area) || 0) + 1)
+  }
+  const scanAreas = areaDefinitions.map((definition) => {
     const hasIssue = Boolean(areaIssues.get(definition.id))
-    const area = summary.areas[index]
-    const state: CustomerVisibilityReviewAreaState = hasIssue ? 'issue' : reviewArea(area?.snapshotStatus) || definition.id === 'search_maps' && needsReview.length ? 'review' : 'good'
+    const area = summary.areas.find((entry) => entry.title === areaTitle[definition.id])
+    const state: CustomerVisibilityReviewAreaState = hasIssue ? 'issue'
+      : area?.snapshotStatus === 'Looking good' && !(definition.id === 'search_maps' && needsReview.length) ? 'good' : 'review'
     const areaSummary = state === 'issue' ? 'We found confirmed improvements worth addressing.'
       : state === 'review' ? 'A few details still need review before recommending changes.'
         : 'This area has verified strengths and no confirmed issues to address.'
@@ -111,15 +120,16 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
   }
   const included = packagePreparation.starterItems.map((item) => item.includedScope)
   const hasStarterPackage = packagePreparation.recommendedPackage !== null
-  const category = state.profile.primaryCategory || state.profile.secondaryCategories || 'Local business'
-  const place = [state.profile.city || state.profile.localMarket, state.profile.state].filter(Boolean).join(', ')
+  const profile = reviewedBusinessProfile(state.profile, state.businessProfile)
+  const category = profile.primaryCategory || profile.secondaryCategories || 'Local business'
+  const place = [profile.city || profile.localMarket, profile.state].filter(Boolean).join(', ')
   return {
     reviewVersion: '1.0',
     business: {
-      name: state.profile.businessName || 'Business visibility review', category,
-      city: state.profile.city || state.profile.localMarket || '', state: state.profile.state || '',
-      website: state.profile.website || '', displayWebsite: displayWebsite(state.profile.website || ''),
-      websitePreview: { headline: state.profile.businessName || 'Business visibility review', subheadline: place ? `${category} in ${place}` : category },
+      name: profile.businessName || 'Business visibility review', category,
+      city: profile.city || profile.localMarket || '', state: profile.state || '',
+      website: profile.website || '', displayWebsite: displayWebsite(profile.website || ''),
+      websitePreview: { headline: profile.businessName || 'Business visibility review', subheadline: place ? `${category} in ${place}` : category },
     },
     overall: { state: overallState(summary.snapshot.overall), headline: overallHeadline[overallState(summary.snapshot.overall)], summary: summary.snapshot.detail },
     scanAreas,

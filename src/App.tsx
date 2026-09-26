@@ -14,9 +14,7 @@ import {
 } from './components/DirectoryAuditPanel'
 import { PackagePreparationPanel } from './components/PackagePreparationPanel'
 import { BusinessProfilePanel } from './components/BusinessProfilePanel'
-import { IntakeForm } from './components/IntakeForm'
 import { ReportView } from './components/ReportView'
-import { SavedScansPanel } from './components/SavedScansPanel'
 import { ScoreCard } from './components/ScoreCard'
 import { SearchVisibilityPanel } from './components/SearchVisibilityPanel'
 import { VoiceReadinessPanel } from './components/VoiceReadinessPanel'
@@ -25,7 +23,8 @@ import { CustomerScanView } from './components/CustomerScanView'
 import { CustomerFindingReview } from './components/CustomerFindingReview'
 import { buildCustomerFindingRefinement, canReviewFinding, customerReviewKey, isPresentedFinding } from './utils/customerScan'
 import type { CustomerFindingWording, CustomerView } from './utils/customerScan'
-import { blankProfile, normalizeWorkspaceProfile } from './utils/workspaceProfile'
+import { normalizeWorkspaceProfile } from './utils/workspaceProfile'
+import { createIsolatedBusinessWorkspace } from './utils/workspaceIsolation'
 import { buildAuditItems } from './data/auditCatalog'
 import { applyCurrentCatalogMetadata, migrateSystemGeneratedFix } from './utils/catalogMetadata'
 import { defaultProfile } from './data/demoProfile'
@@ -63,6 +62,7 @@ import { buildVoiceReadinessCategories, buildVoiceSourceReadinessGroups } from '
 import {
   normalizeBusinessProfileState,
   recordOperatorProfileChanges,
+  reviewedBusinessProfile,
 } from './utils/businessProfileState'
 import { aggregateReviewedSearchObservations } from './utils/searchAggregation'
 import { summarizeAIVisibilityEvidence } from './utils/aiPresence'
@@ -170,7 +170,7 @@ type ActiveView =
 
 const views: ScoreView[] = ['Overall', ...numericOverallScoreAreas]
 
-const navViews: ActiveView[] = [...views, 'Public Presence', 'Profile Management', 'AI Visibility', 'Sales Readiness', 'Reports', 'Business Profile', 'Settings']
+const navViews: ActiveView[] = [...views, 'Public Presence', 'Profile Management', 'AI Visibility', 'Sales Readiness', 'Reports', 'Settings']
 const visibleViewLabel = (view: ActiveView) => view
 
 const navIconPaths: Record<ActiveView, React.ReactNode> = {
@@ -337,35 +337,7 @@ const initialState: AuditState = {
   lastUpdated: new Date().toISOString(),
 }
 
-const createBlankAuditState = (): AuditState => ({
-  ...initialState,
-  profile: blankProfile,
-  businessProfile: normalizeBusinessProfileState(
-    blankProfile,
-    undefined,
-    new Date().toISOString(),
-  ),
-  checks: {},
-  notes: {},
-  evidenceConfidence: {},
-  selectedAIPlatform: 'Gemini',
-  aiAnswerTests: buildDefaultAIAnswerTests(),
-  searchVisibilityTests: {},
-  searchDestinationObservations: {},
-  voicePromptTests: {},
-  voiceAssistantObservations: [],
-  directories: { activeRows: [], ignoredSuggestionIds: [] },
-  manualFixes: [],
-  salesReadiness: normalizeSalesReadiness(undefined, blankProfile),
-  reportSummary: '',
-  websiteAudit: {
-    lastSuccessful: null,
-    latestAttempt: null,
-    manualObservation: defaultManualWebsiteObservation(),
-    browserObservation: null,
-  },
-  lastUpdated: new Date().toISOString(),
-})
+const createBlankAuditState = (): AuditState => createIsolatedBusinessWorkspace(initialState)
 
 const legacyAIObservation = (
   platform: AIAnswerPlatform,
@@ -419,17 +391,19 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
           }
         : defaultTests)
 
-    const profile = normalizeWorkspaceProfile(parsed.profile ?? defaultProfile)
+    const compatibilityProfile = normalizeWorkspaceProfile(parsed.profile ?? defaultProfile)
+    const businessProfile = normalizeBusinessProfileState(
+      compatibilityProfile,
+      parsed.businessProfile,
+      parsed.lastUpdated ?? new Date().toISOString(),
+    )
+    const profile = reviewedBusinessProfile(compatibilityProfile, businessProfile)
 
     return {
       ...initialState,
       ...parsed,
       profile,
-      businessProfile: normalizeBusinessProfileState(
-        profile,
-        parsed.businessProfile,
-        parsed.lastUpdated ?? new Date().toISOString(),
-      ),
+      businessProfile,
       selectedAIPlatform: parsed.selectedAIPlatform ?? 'Gemini',
       searchVisibilityTests: Object.fromEntries(
         Object.entries(parsed.searchVisibilityTests ?? {}).map(([id, test]) => [
@@ -599,7 +573,7 @@ const parseImportedScanFile = (text: string): SavedScanRecord | null => {
 function App() {
   // Always open the internal operator overview, regardless of the persisted Workbench tab.
   const [workbenchOpen, setWorkbenchOpen] = useState(false)
-  const [customerView, setCustomerView] = useState<CustomerView>('Scan')
+  const [customerView, setCustomerView] = useState<CustomerView>('Business')
   const websiteRequestGeneration = useRef(0)
   const [auditState, setAuditState] = useState<AuditState>(loadState)
   const [websiteAuditLoading, setWebsiteAuditLoading] = useState(false)
@@ -1173,7 +1147,7 @@ function App() {
     setBrowserEvidenceJson('')
     setBrowserEvidenceImportError('')
     setCurrentScanId(scan.id)
-    setCustomerView('Scan')
+    setCustomerView('Business')
     setAuditState(normalizeAuditState(scan.payload))
     setWebsiteAuditError('')
   }
@@ -1254,10 +1228,10 @@ function App() {
     setBrowserEvidenceJson('')
     setBrowserEvidenceImportError('')
     setCurrentScanId('')
-    setCustomerView('Scan')
+    setCustomerView('Business')
     setAuditState(createBlankAuditState())
     setWebsiteAuditError('')
-    setActiveView('Settings')
+    setActiveView('Overall')
   }
 
   const runAutoAudit = async () => {
@@ -1276,11 +1250,6 @@ function App() {
     } finally {
       if (requestGeneration === websiteRequestGeneration.current) setWebsiteAuditLoading(false)
     }
-  }
-
-  const researchBusiness = () => {
-    setActiveView('Website SEO')
-    void runAutoAudit()
   }
 
   const setManualWebsiteObservation = (
@@ -2020,30 +1989,12 @@ function App() {
               <p className="eyebrow">Settings</p>
               <h2>Workspace settings</h2>
               <p>
-                Save, reopen, export, and import complete scan workspaces
-                before testing another business.
+                Technical and runtime configuration belongs here. Business
+                workspaces, seed facts, and reviewed profiles now live in the
+                primary Business step.
               </p>
             </div>
           </section>
-          <SavedScansPanel
-            currentScanId={currentScanId}
-            dirty={hasUnsavedChanges}
-            scans={savedScans}
-            onSaveCurrent={saveCurrentScan}
-            onSaveAsNew={saveAsNewScan}
-            onLoad={loadSavedScan}
-            onDuplicate={duplicateSavedScan}
-            onRename={renameSavedScan}
-            onDelete={deleteSavedScan}
-            onExport={exportSavedScan}
-            onImport={importSavedScan}
-            onStartBlank={startBlankScan}
-          />
-          <IntakeForm
-            profile={auditState.profile}
-            onChange={updateProfileFromOperator}
-            onResearch={researchBusiness}
-          />
         </div>
       )
     }
@@ -2063,10 +2014,21 @@ function App() {
       scanError={Boolean(websiteAuditError)}
       onScan={() => void runAutoAudit()}
       onWorkbench={() => setWorkbenchOpen(true)}
-      onReviewFindings={() => {
-        setActiveView('Overall')
-        setWorkbenchOpen(true)
-      }}
+      onReview={reviewCustomerFinding}
+      onSaveRefinement={saveCustomerFindingRefinement}
+      currentScanId={currentScanId}
+      dirty={hasUnsavedChanges}
+      scans={savedScans}
+      onProfileChange={updateProfileFromOperator}
+      onSaveCurrent={saveCurrentScan}
+      onSaveAsNew={saveAsNewScan}
+      onLoad={loadSavedScan}
+      onDuplicate={duplicateSavedScan}
+      onRename={renameSavedScan}
+      onDelete={deleteSavedScan}
+      onExportFullScan={exportSavedScan}
+      onImportFullScan={importSavedScan}
+      onStartBlank={startBlankScan}
     />
   }
 
@@ -2089,11 +2051,11 @@ function App() {
         </div>
 
         <div className="sidebar-tools">
-          <button type="button" onClick={() => setWorkbenchOpen(false)}>Return to Operator Overview</button>
-          <button type="button" onClick={() => setActiveView('Overall')}>Review customer findings</button>
+          <button type="button" onClick={() => setWorkbenchOpen(false)}>Return to operator workflow</button>
+          <button type="button" onClick={() => { setCustomerView('Review'); setWorkbenchOpen(false) }}>Review customer findings</button>
         </div>
 
-        <nav className="sidebar-nav" aria-label="Primary navigation">
+        <nav className="sidebar-nav" aria-label="Workbench tools">
           {navViews.map((view) => (
             <button
               className={`sidebar-link ${activeView === view ? 'sidebar-link-active' : ''}`}

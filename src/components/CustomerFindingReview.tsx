@@ -27,7 +27,7 @@ function FindingCard({ state, fix, allowRefinement, onReview, onSaveRefinement }
   const [draft, setDraft] = useState<CustomerFindingWording>(() => effectiveCustomerFindingWording(state, fix))
   const approved = isPresentedFinding(state, fix)
   const dismissed = isDismissedCustomerFinding(state, fix)
-  const defaults = defaultCustomerFindingWording(fix)
+  const defaults = defaultCustomerFindingWording(fix, state)
   const effective = effectiveCustomerFindingWording(state, fix)
   const refinement = activeCustomerFindingRefinement(state, fix)
   const startEditing = () => {

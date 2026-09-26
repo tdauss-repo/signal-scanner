@@ -1,6 +1,8 @@
 import { scanStateLabel } from './visibilityScanState'
 import { evidenceFingerprint, matchesEvidenceFingerprint } from './evidenceFingerprint'
 import type { AuditState, FixItem } from '../types/audit'
+import { customerBusinessNoun } from './businessContext'
+import { reviewedBusinessProfile } from './businessProfileState'
 import type { MachineCheck, MachineReadabilityCapture, MachineReadabilityReport } from '../types/machineReadability'
 import type { BusinessResultCandidate } from '../types/entityMatch'
 import { matchBusinessCandidate, normalizedWords, reviewedProfileValue } from './entityMatcher'
@@ -164,12 +166,12 @@ export function summarizeMachineReadability(state: AuditState) {
     detail: `${evaluated} evaluated · ${evidence} with evidence · ${reviewRequired} need review · ${unavailable} unavailable` }
 }
 
-export const machineIdentityTitle = 'Incomplete machine-readable business identity'
-const identityWhy = 'Search engines and AI systems use structured and visible information to understand which real-world organization a website represents. Clearer business identity signals can reduce ambiguity when those systems interpret the site. Improvements do not guarantee rankings or AI citations, or eligibility for rich results.'
+export const machineIdentityTitle = 'Help search and AI understand the business'
+const identityWhy = 'Clear business name, location, contact, and website connections make it easier for customers and automated systems to understand which local organization the site represents. Improvements do not guarantee rankings or AI citations.'
 
 const findingCopy = {
-  missing_business_entity: [machineIdentityTitle, 'No explicit structured organization/business entity was observed that clearly identifies the real-world business and connects its confirmed location, contact information and related profiles.', 'Add an appropriate structured organization/business entity using confirmed business information. Choose an entity type appropriate to the actual organization rather than forcing a generic LocalBusiness type.'],
-  incomplete_business_identity: [machineIdentityTitle, 'The captured business description names the business but leaves out supported contact, location and website connections.', 'Complete the business description using confirmed public identity and contact information.'],
+  missing_business_entity: [machineIdentityTitle, 'The website does not clearly connect the confirmed business name, location, contact information, and website in the behind-the-scenes information used by search and AI systems.', 'Found Local will improve the website’s behind-the-scenes business information using only confirmed public facts.'],
+  incomplete_business_identity: [machineIdentityTitle, 'The website identifies the business but leaves out supported contact, location, or website connections used by search and AI systems.', 'Found Local will complete the website’s business identity information using confirmed public facts.'],
   business_profile_conflict: ['Business information differs between site and profile', 'Some captured business details differ from the reviewed profile.', 'Confirm the correct facts and propose corrections to the specific inconsistent source.'],
   location_not_represented: ['Location information is incomplete for machines', 'The captured page shows a confirmed physical location, but its structured business description does not connect that location to the business.', 'Connect the confirmed location to the existing business description.'],
 } as const
@@ -177,9 +179,11 @@ export function deriveMachineFindings(state: AuditState): FixItem[] {
   const report = currentMachineReadability(state)
   if (!report || report.status !== 'evidence_captured' || !report.acquisition) return []
   return report.conditions.map((condition) => {
-    const [title, baseFound, recommendation] = findingCopy[condition.id]
+    const [baseTitle, baseFound, recommendation] = findingCopy[condition.id]
+    const noun = customerBusinessNoun(reviewedBusinessProfile(state.profile, state.businessProfile))
+    const title = baseTitle === machineIdentityTitle ? `Help search and AI understand your ${noun}` : baseTitle
     const found = condition.id === 'missing_business_entity' && report.schemaTypes.some((type) => ['WebSite', 'WebPage'].includes(type))
-      ? `The website includes general page/website structured data, but no explicit structured organization/business entity was observed that clearly identifies the real-world business and connects its confirmed location, contact information and related profiles.` : baseFound
+      ? `The website includes general page information, but it does not clearly connect the confirmed ${noun} name, location, contact details, and website for search and AI systems.` : baseFound
     const evidence = condition.evidence.join(' ')
     const verification = 'After approved implementation, refetch the homepage and parse JSON-LD. Verify the expected entity type and confirmed name/address/phone/URL fields against the approved proposal; do not invent unconfirmed fields. Verify that no contradictory structured identity was introduced. Rescan Machine Readability / AI Readiness and check for unrelated metadata or page regressions.'
     const change = `${recommendation} Use Organization or a more specific business type only when the reviewed profile supports it. Preserve valid existing page/site schema and entity identifiers; do not create a competing duplicate entity.`

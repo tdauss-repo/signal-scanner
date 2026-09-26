@@ -97,11 +97,12 @@ try {
   const reviewMarkup = review({ state, fixes: candidates, onReview() {} })
   assert.match(reviewMarkup, /Secure website connection/)
   assert.match(reviewMarkup, /Homepage search description/)
-  for (const view of ['Findings', 'Action Plan']) {
-    const props = { state, items: [], fixes: candidates, view, loading: false, scanError: false, onView() {}, onScan() {}, onWorkbench() {} }
-    assert.match(render(props), /Secure website connection/)
-    assert(!render({ ...props, state: { ...state, customerFindingReviews: {} } }).includes('Secure website connection'))
-  }
+  const reviewProps = { state, items: [], fixes: candidates, view: 'Review', loading: false, scanError: false, onView() {}, onScan() {}, onWorkbench() {} }
+  assert.match(render(reviewProps), /Secure website connection/)
+  assert.match(render({ ...reviewProps, state: { ...state, customerFindingReviews: {} } }), /Secure website connection/, 'Review shows candidates before disposition')
+  const packageProps = { ...reviewProps, view: 'Package' }
+  assert.match(render(packageProps), /Secure website connection/)
+  assert(!render({ ...packageProps, state: { ...state, customerFindingReviews: {} } }).includes('Secure website connection'), 'Package remains approved-only')
 
   failureCode = 'ECONNREFUSED'
   const refused = await scan()

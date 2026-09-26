@@ -66,9 +66,10 @@ try {
   const html = render({ state, items: [], fixes: [], view: 'Scan', loading: false, scanError: false, onScan() {}, onWorkbench() {}, onView() {} }) as string
   assert(html.includes('Business Scanner Tool'))
   assert(html.includes('Internal Found Local operator workflow'))
-  assert(html.includes('Customer Review Readiness') && html.includes('Not ready'))
-  assert(html.includes('Candidate findings') && html.includes('Approved findings') && html.includes('Dismissed findings') && html.includes('Awaiting review') && html.includes('Needs review'))
-  assert(html.includes('Review Findings'))
+  assert(html.includes('Operational scan') && html.includes('Evidence health'))
+  for (const step of ['Business', 'Scan', 'Review', 'Package', 'Customer Review', 'Verification']) assert(html.includes(`>${step}<`))
+  assert(html.includes('Continue to Review'))
+  assert(!html.includes('Copy Customer Review JSON'), 'Export belongs to the final Customer Review step')
   assert(!html.includes('Recommended Fix Package') && !html.includes('What&#x27;s already working'))
   assert(!html.includes('0–100') && !html.includes('SEO score'))
 } finally { unlinkSync(renderPath); stop() }

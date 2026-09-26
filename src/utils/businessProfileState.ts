@@ -4,6 +4,7 @@ import type {
   BusinessProfileState,
   BusinessProfileValue,
 } from '../types/audit'
+import { blankProfile, normalizeWorkspaceProfile } from './workspaceProfile'
 
 export const businessProfileFields: BusinessProfileField[] = [
   'businessName',
@@ -114,4 +115,29 @@ export const preserveOwnerConfirmedValues = (
     }
   })
   return { schemaVersion: 1, values }
+}
+
+const authoritativeStatuses = new Set(['operator_reviewed', 'owner_confirmed'])
+
+/**
+ * Projects the current reviewed identity without letting stale compatibility
+ * fields from a different business override reviewed facts. If the reviewed
+ * business name conflicts with the flat profile, unreviewed flat fields are
+ * discarded rather than carried across workspaces.
+ */
+export const reviewedBusinessProfile = (
+  profile: BusinessProfile,
+  state: BusinessProfileState,
+): BusinessProfile => {
+  const normalized = normalizeWorkspaceProfile(profile)
+  const reviewedName = state.values.businessName
+  const identityConflict = reviewedName && authoritativeStatuses.has(reviewedName.status) &&
+    String(reviewedName.value).trim() !== normalized.businessName.trim()
+  const projected = { ...(identityConflict ? blankProfile : normalized) }
+  businessProfileFields.forEach((field) => {
+    const fact = state.values[field]
+    if (!fact || !authoritativeStatuses.has(fact.status)) return
+    ;(projected[field] as unknown) = structuredClone(fact.value) as never
+  })
+  return normalizeWorkspaceProfile(projected)
 }

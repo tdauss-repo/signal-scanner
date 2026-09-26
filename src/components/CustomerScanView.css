@@ -159,6 +159,24 @@
 .customer-skip:focus { top: 0; }
 .customer-review-row { padding: 18px 0; border-top: 1px solid #ddd; }
 .customer-review-row p { white-space: pre-line; overflow-wrap: anywhere; }
+.operator-primary-nav { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.business-workspace-grid, .customer-review-handoff { display: grid; gap: 22px; }
+.business-workspace-summary { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.business-workspace-summary h2 { margin: 5px 0 12px; }
+.business-workspace-summary p { margin: 4px 0; }
+.business-workspace-actions { display: grid; min-width: 210px; gap: 10px; }
+.profile-status { display: inline-flex; justify-content: center; padding: 7px 10px; border-radius: 999px; font-weight: 750; }
+.profile-status-ready { color: #17653c; background: #e5f5eb; }
+.profile-status-review { color: #7a5315; background: #fff4d8; }
+.profile-completeness-list { display: grid; gap: 9px; }
+.profile-completeness-list > div { display: grid; grid-template-columns: 120px minmax(180px, .7fr) 1fr; gap: 12px; align-items: baseline; padding: 9px 0; border-top: 1px solid #e1e8e2; }
+.profile-fact-state { font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.profile-fact-reviewed { color: #17653c; }
+.profile-fact-needs_review { color: #7a5315; }
+.profile-fact-missing { color: #9a2f25; }
+.customer-review-warnings { margin: 18px 0; padding: 14px 18px; border-left: 4px solid #9a2f25; background: #fff2ef; }
+.customer-handoff-identity p { margin: 5px 0; }
+.review-evidence-summary { margin-bottom: 22px; }
 .customer-finding-source, .customer-finding-refinement { margin: 14px 0; padding: 18px; border: 1px solid #d9e2db; border-radius: 12px; background: #f8faf8; }
 .customer-finding-refinement { border-color: color-mix(in srgb, var(--customer-accent) 35%, #d9e2db); background: color-mix(in srgb, var(--customer-accent) 5%, #fff); }
 .customer-refinement-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
@@ -178,6 +196,10 @@
   .customer-readiness { grid-template-columns: 1fr; }.customer-readiness dl { grid-template-columns: repeat(4, 1fr); }
 }
 @media (max-width: 640px) {
+  .operator-primary-nav { grid-template-columns: repeat(2, 1fr); }
+  .business-workspace-summary { flex-direction: column; }
+  .business-workspace-actions { width: 100%; }
+  .profile-completeness-list > div { grid-template-columns: 1fr; }
   .customer-header, .customer-workspace, .customer-nav, .customer-content, .customer-footer { padding-left: 20px; padding-right: 20px; }
   .customer-header { align-items: flex-start; gap: 12px; }
   .customer-brand p { max-width: 170px; font-size: 10px; }

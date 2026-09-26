@@ -19,6 +19,15 @@ const splitCsv = (value: string) =>
     .map((item) => item.trim())
     .filter(Boolean)
 
+const localContextTerms = (profile: BusinessProfile) => [...new Set([
+  ...splitCsv(profile.serviceArea),
+  ...splitCsv(profile.localMarket),
+  profile.city.trim(),
+  profile.targetLocation.trim(),
+].filter((value) => value && !/^[A-Z]{2}$/i.test(value)))]
+
+const serviceProgramLinkPattern = /(?:^|[^a-z])(services?|programs?|classes|offerings|menu)(?:[^a-z]|$)/i
+
 const isWebsiteAuditResult = (value: unknown): value is WebsiteAuditResult => {
   if (!value || typeof value !== 'object') return false
   const record = value as Record<string, unknown>
@@ -110,7 +119,7 @@ const homepageClarityStatus = (
   const title = result.title.toLowerCase()
   const meta = result.metaDescription.toLowerCase()
   const services = splitCsv(profile.primaryServices)
-  const areas = splitCsv(profile.serviceArea)
+  const areas = localContextTerms(profile)
   const hasServiceInTitleOrMeta = services.some(
     (service) =>
       title.includes(service.toLowerCase()) ||
@@ -154,7 +163,7 @@ export const mapAutoAuditToWebsiteChecks = (
   profile: BusinessProfile,
 ): AutoAuditMapping => {
   const serviceCount = splitCsv(profile.primaryServices).length
-  const areaCount = splitCsv(profile.serviceArea).length
+  const areaCount = localContextTerms(profile).length
   const serviceMatches = result.servicePhraseMatches.length
   const areaMatches = result.serviceAreaPhraseMatches.length
   const hasMeta = result.metaDescription.length >= 70
@@ -173,13 +182,19 @@ export const mapAutoAuditToWebsiteChecks = (
         : 'fail',
     'website-homepage-clarity': homepageClarityStatus(result, profile),
     'website-service-pages':
-      serviceMatches >= Math.min(3, serviceCount)
+      result.serviceLinks.length > 0
         ? 'pass'
-        : serviceMatches > 0
+        : serviceCount === 0
+          ? 'unknown'
+          : serviceMatches >= Math.min(3, serviceCount)
+            ? 'pass'
+            : serviceMatches > 0
           ? 'partial'
           : 'fail',
     'website-local-content':
-      areaMatches >= Math.min(2, areaCount)
+      areaCount === 0
+        ? 'unknown'
+        : areaMatches >= Math.min(2, areaCount)
         ? 'pass'
         : areaMatches > 0
           ? 'partial'
@@ -235,10 +250,10 @@ export const mapAutoAuditToWebsiteChecks = (
       note('H1 headings found (supporting evidence only)', result.h1Text),
       note('H2 headings found (supporting evidence only)', result.h2Text.slice(0, 8)),
     ].join('\n'),
-    'website-service-pages': note(
-      'Service phrases found on homepage',
-      result.servicePhraseMatches,
-    ),
+    'website-service-pages': [
+      note('Service/program phrases found on homepage', result.servicePhraseMatches),
+      note('Prominent service/program links found', result.serviceLinks),
+    ].join('\n'),
     'website-local-content': note(
       'Service-area phrases found on homepage',
       result.serviceAreaPhraseMatches,
@@ -330,11 +345,7 @@ export const analyzeManualWebsiteObservation = (
     ...splitCsv(profile.industryTags),
     profile.primaryCategory,
   ].filter(Boolean)
-  const areas = [
-    ...splitCsv(profile.serviceArea),
-    profile.localMarket,
-    profile.targetLocation,
-  ].filter(Boolean)
+  const areas = localContextTerms(profile)
   const phoneNumbers = [
     profile.phone,
     ...validProfilePhoneNumbers(profile).map((record) => record.number),
@@ -387,7 +398,7 @@ export const analyzeManualWebsiteObservation = (
     Boolean(websiteDomain) && visibleCombined.includes(websiteDomain)
   const contactLinkFound = links.some(manualObservedLinkHasContactIntent)
   const serviceLinkMatches = links.filter((link) =>
-    services.some((service) => {
+    serviceProgramLinkPattern.test(link) || services.some((service) => {
       const normalizedService = service.toLowerCase().replace(/\s+/g, '-')
       return link.toLowerCase().includes(normalizedService)
     }),
@@ -444,13 +455,19 @@ export const analyzeManualWebsiteObservation = (
           ? 'partial'
           : 'fail',
     'website-service-pages':
-      serviceMatches.length >= Math.min(3, services.length)
+      serviceLinkMatches.length > 0
         ? 'pass'
-        : serviceMatches.length > 0 || serviceLinkMatches.length > 0
-          ? 'partial'
-          : 'fail',
+        : services.length === 0
+          ? 'unknown'
+          : serviceMatches.length >= Math.min(3, services.length)
+            ? 'pass'
+            : serviceMatches.length > 0
+              ? 'partial'
+              : 'fail',
     'website-local-content':
-      areaMatches.length >= Math.min(2, areas.length)
+      areas.length === 0
+        ? 'unknown'
+        : areaMatches.length >= Math.min(2, areas.length)
         ? 'pass'
         : areaMatches.length > 0
           ? 'partial'
@@ -600,11 +617,7 @@ export const analyzeBrowserWebsiteObservation = (
     ...splitCsv(profile.industryTags),
     profile.primaryCategory,
   ].filter(Boolean)
-  const areas = [
-    ...splitCsv(profile.serviceArea),
-    profile.localMarket,
-    profile.targetLocation,
-  ].filter(Boolean)
+  const areas = localContextTerms(profile)
   const phoneNumbers = [
     profile.phone,
     ...validProfilePhoneNumbers(profile).map((record) => record.number),
@@ -654,12 +667,12 @@ export const analyzeBrowserWebsiteObservation = (
   const websiteDomainFound =
     Boolean(websiteDomain) && visibleCombined.includes(websiteDomain)
   const contactLinkFound = observation.contactLinks.length > 0
-  const serviceLinkMatches = linkUrls.filter((link) =>
-    services.some((service) => {
+  const serviceLinkMatches = observation.links.filter((link) =>
+    serviceProgramLinkPattern.test(`${link.anchorText} ${link.url}`) || services.some((service) => {
       const normalizedService = service.toLowerCase().replace(/\s+/g, '-')
-      return link.toLowerCase().includes(normalizedService)
+      return link.url.toLowerCase().includes(normalizedService)
     }),
-  )
+  ).map((link) => link.url)
   const faqFound = observation.faqIndicators.length > 0
   const localSchemaFound =
     observation.detectedSchemaTypes.some((type) =>
@@ -708,13 +721,19 @@ export const analyzeBrowserWebsiteObservation = (
           ? 'partial'
           : 'fail',
     'website-service-pages':
-      serviceMatches.length >= Math.min(3, services.length)
+      serviceLinkMatches.length > 0
         ? 'pass'
-        : serviceMatches.length > 0 || serviceLinkMatches.length > 0
-          ? 'partial'
-          : 'fail',
+        : services.length === 0
+          ? 'unknown'
+          : serviceMatches.length >= Math.min(3, services.length)
+            ? 'pass'
+            : serviceMatches.length > 0
+              ? 'partial'
+              : 'fail',
     'website-local-content':
-      areaMatches.length >= Math.min(2, areas.length)
+      areas.length === 0
+        ? 'unknown'
+        : areaMatches.length >= Math.min(2, areas.length)
         ? 'pass'
         : areaMatches.length > 0
           ? 'partial'
@@ -826,7 +845,7 @@ export const runWebsiteAutoAudit = async (profile: BusinessProfile, options: { m
       phoneNumbers: validProfilePhoneNumbers(profile).map((record) => record.number),
       contactStructureNote: profile.contactStructureNote,
       services: splitCsv(profile.primaryServices),
-      serviceAreas: splitCsv(profile.serviceArea),
+      serviceAreas: localContextTerms(profile),
     }),
   })
 

@@ -99,18 +99,31 @@ const compiled = await build({
   banner: { js: `import { createRequire } from 'node:module'; const require = createRequire(${JSON.stringify(import.meta.url)});` },
 })
 const { render, renderApp } = await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString('base64')}`)
-const props = { state, items, fixes: [fix, owner, later], loading: false, scanError: false, onScan() {}, onWorkbench() {}, onView() {} }
-for (const view of ['Scan', 'Findings', 'Action Plan', 'Results']) {
+const props = {
+  state, items, fixes: [fix, owner, later], loading: false, scanError: false, onScan() {}, onWorkbench() {}, onView() {}, onReview() {}, onSaveRefinement() {},
+  currentScanId: '', dirty: true, scans: [], onProfileChange() {}, onSaveCurrent() {}, onSaveAsNew() {}, onLoad() {}, onDuplicate() {}, onRename() {}, onDelete() {}, onExportFullScan() {}, onImportFullScan() {}, onStartBlank() {},
+}
+for (const view of ['Business', 'Scan', 'Review', 'Package', 'Customer Review', 'Verification']) {
   const html = render({ ...props, view }) as string
   assert(html.includes('Montessori Center of Downriver'))
   assert(!html.includes('JEM Photography'))
   assert(!html.includes('419.410.4974'))
-  assert(html.includes('Open evidence Workbench'))
+  assert(html.includes('Detailed evidence &amp; tools'))
   assert(html.includes('aria-current="page"'))
-  if (view === 'Findings') assert(html.includes(fix.issue))
-  if (view === 'Action Plan') assert(html.includes('Package Preparation') && html.includes('Customer/platform ownership required'))
-  if (view === 'Results') assert(html.includes('Verified improvements will appear here'))
+  if (view === 'Business') assert(html.includes('Business Seed') && html.includes('Business Profile') && html.includes('Saved Scans'))
+  if (view === 'Scan') assert(html.includes('Operational scan') && html.includes('Evidence health'))
+  if (view === 'Review') assert(html.includes(fix.issue) && html.includes('Evidence summary'))
+  if (view === 'Package') assert(html.includes('Package Preparation') && html.includes('Customer/platform ownership required'))
+  if (view === 'Customer Review') assert(html.includes('Final quality gate') && html.includes('Exact customer findings preview'))
+  if (view === 'Verification') assert(html.includes('Verified improvements will appear here'))
 }
+const handoffProfile = normalizeWorkspaceProfile({ ...montessori, primaryCategory: 'Montessori school', streetAddress: '15575 Northline Road', zip: '48195', phone: '734-282-6465', primaryServices: 'Toddler Program, Preschool, Kindergarten' })
+const handoffState = makeState(handoffProfile)
+handoffState.customerFindingReviews = Object.fromEntries([fix, owner, later].map((finding) => [finding.id, customerReviewKey(handoffState, finding)]))
+const handoff = render({ ...props, state: handoffState, items: buildAuditItems(handoffProfile), view: 'Customer Review' }) as string
+assert(handoff.includes('Ready for customer presentation'))
+assert(handoff.includes('Copy Customer Review JSON') && handoff.includes('Export Customer Review JSON'))
+assert(handoff.includes('Montessori school') && !handoff.includes('Photography studio'))
 const jem = makeState(defaultProfile)
 const jemHtml = render({ ...props, state: jem, items: buildAuditItems(jem.profile), fixes: [], view: 'Scan' }) as string
 assert(jemHtml.includes('JEM Photography'))
@@ -135,7 +148,8 @@ assert(loadedMontessori.includes('Montessori Center of Downriver'))
 assert(!loadedMontessori.includes('JEM'))
 assert(!loadedMontessori.includes('419.'))
 assert(!loadedMontessori.includes('Sylvania'))
-assert(!loadedMontessori.includes('Business Seed'), 'Persisted internal tab must not open the Workbench on reload')
+assert(loadedMontessori.includes('Business Seed'), 'Business Seed belongs in the primary Business workspace')
+assert(!loadedMontessori.includes('Workbench · internal tools &amp; evidence'), 'Persisted internal tab must not open the Workbench on reload')
 assert(loadedMontessori.includes('Internal Found Local operator workflow'))
 storage.set('local-signal-scanner-state', JSON.stringify(jem))
 const loadedJem = renderApp() as string

@@ -162,19 +162,19 @@ try {
   assert.equal(failed.outcome, 'failed')
   assert.equal(failed.browserEvidence, undefined)
 
-  // Actual customer components: raw implementation details absent; no manufactured Results.
+  // Actual operator components: Review may expose drill-down details; Package stays customer-wording focused and Verification makes no manufactured result.
   const bundle = await build({ stdin: { contents: `import React from 'react'; import {renderToStaticMarkup} from 'react-dom/server'; import {CustomerScanView} from './src/components/CustomerScanView'; export const render = props => renderToStaticMarkup(React.createElement(CustomerScanView, props));`, resolveDir: process.cwd(), loader: 'tsx' },
     bundle: true, write: false, format: 'esm', platform: 'node', jsx: 'automatic', loader: { '.css': 'empty' }, define: { 'process.env.NODE_ENV': '"production"' },
     banner: { js: `import { createRequire } from 'node:module'; const require = createRequire(${JSON.stringify(import.meta.url)});` } })
   const { render } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`)
-  for (const view of ['Findings', 'Action Plan']) {
+  for (const view of ['Review', 'Package']) {
     const markup = render({ state, items: [], fixes: candidates, view, loading: false, scanError: false, onView() {}, onScan() {}, onWorkbench() {} })
     assert.match(markup, /Secure website connection/)
     assert.match(markup, /Homepage search description/)
-    assert(!markup.includes('Identify which theme, plugin or framework'))
+    if (view === 'Package') assert(!markup.includes('Identify which theme, plugin or framework'))
     assert(!markup.includes('JEM'))
   }
-  const emptyResults = render({ state, items: [], fixes: candidates, view: 'Results', onView() {}, onScan() {}, onWorkbench() {} })
+  const emptyResults = render({ state, items: [], fixes: candidates, view: 'Verification', onView() {}, onScan() {}, onWorkbench() {} })
   assert.match(emptyResults, /Verified improvements will appear here/)
   assert(!emptyResults.includes('Homepage search description'))
   console.info = originalInfo

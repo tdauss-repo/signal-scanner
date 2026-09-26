@@ -57,14 +57,32 @@ A future frontend structure could look like this:
 - src/types: shared TypeScript models
 
 ## Data Flow
-A typical workflow is:
-1. An operator establishes the reviewed Business Profile.
-2. The scanner discovers and captures bounded evidence.
-3. The operator reviews evidence, optionally refines customer-facing wording
-   without changing scanner evidence, and approves customer findings.
-4. Found Local packages approved work and exports customer-safe JSON.
-5. Found Local Sites renders the external Customer Visibility Review.
-6. Sold work is executed and verified before it is presented as a result.
+The primary operator workflow is `Business → Scan → Review → Package → Customer
+Review → Verification`:
+
+1. **Business** selects or creates an isolated workspace and keeps seed facts,
+   the reviewed Business Profile, profile completeness, and Full Scan JSON
+   operations together. Reviewed profile facts are the authoritative source for
+   customer projection; a new workspace clears prior evidence, decisions, and
+   customer wording.
+2. **Scan** runs bounded acquisition and shows operational progress and evidence
+   health. Acquisition failure remains neutral.
+3. **Review** combines the evidence summary, candidate findings, optional
+   customer-wording refinement, and explicit approve/dismiss/reopen decisions.
+   Raw evidence remains immutable and detailed provider data is a Workbench
+   drill-down.
+4. **Package** derives scope only from explicitly approved effective customer
+   findings.
+5. **Customer Review** is the final operator quality gate and previews the exact
+   reviewed business identity, area-specific status, findings, package, and
+   sanitized version 1.0 JSON handoff.
+6. **Verification** records completed outcomes only after execution and a
+   follow-up check.
+
+Found Local Sites then renders the external Customer Visibility Review. The
+Workbench remains available as a secondary internal evidence/configuration
+surface and Settings contains runtime configuration rather than ordinary
+business workflow.
 
 ## Design Principles
 - Keep the operator workflow efficient and evidence-preserving

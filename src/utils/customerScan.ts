@@ -6,9 +6,11 @@ import type { AuditItem, AuditState, CustomerFindingRefinement, FixItem } from '
 import { effectivePackageFit, isStarterEligible, sortSalesActions } from './salesReadiness'
 import { primarySearchDestinations } from './searchVisibility'
 import { salesCockpitVisibility } from './salesVisibilityProjection'
+import { customerBusinessNoun, localBusinessModel } from './businessContext'
+import { reviewedBusinessProfile } from './businessProfileState'
 
 export const findingLifecycle = ['Detected', 'Evidence captured', 'Reviewed', 'Action proposed', 'Approved', 'Implemented', 'Re-scanned', 'Verified'] as const
-export type CustomerView = 'Scan' | 'Findings' | 'Action Plan' | 'Results'
+export type CustomerView = 'Business' | 'Scan' | 'Review' | 'Package' | 'Customer Review' | 'Verification'
 export type CustomerAreaStatus = (typeof scanStateLabel)[ScanState] | 'Looking good' | 'Needs attention' | 'Opportunities identified' | 'Confirmation needed' | 'Scan in progress' | 'Not reviewed / Not checked'
 export type VisibilitySnapshotOverall = 'Looking strong' | 'Mostly visible' | 'Some improvements recommended' | 'Needs attention' | 'Not fully verified' | 'Not yet scanned' | 'Scan still being completed'
 export type VisibilitySnapshotCategory = 'Looking good' | 'Some improvements' | 'Needs attention' | 'Not fully verified' | 'Not yet scanned'
@@ -63,15 +65,40 @@ export interface CustomerFindingWording {
   recommendedAction: string
 }
 
-export const defaultCustomerFindingWording = (fix: FixItem): CustomerFindingWording => ({
-  title: fix.intelligence?.customer.title || fix.issue,
-  priority: fix.priority,
-  summary: fix.intelligence?.customer.found || fix.whyItMatters || 'A reviewed visibility issue was confirmed and is ready to address.',
-  recommendedAction: fix.intelligence?.customer.recommendation || fix.fix,
-})
+export const defaultCustomerFindingWording = (fix: FixItem, state?: AuditState): CustomerFindingWording => {
+  const profile = state ? reviewedBusinessProfile(state.profile, state.businessProfile) : undefined
+  const model = profile ? localBusinessModel(profile) : 'generic'
+  const noun = profile ? customerBusinessNoun(profile) : 'business'
+  if (fix.id === 'website-local-content') return {
+    title: model === 'service_area' ? 'Service-area clarity' : 'Homepage local identity clarity',
+    priority: fix.priority,
+    summary: fix.status === 'partial'
+      ? `The homepage includes some local context, but it could connect the ${noun} more clearly to its primary location or community.`
+      : `The homepage does not currently make the ${noun}'s primary location or market clear enough for nearby customers and search or AI systems.`,
+    recommendedAction: model === 'physical_location'
+      ? 'Found Local will clarify the physical location and community served and make the public address easier to verify.'
+      : model === 'service_area'
+        ? 'Found Local will clarify the cities and areas served using accurate, natural homepage language.'
+        : 'Found Local will clarify the business location or local market using accurate homepage language.',
+  }
+  if (fix.id === 'website-service-pages') return {
+    title: model === 'physical_location' ? 'Programs and offerings visibility' : 'Services visibility',
+    priority: fix.priority,
+    summary: fix.status === 'partial'
+      ? `The website shows some ${model === 'physical_location' ? 'program or offering' : 'service'} information, but the path from the homepage could be clearer.`
+      : `The homepage does not clearly show where customers can learn about the ${model === 'physical_location' ? 'programs or offerings' : 'services'} available. This does not prove that dedicated pages are missing.`,
+    recommendedAction: `Found Local will review the existing ${model === 'physical_location' ? 'program or offering' : 'service'} pages and strengthen homepage links or summary wording where needed.`,
+  }
+  return {
+    title: fix.intelligence?.customer.title || fix.issue,
+    priority: fix.priority,
+    summary: fix.intelligence?.customer.found || fix.whyItMatters || 'The website does not currently make this visibility detail clear enough for local customers.',
+    recommendedAction: fix.intelligence?.customer.recommendation || fix.fix,
+  }
+}
 
 export const effectiveCustomerFindingWording = (state: AuditState, fix: FixItem): CustomerFindingWording => {
-  const defaults = defaultCustomerFindingWording(fix)
+  const defaults = defaultCustomerFindingWording(fix, state)
   const refinement = activeCustomerFindingRefinement(state, fix)
   return refinement ? {
     title: refinement.title || defaults.title,
@@ -86,7 +113,7 @@ export const buildCustomerFindingRefinement = (
   fix: FixItem,
   wording: CustomerFindingWording,
 ): CustomerFindingRefinement | null => {
-  const defaults = defaultCustomerFindingWording(fix)
+  const defaults = defaultCustomerFindingWording(fix, state)
   const title = wording.title.trim()
   const summary = wording.summary.trim()
   const recommendedAction = wording.recommendedAction.trim()
@@ -100,8 +127,6 @@ export const buildCustomerFindingRefinement = (
 
 /** Returns a presentation copy. Raw evidence and the source FixItem remain unchanged. */
 export const effectiveCustomerFinding = (state: AuditState, fix: FixItem): FixItem => {
-  const refinement = activeCustomerFindingRefinement(state, fix)
-  if (!refinement) return fix
   const wording = effectiveCustomerFindingWording(state, fix)
   return {
     ...fix,

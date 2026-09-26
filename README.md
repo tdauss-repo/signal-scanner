@@ -1,6 +1,6 @@
 # Business Scanner Tool
 
-Business Scanner Tool v02 is Found Local's private/internal operator system for preparing local visibility work. Operators can enter a business profile, run available checks and guided scans, review evidence, approve customer findings, prepare a bounded package, and export a sanitized Customer Visibility Review JSON payload.
+Business Scanner Tool v02 is Found Local's private/internal operator system for preparing local visibility work. Its primary workflow is Business → Scan → Review → Package → Customer Review → Verification. Operators work in an isolated business workspace, run available checks, review evidence, approve customer findings, prepare a bounded package, and export a sanitized Customer Visibility Review JSON payload.
 
 The Business Scanner Tool is not the polished customer-presentation surface. The current handoff is: reviewed scanner state → customer-safe JSON → Found Local Sites → customer presentation and sales conversation.
 

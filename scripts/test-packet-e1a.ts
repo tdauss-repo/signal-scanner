@@ -14,7 +14,7 @@ import { defaultProfile } from '../src/data/demoProfile.ts'
 
 // Historical metadata + controlled transport and synthetic review. No live Mary assertions.
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/website-audit-montessori-2026-09-16.json', import.meta.url), 'utf8'))
-const profile = normalizeWorkspaceProfile({ businessName: fixture.request.businessName, website: 'http://montessoridownriver.com/', city: 'Southgate', state: 'MI' })
+const profile = normalizeWorkspaceProfile({ businessName: fixture.request.businessName, primaryCategory: 'Montessori school', website: 'http://montessoridownriver.com/', city: 'Southgate', state: 'MI' })
 const profileReview: BusinessProfileState = { schemaVersion: 1, values: Object.fromEntries(Object.entries(profile).map(([field, value]) => [field, { value, status: 'operator_reviewed', source: 'synthetic fixture review', confidence: 'high' }])) }
 const response = (body: string, url: string, status = 200) => {
   const result = new Response(body, { status })
@@ -33,7 +33,7 @@ try {
     if (options?.method === 'HEAD') return response('', url)
     return response(`<html><head><title>${fixture.response.title}</title>${fixture.descriptionElements.join('')}<script type="application/ld+json">${JSON.stringify(fixture.response.jsonLdSchemaBlocks)}</script></head><body><h1>${profile.businessName}</h1><p>Southgate, MI</p><a href="/contact">Contact and registration</a></body></html>`, profile.website)
   }
-  const result = await auditWebsite({ ...profile, phoneNumbers: [], services: [], serviceAreas: [], machineReadability: true })
+  const result = await auditWebsite({ ...profile, phoneNumbers: [], services: [], serviceAreas: [profile.city], machineReadability: true })
   assert(result.ok)
   const mapping = mapAutoAuditToWebsiteChecks(result, profile)
   state = { profile, businessProfile: profileReview, checks: mapping.statuses, notes: mapping.notes, evidenceConfidence: {}, lastUpdated: '', reportSummary: '',
@@ -46,14 +46,15 @@ const pristineState = structuredClone(state)
 const findings = workspaceFindings(state)
 const entity = findings.find((fix) => fix.intelligence?.condition === 'missing_business_entity')!
 assert(entity)
-assert.equal(entity.issue, 'Incomplete machine-readable business identity', '1: customer finding label')
+assert.equal(entity.issue, 'Help search and AI understand your school', '1: customer finding label')
 assert.equal(entity.intelligence!.customer.title, entity.issue)
-assert.match(entity.intelligence!.customer.found, /general page\/website structured data/)
-assert.match(entity.intelligence!.customer.found, /no explicit structured organization\/business entity/)
-assert.match(entity.fix, /rather than forcing a generic LocalBusiness/)
+assert.match(entity.intelligence!.customer.found, /general page information/)
+assert.match(entity.intelligence!.customer.found, /does not clearly connect the confirmed school name/)
+assert.match(entity.fix, /using only confirmed public facts/)
+assert.equal(/LocalBusiness|entity-appropriate/i.test(entity.fix), false, 'customer action stays plain-language')
 assert.equal(state.machineReadability!.entities.length, 0, '2: generic schema alone is not business identity')
 assert(state.machineReadability!.schemaTypes.includes('WebSite') && state.machineReadability!.schemaTypes.includes('WebPage'))
-assert.match(entity.intelligence!.customer.why, /reduce ambiguity/)
+assert.match(entity.intelligence!.customer.why, /understand which local organization the site represents/)
 assert.match(entity.intelligence!.customer.why, /do not guarantee rankings or AI citations/, '3: no outcome guarantee')
 for (const term of ['refetch', 'JSON-LD', 'entity type', 'name/address/phone/URL', 'contradictory structured identity', 'Machine Readability / AI Readiness']) assert(entity.verificationMethod!.includes(term))
 assert(entity.intelligence!.delivery.customerInput.length)
@@ -102,7 +103,7 @@ const initial = [...website, entity]
 assert(initial.every(canReviewFinding))
 assert.equal(summarizeCustomerScan(state, [], findings).findings.length, 0, 'No findings before explicit presentation approval')
 state.customerFindingReviews = Object.fromEntries(initial.map((fix) => [fix.id, customerReviewKey(state, fix)]))
-assert.deepEqual(new Set(summarizeCustomerScan(state, [], findings).findings.map((fix) => fix.issue)), new Set(['Secure website connection', 'Homepage search description', 'Incomplete machine-readable business identity']))
+assert.deepEqual(new Set(summarizeCustomerScan(state, [], findings).findings.map((fix) => fix.issue)), new Set(['Secure website connection', 'Homepage search description', 'Help search and AI understand your school']))
 assert.deepEqual(state.profile, pristineState.profile, 'No public fact replaces profile data')
 const other = { ...structuredClone(state), profile: normalizeWorkspaceProfile(defaultProfile), businessProfile: { schemaVersion: 1 as const, values: {} } }
 assert.equal(deriveMachineFindings(other).length, 0, '10: Mary evidence cannot create a JEM machine finding')
@@ -115,11 +116,12 @@ const renderPath = new URL('../.packet-e1a-render.mjs', import.meta.url)
 writeFileSync(renderPath, compiled.outputFiles[0].text)
 try {
   const { customer, review, card } = await import(renderPath.href)
-  const props = { state, items: [], fixes: findings, loading: false, scanError: false, onScan() {}, onWorkbench() {}, onView() {} }
-  const html = customer({ ...props, view: 'Findings' })
+  const props = { state, items: [], fixes: findings, loading: false, scanError: false, onScan() {}, onWorkbench() {}, onView() {}, onReview() {}, onSaveRefinement() {} }
+  const html = customer({ ...props, view: 'Review' })
   assert(html.includes(entity.issue))
-  for (const title of ['Homepage SEO clarity', 'Contact info visibility', 'Social profile links', 'Homepage title quality']) assert(!html.includes(title), 'Initial customer package contains only selected strong findings')
-  const results = customer({ ...props, view: 'Results' })
+  assert(!html.includes('Homepage SEO clarity'), 'Ineligible broad observation stays out of Review')
+  for (const title of ['Contact info visibility', 'Social profile links', 'Homepage title quality']) assert(html.includes(title), 'Supporting evidence remains visible for operator review without automatic approval')
+  const results = customer({ ...props, view: 'Verification' })
   assert(results.includes('Verified improvements will appear here'), '9: no results without implementation/verification')
   assert(!results.includes(entity.issue))
   const queue = review({ state: pristineState, fixes: findings, onReview() {} })

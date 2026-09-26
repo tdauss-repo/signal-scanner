@@ -18,6 +18,7 @@ import {
   voiceCategoryToAuditItem,
   voicePromptToAuditItem,
 } from '../utils/voiceReadiness'
+import { localBusinessModel } from '../utils/businessContext'
 
 const ownerUnverified =
   'Owner access unverified - confirm during onboarding. Public checks use generated links only.'
@@ -40,6 +41,7 @@ export const buildAuditItems = (
   profile: BusinessProfile,
   profileState?: BusinessProfileState,
 ): AuditItem[] => {
+  const businessModel = localBusinessModel(profile)
   const listingItems: AuditItem[] = [
     {
       id: 'listing-google',
@@ -182,22 +184,28 @@ export const buildAuditItems = (
     {
       id: 'website-service-pages',
       area: 'website',
-      label: 'Service pages/content indicators',
-      description: 'Authorized website scan. Look for homepage content and links indicating major services are covered.',
+      label: businessModel === 'physical_location' ? 'Programs and offerings visibility' : 'Service pages/content indicators',
+      description: 'Authorized website scan. Look for homepage content or prominent internal links showing where major services, programs, or offerings are explained.',
       weight: 14,
       access: 'public',
       evidenceLinks: websiteLinks,
-      fix: 'Create or strengthen dedicated service pages with examples, FAQs, internal links, and booking calls to action.',
+      fix: businessModel === 'physical_location'
+        ? 'Make existing program or offering pages easy to find from the homepage and clarify the primary programs without requiring full descriptions on the homepage.'
+        : 'Make existing service pages easy to find from the homepage; create missing service detail only when a separate review confirms that it is actually absent.',
     },
     {
       id: 'website-local-content',
       area: 'website',
-      label: 'Service-area copy',
-      description: 'Authorized website scan. Confirm local place names, service-area language, and local proof appear naturally.',
+      label: businessModel === 'service_area' ? 'Service-area clarity' : 'Local identity clarity',
+      description: 'Authorized website scan. Confirm the homepage communicates appropriate local context for this business model.',
       weight: 12,
       access: 'public',
       evidenceLinks: websiteLinks,
-      fix: 'Add natural service-area copy, local project examples, venue/location references, and customer proof.',
+      fix: businessModel === 'physical_location'
+        ? 'Clarify the physical location and community served using natural homepage language and a clearly visible address.'
+        : businessModel === 'service_area'
+          ? 'Clarify the cities or areas served using natural homepage language and relevant local proof.'
+          : 'Clarify the business location or market served using accurate, natural homepage language.',
     },
     {
       id: 'website-schema',
