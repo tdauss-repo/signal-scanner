@@ -141,6 +141,8 @@ export interface AuditState {
   customerFindingDismissals?: Record<string, string>
   /** Optional customer-facing wording, valid only for the evidence identity it was written against. */
   customerFindingRefinements?: Record<string, CustomerFindingRefinement>
+  /** Load-time identity conflicts retained after the compatibility profile is safely reconciled. */
+  profileProjectionConflicts?: string[]
 }
 
 export interface CustomerFindingRefinement {

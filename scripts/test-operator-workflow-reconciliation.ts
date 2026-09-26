@@ -17,7 +17,7 @@ import {
   summarizeCustomerScan,
 } from '../src/utils/customerScan.ts'
 import { derivePackagePreparation } from '../src/utils/packagePreparation.ts'
-import { buildCustomerVisibilityReviewExport, serializeCustomerVisibilityReview } from '../src/utils/customerVisibilityReviewExport.ts'
+import { buildCustomerVisibilityReviewExport, customerVisibilityReviewQaText, serializeCustomerVisibilityReview } from '../src/utils/customerVisibilityReviewExport.ts'
 
 const reviewed = (value: unknown) => ({ value, source: 'operator acceptance fixture', recordedAt: '2026-09-25T12:00:00Z', confidence: 'high' as const, status: 'operator_reviewed' as const })
 const maryFacts: BusinessProfileState = { schemaVersion: 1, values: {
@@ -51,6 +51,13 @@ assert.equal(maryProfile.phone, '734-282-6465')
 for (const stale of ['Photography studio', 'Wedding photography', 'Detroit photographer', defaultProfile.phone]) {
   assert.equal(JSON.stringify(maryProfile).includes(stale), false, `reviewed Mary projection must not retain ${stale}`)
 }
+const sameNameContamination = reviewedBusinessProfile(
+  { ...staleJemProfile, businessName: 'Montessori Center of Downriver' },
+  maryFacts,
+)
+for (const stale of ['Photography studio', 'Wedding photography', 'Detroit photographer']) {
+  assert.equal(JSON.stringify(sameNameContamination).includes(stale), false, `a reviewed category mismatch must clear unreviewed ${stale} even when the business name already matches`)
+}
 
 const localFinding: FixItem = {
   id: 'website-local-content', area: 'Website SEO', sourceArea: 'website', priority: 'Medium', status: 'partial', reviewed: true,
@@ -75,6 +82,12 @@ assert.equal(programWording.title, 'Programs and offerings visibility')
 assert.match(programWording.summary, /path from the homepage could be clearer/)
 assert.equal(/program pages are missing/i.test(programWording.summary), false)
 assert.match(programWording.recommendedAction, /existing program or offering pages/)
+
+const schemaWording = defaultCustomerFindingWording({ ...localFinding, id: 'website-schema', issue: 'Incomplete machine-readable business identity', fix: 'Add entity-appropriate LocalBusiness schema.' }, baseState)
+assert.equal(schemaWording.title, 'Help search and AI understand your school')
+assert.match(schemaWording.summary, /name, location, contact details, and website/)
+assert.match(schemaWording.recommendedAction, /add clear business information/)
+assert.equal(/entity-appropriate|LocalBusiness|machine-readable/i.test(`${schemaWording.title} ${schemaWording.summary} ${schemaWording.recommendedAction}`), false)
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/website-audit-montessori-2026-09-16.json', import.meta.url), 'utf8')) as { response: WebsiteAuditResult }
 const observed = { ...fixture.response, serviceAreaPhraseMatches: ['Downriver'], servicePhraseMatches: [], serviceLinks: ['https://montessoridownriver.example/our-programs/'] }
@@ -105,8 +118,21 @@ for (const area of ['search_maps', 'business_information', 'ai_discovery'] as co
   assert.equal(customerReview.scanAreas.find((entry) => entry.id === area)?.state, 'review', `${area} must not inherit a website issue`)
 }
 const customerJson = serializeCustomerVisibilityReview(customerReview)
+const qaText = customerVisibilityReviewQaText(customerReview, true)
+assert.match(qaText, /CUSTOMER REVIEW — OPERATOR QA/)
+assert.match(qaText, /Montessori Center of Downriver/)
+assert.match(qaText, /Montessori school/)
+assert.match(qaText, /Homepage local identity clarity/)
+assert.match(qaText, /physical location and community served/)
+assert.match(qaText, /Starter Visibility Cleanup/)
+assert.match(qaText, /READY FOR CUSTOMER PRESENTATION/)
+for (const issue of customerReview.confirmedIssues) {
+  for (const value of [issue.title, issue.summary, issue.foundLocalAction]) assert(qaText.includes(value), 'QA text and JSON projection must use the same customer finding fields')
+}
+for (const scope of customerReview.recommendedPackage.included) assert(qaText.includes(scope), 'QA text and JSON projection must use the same package scope')
 for (const forbidden of ['Photography studio', 'Wedding photography', 'Detroit photographer', 'Service-area phrases found', 'fingerprint', 'provider']) {
   assert.equal(customerJson.includes(forbidden), false, `${forbidden} must not leak into customer JSON`)
+  assert.equal(qaText.includes(forbidden), false, `${forbidden} must not leak into customer QA text`)
 }
 
 const contaminated: AuditState = {

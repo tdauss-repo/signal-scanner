@@ -209,7 +209,7 @@ try {
   try {
     const { customer, presence, machine } = await import(renderPath.href)
     const props = { state, items: [], fixes: workspaceFindings(state), loading: false, scanError: false, onScan() {}, onWorkbench() {}, onView() {} }
-    assert(customer({ ...props, view: 'Verification' }).includes('Verified improvements will appear here'), '15: no implementation/verification means empty Results')
+    assert(customer({ ...props, view: 'Verification' }).includes('No implementation has been recorded yet'), '15: no implementation/verification means empty Results')
     const scan = customer({ ...props, view: 'Scan' })
     assert(scan.includes('website readability checks have evidence'))
     for (const internal of ['Playwright', 'fixture-server_fetch', 'confidence algorithm', 'DOM extraction', 'JSON-LD']) assert(!scan.includes(internal))

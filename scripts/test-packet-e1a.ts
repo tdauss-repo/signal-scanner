@@ -122,7 +122,7 @@ try {
   assert(!html.includes('Homepage SEO clarity'), 'Ineligible broad observation stays out of Review')
   for (const title of ['Contact info visibility', 'Social profile links', 'Homepage title quality']) assert(html.includes(title), 'Supporting evidence remains visible for operator review without automatic approval')
   const results = customer({ ...props, view: 'Verification' })
-  assert(results.includes('Verified improvements will appear here'), '9: no results without implementation/verification')
+  assert(results.includes('No implementation has been recorded yet'), '9: no results without implementation/verification')
   assert(!results.includes(entity.issue))
   const queue = review({ state: pristineState, fixes: findings, onReview() {} })
   assert(!queue.includes('Homepage SEO clarity'))

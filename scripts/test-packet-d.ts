@@ -175,7 +175,7 @@ try {
     assert(!markup.includes('JEM'))
   }
   const emptyResults = render({ state, items: [], fixes: candidates, view: 'Verification', onView() {}, onScan() {}, onWorkbench() {} })
-  assert.match(emptyResults, /Verified improvements will appear here/)
+  assert.match(emptyResults, /No implementation has been recorded yet/)
   assert(!emptyResults.includes('Homepage search description'))
   console.info = originalInfo
   console.log('Packet D: detection, review/presentation, persistence, isolation, provider normalization/failure and customer surfaces PASS (synthetic, no network).')

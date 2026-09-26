@@ -110,12 +110,18 @@ for (const view of ['Business', 'Scan', 'Review', 'Package', 'Customer Review', 
   assert(!html.includes('419.410.4974'))
   assert(html.includes('Detailed evidence &amp; tools'))
   assert(html.includes('aria-current="page"'))
-  if (view === 'Business') assert(html.includes('Business Seed') && html.includes('Business Profile') && html.includes('Saved Scans'))
+  assert(!html.includes('>Settings<'))
+  if (view === 'Business') {
+    for (const control of ['Business name', 'Website', 'Street address', 'Primary category / business type', 'Save Business', 'Continue to Scan', 'Change business']) assert(html.includes(control))
+    for (const internalConcept of ['Business Seed', 'Business Profile', 'Saved Scans', 'Profile completeness']) assert(!html.includes(internalConcept), `${internalConcept} must not be a primary Business-page concept`)
+    assert(!html.includes('class="customer-workspace"') && !html.includes('<h1>Montessori Center of Downriver</h1>'), 'Business identity is not repeated as a large persistent block and page hero')
+    assert(html.indexOf('Business name') < html.indexOf('Additional business context'), 'Primary inputs appear before secondary detail')
+  }
   if (view === 'Scan') assert(html.includes('Operational scan') && html.includes('Evidence health'))
-  if (view === 'Review') assert(html.includes(fix.issue) && html.includes('Evidence summary'))
-  if (view === 'Package') assert(html.includes('Package Preparation') && html.includes('Customer/platform ownership required'))
-  if (view === 'Customer Review') assert(html.includes('Final quality gate') && html.includes('Exact customer findings preview'))
-  if (view === 'Verification') assert(html.includes('Verified improvements will appear here'))
+  if (view === 'Review') assert(html.includes(fix.issue) && html.includes('Evidence summary') && html.includes('Business information to confirm') && html.includes('Continue to Package'))
+  if (view === 'Package') assert(html.includes('Package Preparation') && html.includes('Customer/platform ownership required') && html.includes('Continue to Customer Review'))
+  if (view === 'Customer Review') assert(html.includes('Final quality gate') && html.includes('Customer Review — operator QA') && html.includes('Copy Review Text'))
+  if (view === 'Verification') assert(html.includes('No implementation has been recorded yet.'))
 }
 const handoffProfile = normalizeWorkspaceProfile({ ...montessori, primaryCategory: 'Montessori school', streetAddress: '15575 Northline Road', zip: '48195', phone: '734-282-6465', primaryServices: 'Toddler Program, Preschool, Kindergarten' })
 const handoffState = makeState(handoffProfile)
@@ -123,7 +129,21 @@ handoffState.customerFindingReviews = Object.fromEntries([fix, owner, later].map
 const handoff = render({ ...props, state: handoffState, items: buildAuditItems(handoffProfile), view: 'Customer Review' }) as string
 assert(handoff.includes('Ready for customer presentation'))
 assert(handoff.includes('Copy Customer Review JSON') && handoff.includes('Export Customer Review JSON'))
+assert(handoff.includes('Copy Review Text') && handoff.includes('Exact customer-safe preview'))
 assert(handoff.includes('Montessori school') && !handoff.includes('Photography studio'))
+const unsafeState = makeState(defaultProfile)
+unsafeState.businessProfile = { schemaVersion: 1, values: {
+  businessName: { value: 'Montessori Center of Downriver', source: 'operator', confidence: 'high', status: 'operator_reviewed' },
+  primaryCategory: { value: 'Montessori school', source: 'operator', confidence: 'high', status: 'operator_reviewed' },
+  website: { value: 'https://montessoridownriver.example/', source: 'operator', confidence: 'high', status: 'operator_reviewed' },
+  city: { value: 'Southgate', source: 'operator', confidence: 'high', status: 'operator_reviewed' },
+  state: { value: 'MI', source: 'operator', confidence: 'high', status: 'operator_reviewed' },
+} }
+unsafeState.customerFindingReviews = { [fix.id]: customerReviewKey(unsafeState, fix) }
+const unsafeHandoff = render({ ...props, state: unsafeState, items: buildAuditItems(unsafeState.profile), fixes: [fix], view: 'Customer Review' }) as string
+assert(unsafeHandoff.includes('Primary category mismatch'))
+assert(unsafeHandoff.includes('Photography studio') && unsafeHandoff.includes('Montessori school'))
+assert(!unsafeHandoff.includes('Export Customer Review JSON'), 'Unsafe identity mismatch blocks export')
 const jem = makeState(defaultProfile)
 const jemHtml = render({ ...props, state: jem, items: buildAuditItems(jem.profile), fixes: [], view: 'Scan' }) as string
 assert(jemHtml.includes('JEM Photography'))
@@ -148,14 +168,18 @@ assert(loadedMontessori.includes('Montessori Center of Downriver'))
 assert(!loadedMontessori.includes('JEM'))
 assert(!loadedMontessori.includes('419.'))
 assert(!loadedMontessori.includes('Sylvania'))
-assert(loadedMontessori.includes('Business Seed'), 'Business Seed belongs in the primary Business workspace')
+assert(!loadedMontessori.includes('Business Seed'), 'Seed/profile provenance stays beneath the consolidated Business form')
 assert(!loadedMontessori.includes('Workbench · internal tools &amp; evidence'), 'Persisted internal tab must not open the Workbench on reload')
-assert(loadedMontessori.includes('Internal Found Local operator workflow'))
+assert(loadedMontessori.includes('Business Scanner Tool'))
 storage.set('local-signal-scanner-state', JSON.stringify(jem))
 const loadedJem = renderApp() as string
 assert(loadedJem.includes('JEM Photography'))
 assert(!loadedJem.includes('Montessori'))
 assert(!loadedJem.includes('Southgate'))
+storage.set('local-signal-scanner-state', JSON.stringify(unsafeState))
+const loadedConflict = renderApp() as string
+assert(loadedConflict.includes('Primary category mismatch') && loadedConflict.includes('Photography studio') && loadedConflict.includes('Montessori school'))
+assert(loadedConflict.includes('Confirm reviewed facts'), 'Load-time profile conflicts remain visible until the operator confirms the reviewed business')
 storage.set('local-signal-scanner-state', JSON.stringify({ profile: montessori }))
 assert(!renderApp().includes('JEM'))
 console.log('Packet C: customer summary, review gates, freshness, isolation, JSON compatibility, and all four React surfaces passed for two separate profiles.')

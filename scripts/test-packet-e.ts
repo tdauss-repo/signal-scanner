@@ -120,7 +120,7 @@ try {
   try {
     const { render, presence } = await import(renderPath.href)
     const props = { state, items: [], fixes: candidates, view: 'Verification', loading: false, scanError: false, onScan() {}, onWorkbench() {}, onView() {} }
-    assert(render(props).includes('Verified improvements will appear here'), '14: no implementation/verification means no Results')
+    assert(render(props).includes('No implementation has been recorded yet'), '14: no implementation/verification means no Results')
     const beforeWebsite = snapshots.find((snapshot) => snapshot.visibilityRuns?.at(-1)?.checks[0].state === 'scanning')!
     const progress = render({ ...props, state: beforeWebsite, view: 'Scan', loading: true })
     assert(progress.includes('Checking website'))

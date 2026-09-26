@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import type { AuditState, FixItem, SearchDestinationObservation } from '../src/types/audit.ts'
-import { buildCustomerVisibilityReviewExport, serializeCustomerVisibilityReview } from '../src/utils/customerVisibilityReviewExport.ts'
+import { buildCustomerVisibilityReviewExport, customerVisibilityReviewQaText, serializeCustomerVisibilityReview } from '../src/utils/customerVisibilityReviewExport.ts'
 import { customerReviewKey, customerReviewReadiness, summarizeCustomerScan } from '../src/utils/customerScan.ts'
 import { defaultSearchDestinationObservation } from '../src/utils/searchVisibility.ts'
 import { normalizeSalesReadiness } from '../src/utils/salesReadiness.ts'
@@ -84,8 +84,13 @@ assert.equal(review.needsReview.filter((item) => item === 'Yelp').length, 1, 're
 assert(review.needsReview.includes('Apple Maps'))
 
 const serialized = serializeCustomerVisibilityReview(review)
+const qaText = customerVisibilityReviewQaText(review, true)
 assert.doesNotThrow(() => JSON.parse(serialized))
-for (const forbidden of ['brightdata', 'provider_permission_blocked', 'operator-only-run', 'operator-only raw evidence', 'internal note', 'confidence', 'blocker', 'provenance', 'resultRegionInspected', 'captures']) assert.equal(serialized.toLowerCase().includes(forbidden.toLowerCase()), false, `customer export must omit ${forbidden}`)
+for (const issue of review.confirmedIssues) for (const value of [issue.title, issue.summary, issue.foundLocalAction]) assert(qaText.includes(value), 'QA text reuses the exact customer-safe finding projection')
+for (const forbidden of ['brightdata', 'provider_permission_blocked', 'operator-only-run', 'operator-only raw evidence', 'internal note', 'confidence', 'blocker', 'provenance', 'resultRegionInspected', 'captures']) {
+  assert.equal(serialized.toLowerCase().includes(forbidden.toLowerCase()), false, `customer export must omit ${forbidden}`)
+  assert.equal(qaText.toLowerCase().includes(forbidden.toLowerCase()), false, `customer QA text must omit ${forbidden}`)
+}
 
 const jemProfile = normalizeWorkspaceProfile({ businessName: 'JEM Photography', primaryCategory: 'Photography studio', city: 'Detroit', state: 'MI', website: 'https://jem.example/' })
 const jemState = makeState(jemProfile)

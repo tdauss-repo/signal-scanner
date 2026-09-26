@@ -35,14 +35,20 @@ export function profileCompleteness(state: AuditState) {
   return { profile, model, items, missing, needsReview, readyToScan: Boolean(profile.businessName.trim() && profile.website.trim()) }
 }
 
-export const profileProjectionWarnings = (state: AuditState) => {
+export const businessProfileProjectionWarnings = (profile: AuditState['profile'], businessProfile: AuditState['businessProfile']) => {
   const warnings: string[] = []
-  const reviewed = reviewedBusinessProfile(state.profile, state.businessProfile)
+  const reviewed = reviewedBusinessProfile(profile, businessProfile)
+  const labels = { businessName: 'Business name', primaryCategory: 'Primary category', city: 'City', state: 'State', website: 'Website', phone: 'Phone' }
   for (const field of ['businessName', 'primaryCategory', 'city', 'state', 'website', 'phone'] as const) {
-    const fact = state.businessProfile.values[field]
-    if (fact && ['operator_reviewed', 'owner_confirmed'].includes(fact.status) && JSON.stringify(state.profile[field]) !== JSON.stringify(reviewed[field])) {
-      warnings.push(`${field} differs from the flat workspace value; the reviewed fact will be used for customer output.`)
+    const fact = businessProfile.values[field]
+    if (fact && ['operator_reviewed', 'owner_confirmed'].includes(fact.status) && JSON.stringify(profile[field]) !== JSON.stringify(reviewed[field])) {
+      warnings.push(`${labels[field]} mismatch: workspace says “${String(profile[field] || 'blank')}”; reviewed profile says “${String(reviewed[field] || 'blank')}”. Customer output will use the reviewed value.`)
     }
   }
   return warnings
 }
+
+export const profileProjectionWarnings = (state: AuditState) => [...new Set([
+  ...(state.profileProjectionConflicts ?? []),
+  ...businessProfileProjectionWarnings(state.profile, state.businessProfile),
+])]

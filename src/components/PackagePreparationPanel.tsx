@@ -1,6 +1,13 @@
 import type { AuditState, FixItem } from '../types/audit'
 import { derivePackagePreparation } from '../utils/packagePreparation'
 
+const scopeLabel = (fit: NonNullable<FixItem['salesPackageFit']>) => ({
+  starter: 'Included in Starter',
+  later: 'Separate scope',
+  owner_action: 'Customer/platform action required',
+  excluded: 'Not included',
+})[fit]
+
 export function PackagePreparationPanel({ state, fixes }: { state: AuditState; fixes: FixItem[] }) {
   const preparation = derivePackagePreparation(state, fixes)
   return <section className="panel package-preparation-panel" aria-label="Package Preparation">
@@ -16,7 +23,8 @@ export function PackagePreparationPanel({ state, fixes }: { state: AuditState; f
       {preparation.starterItems.map((item) => <article className="fix-item" key={item.findingId}>
         <div className="fix-title-cell"><p className="fix-area">Finding</p><h3>{item.finding}</h3></div>
         <div className="fix-table-cell"><strong>Priority</strong><p>{item.priority}</p></div>
-        <div className="fix-table-cell"><strong>Remediation action</strong><p>{item.remediationAction}</p></div>
+        <div className="fix-table-cell"><strong>What Found Local will do</strong><p>{item.remediationAction}</p></div>
+        <div className="fix-table-cell"><strong>Scope classification</strong><p>{scopeLabel(item.packageFit)}</p></div>
         <div className="fix-table-cell"><strong>Package assignment</strong><p>{item.packageAssignment}</p></div>
         <div className="fix-table-cell"><strong>Included scope</strong><p>{item.includedScope}</p></div>
       </article>)}
@@ -26,7 +34,8 @@ export function PackagePreparationPanel({ state, fixes }: { state: AuditState; f
       {preparation.separateScopeItems.map((item) => <article className="fix-item" key={item.findingId}>
         <div className="fix-title-cell"><p className="fix-area">Approved finding</p><h3>{item.finding}</h3></div>
         <div className="fix-table-cell"><strong>Priority</strong><p>{item.priority}</p></div>
-        <div className="fix-table-cell"><strong>Remediation action</strong><p>{item.remediationAction}</p></div>
+        <div className="fix-table-cell"><strong>What Found Local will do</strong><p>{item.remediationAction}</p></div>
+        <div className="fix-table-cell"><strong>Scope classification</strong><p>{scopeLabel(item.packageFit)}</p></div>
         <div className="fix-table-cell"><strong>Package assignment</strong><p>{item.packageAssignment}</p></div>
       </article>)}
     </div> : null}

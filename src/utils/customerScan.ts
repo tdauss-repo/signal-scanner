@@ -89,6 +89,12 @@ export const defaultCustomerFindingWording = (fix: FixItem, state?: AuditState):
       : `The homepage does not clearly show where customers can learn about the ${model === 'physical_location' ? 'programs or offerings' : 'services'} available. This does not prove that dedicated pages are missing.`,
     recommendedAction: `Found Local will review the existing ${model === 'physical_location' ? 'program or offering' : 'service'} pages and strengthen homepage links or summary wording where needed.`,
   }
+  if (fix.id === 'website-schema') return {
+    title: `Help search and AI understand your ${noun}`,
+    priority: fix.priority,
+    summary: `Search engines and AI tools can see parts of the website, but the site does not clearly connect the ${noun}'s name, location, contact details, and website. Clear business information helps these systems understand which local business the site represents and where it is located.`,
+    recommendedAction: `Found Local will add clear business information so search engines and AI tools can better understand the ${noun}'s name, location, contact details, and website.`,
+  }
   return {
     title: fix.intelligence?.customer.title || fix.issue,
     priority: fix.priority,

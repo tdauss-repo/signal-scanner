@@ -152,6 +152,55 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
 
 export const serializeCustomerVisibilityReview = (review: CustomerVisibilityReviewExport) => JSON.stringify(review, null, 2)
 
+/**
+ * Human-readable operator QA derived only from the same customer-safe
+ * projection serialized for Sites. It intentionally adds no scanner evidence
+ * or internal state.
+ */
+export const customerVisibilityReviewQaText = (
+  review: CustomerVisibilityReviewExport,
+  ready: boolean,
+) => {
+  const lines = [
+    'CUSTOMER REVIEW — OPERATOR QA',
+    '',
+    'Business:',
+    review.business.name,
+    review.business.category,
+    [review.business.city, review.business.state].filter(Boolean).join(', '),
+    review.business.website,
+    '',
+    'What’s working:',
+    ...(review.verifiedStrengths.length
+      ? review.verifiedStrengths.flatMap((strength) => [`- ${strength.title}`, `  ${strength.summary}`])
+      : ['- No verified strengths are included yet.']),
+    '',
+    'Recommended improvements:',
+    ...(review.confirmedIssues.length
+      ? review.confirmedIssues.flatMap((issue, index) => [
+          `${index + 1}. ${issue.title}`,
+          'Why it matters:',
+          issue.summary,
+          'Found Local will:',
+          issue.foundLocalAction,
+          '',
+        ])
+      : ['No approved customer improvements.', '']),
+    'Still being verified:',
+    ...(review.needsReview.length ? review.needsReview.map((item) => `- ${item}`) : ['- Nothing currently listed.']),
+    '',
+    'Recommended package:',
+    review.recommendedPackage.name,
+    '',
+    'Included:',
+    ...(review.recommendedPackage.included.length ? review.recommendedPackage.included.map((item) => `- ${item}`) : ['- No approved package scope.']),
+    '',
+    'Readiness:',
+    ready ? 'READY FOR CUSTOMER PRESENTATION' : 'NOT READY FOR CUSTOMER PRESENTATION',
+  ]
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 export const customerVisibilityReviewFilename = (review: CustomerVisibilityReviewExport, date = new Date()) => {
   const slug = review.business.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'business'
   const day = date.toISOString().slice(0, 10)

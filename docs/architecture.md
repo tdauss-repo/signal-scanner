@@ -60,29 +60,31 @@ A future frontend structure could look like this:
 The primary operator workflow is `Business → Scan → Review → Package → Customer
 Review → Verification`:
 
-1. **Business** selects or creates an isolated workspace and keeps seed facts,
-   the reviewed Business Profile, profile completeness, and Full Scan JSON
-   operations together. Reviewed profile facts are the authoritative source for
-   customer projection; a new workspace clears prior evidence, decisions, and
-   customer wording.
+1. **Business** presents one consolidated reviewed-business form. Seed and
+   reviewed-profile provenance remain internal compatibility concepts, while a
+   compact Change business control owns saved workspaces and Full Scan JSON.
+   Only business name and website are required to begin. Reviewed profile facts
+   are authoritative for customer projection; a new workspace clears prior
+   evidence, decisions, and customer wording.
 2. **Scan** runs bounded acquisition and shows operational progress and evidence
    health. Acquisition failure remains neutral.
-3. **Review** combines the evidence summary, candidate findings, optional
-   customer-wording refinement, and explicit approve/dismiss/reopen decisions.
-   Raw evidence remains immutable and detailed provider data is a Workbench
-   drill-down.
+3. **Review** combines the evidence summary, business-information gaps,
+   candidate findings, optional customer-wording refinement, and explicit
+   approve/dismiss/reopen decisions. Raw evidence remains immutable and
+   detailed provider data is a Workbench drill-down.
 4. **Package** derives scope only from explicitly approved effective customer
    findings.
-5. **Customer Review** is the final operator quality gate and previews the exact
-   reviewed business identity, area-specific status, findings, package, and
-   sanitized version 1.0 JSON handoff.
+5. **Customer Review** is the final operator quality gate. Its human-readable
+   QA frame, copyable review text, and sanitized version 1.0 JSON are all built
+   from the same customer-safe projection of reviewed identity, area-specific
+   status, approved effective findings, and approved-only package scope.
 6. **Verification** records completed outcomes only after execution and a
    follow-up check.
 
 Found Local Sites then renders the external Customer Visibility Review. The
 Workbench remains available as a secondary internal evidence/configuration
-surface and Settings contains runtime configuration rather than ordinary
-business workflow.
+surface. Legacy Business Profile and Settings routes remain compatibility
+details and are hidden from normal navigation.
 
 ## Design Principles
 - Keep the operator workflow efficient and evidence-preserving

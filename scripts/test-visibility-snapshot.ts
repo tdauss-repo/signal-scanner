@@ -65,7 +65,6 @@ try {
   const { render } = await import(renderPath.href)
   const html = render({ state, items: [], fixes: [], view: 'Scan', loading: false, scanError: false, onScan() {}, onWorkbench() {}, onView() {} }) as string
   assert(html.includes('Business Scanner Tool'))
-  assert(html.includes('Internal Found Local operator workflow'))
   assert(html.includes('Operational scan') && html.includes('Evidence health'))
   for (const step of ['Business', 'Scan', 'Review', 'Package', 'Customer Review', 'Verification']) assert(html.includes(`>${step}<`))
   assert(html.includes('Continue to Review'))

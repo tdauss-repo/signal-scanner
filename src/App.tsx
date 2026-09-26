@@ -65,6 +65,7 @@ import {
   reviewedBusinessProfile,
 } from './utils/businessProfileState'
 import { aggregateReviewedSearchObservations } from './utils/searchAggregation'
+import { businessProfileProjectionWarnings } from './utils/profileCompleteness'
 import { summarizeAIVisibilityEvidence } from './utils/aiPresence'
 import { projectPublicObservationToProfiles, summarizePublicPresence } from './utils/publicPresence'
 import { entityAction, normalizeSalesReadiness, questionAction, sortSalesActions } from './utils/salesReadiness'
@@ -170,7 +171,7 @@ type ActiveView =
 
 const views: ScoreView[] = ['Overall', ...numericOverallScoreAreas]
 
-const navViews: ActiveView[] = [...views, 'Public Presence', 'Profile Management', 'AI Visibility', 'Sales Readiness', 'Reports', 'Settings']
+const navViews: ActiveView[] = [...views, 'Public Presence', 'Profile Management', 'AI Visibility', 'Sales Readiness', 'Reports']
 const visibleViewLabel = (view: ActiveView) => view
 
 const navIconPaths: Record<ActiveView, React.ReactNode> = {
@@ -398,12 +399,14 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
       parsed.lastUpdated ?? new Date().toISOString(),
     )
     const profile = reviewedBusinessProfile(compatibilityProfile, businessProfile)
+    const profileProjectionConflicts = parsed.profileProjectionConflicts ?? businessProfileProjectionWarnings(compatibilityProfile, businessProfile)
 
     return {
       ...initialState,
       ...parsed,
       profile,
       businessProfile,
+      profileProjectionConflicts,
       selectedAIPlatform: parsed.selectedAIPlatform ?? 'Gemini',
       searchVisibilityTests: Object.fromEntries(
         Object.entries(parsed.searchVisibilityTests ?? {}).map(([id, test]) => [
@@ -736,6 +739,7 @@ function App() {
           current.businessProfile,
           recordedAt,
         ),
+        profileProjectionConflicts: undefined,
         lastUpdated: recordedAt,
       }
     })
@@ -2078,12 +2082,6 @@ function App() {
             <span>Operator Tools</span>
             <button type="button" onClick={() => window.print()}>
               Print Internal Report
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveView('Overall')}
-            >
-              View Package
             </button>
             <button
               type="button"
