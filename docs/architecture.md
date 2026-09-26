@@ -72,7 +72,8 @@ Review → Verification`:
    and unfinished checks are terminalized before Review becomes available.
    Acquisition failure remains neutral.
 3. **Review** combines the evidence summary, business-information gaps,
-   candidate findings, optional customer-wording refinement, and explicit
+   verified-strength inclusion and optional customer wording, candidate
+   findings, optional customer-wording refinement, and explicit
    approve/dismiss/reopen decisions. Raw evidence remains immutable and
    detailed provider data is a Workbench drill-down. Approval, dismissal, and
    customer wording are bound to a finding-scoped material-evidence identity:
@@ -81,6 +82,10 @@ Review → Verification`:
    request metadata, and unrelated findings do not. Materially refreshed
    evidence retains the previous decision as history and requires explicit
    operator reconfirmation; it is never presented as a current approval.
+   Strength presentation state follows the same material-evidence boundary:
+   historical workspaces include generated strengths by default, hidden
+   strengths remain verified internally, and stale inclusion or wording is
+   withheld from customer output until reconciled.
 4. **Package** derives scope only from explicitly approved effective customer
    findings. Its existing defaults remain available until the operator assigns
    an approved finding to Starter, separate scope, customer/third-party action,

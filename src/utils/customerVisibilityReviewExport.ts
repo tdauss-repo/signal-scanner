@@ -2,6 +2,7 @@ import type { AuditItem, AuditState, FixItem } from '../types/audit'
 import { summarizeCustomerScan, type VisibilitySnapshotOverall } from './customerScan'
 import { derivePackagePreparation, type PackagePreparationItem } from './packagePreparation'
 import { reviewedBusinessProfile } from './businessProfileState'
+import { effectiveCustomerStrengths } from './customerStrengths'
 
 export type CustomerVisibilityReviewAreaId = 'website' | 'search_maps' | 'business_information' | 'ai_discovery'
 export type CustomerVisibilityReviewAreaState = 'good' | 'review' | 'issue'
@@ -119,11 +120,7 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
         : 'This area has verified strengths and no confirmed issues to address.'
     return { ...definition, state, summary: areaSummary }
   })
-  const strengths = new Map<string, string>()
-  for (const entry of summary.cockpit.lookingGood) strengths.set(entry.destination, entry.identitySummary)
-  for (const item of items.filter((item) => state.checks[item.id] === 'pass').slice(0, 6)) {
-    if (!strengths.has(item.label)) strengths.set(item.label, 'This reviewed check is looking good.')
-  }
+  const strengths = effectiveCustomerStrengths(state, items)
   const included = packagePreparation.starterItems.map((item) => item.includedScope)
   const hasStarterPackage = packagePreparation.recommendedPackage !== null
   const profile = reviewedBusinessProfile(state.profile, state.businessProfile)
@@ -139,7 +136,7 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
     },
     overall: { state: overallState(summary.snapshot.overall), headline: overallHeadline[overallState(summary.snapshot.overall)], summary: summary.snapshot.detail },
     scanAreas,
-    verifiedStrengths: [...strengths].map(([title, strengthSummary]) => ({ title, summary: strengthSummary })),
+    verifiedStrengths: strengths.map(({ title, summary: strengthSummary }) => ({ title, summary: strengthSummary })),
     confirmedIssues,
     needsReview,
     recommendedPackage: hasStarterPackage ? {

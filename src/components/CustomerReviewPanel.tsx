@@ -38,6 +38,7 @@ export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: 
     ...(packageReconciliations.length ? [`${packageReconciliations.length} finding${packageReconciliations.length === 1 ? '' : 's'} ${packageReconciliations.length === 1 ? 'needs' : 'need'} package scope reconfirmation.`] : []),
     ...(readiness.scanIncomplete ? ['The active visibility scan has not reached a terminal state.'] : []),
     ...(readiness.awaitingDisposition ? [`${readiness.awaitingDisposition} primary finding${readiness.awaitingDisposition === 1 ? '' : 's'} still await operator disposition.`] : []),
+    ...(readiness.strengthsNeedingReconfirmation ? [`${readiness.strengthsNeedingReconfirmation} verified ${readiness.strengthsNeedingReconfirmation === 1 ? 'strength needs' : 'strengths need'} operator reconciliation.`] : []),
     ...wordingWarnings,
     ...packageWarnings,
   ]

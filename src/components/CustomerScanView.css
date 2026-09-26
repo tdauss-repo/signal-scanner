@@ -216,6 +216,19 @@
 .customer-refinement-form label { display: grid; gap: 6px; font-weight: 700; }
 .customer-refinement-form textarea { min-height: 110px; }
 .customer-refinement-warning { padding: 10px 12px; border-left: 3px solid #9a6518; background: #fff8e8; }
+.customer-strength-review { margin-bottom: 22px; }
+.customer-strength-list { display: grid; gap: 16px; padding: 0 18px 18px; }
+.customer-strength-card { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(320px, 1.2fr); gap: 18px; padding: 18px; border: 1px solid #d9e2db; border-radius: 12px; background: #fff; }
+.customer-strength-card h3 { margin: 4px 0 8px; }
+.customer-strength-card p { margin: 5px 0; }
+.customer-strength-source { padding-right: 18px; border-right: 1px solid #e1e8e2; }
+.customer-strength-source > p:last-child { color: var(--customer-muted); font-size: 13px; white-space: pre-line; }
+.customer-strength-state { flex: 0 0 auto; padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 750; }
+.customer-strength-state-included_generated { color: #315b49; background: #e8f1eb; }
+.customer-strength-state-included_refined { color: #17653c; background: #dff2e6; }
+.customer-strength-state-hidden { color: #5f6661; background: #ecefed; }
+.customer-strength-state-needs_reconfirmation { color: #7a5315; background: #fff0cf; }
+.customer-strength-presentation .directory-actions { display: flex; flex-wrap: wrap; gap: 9px; }
 .package-scope-item { position: relative; }
 .package-scope-item .fix-title-cell { grid-column: span 2; }
 .package-scope-item .method-pill { display: inline-block; margin-top: 7px; }
@@ -279,6 +292,8 @@
   .operator-workflow { grid-template-columns: 1fr 1fr; }.operator-scan-grid, .operator-area-list { grid-template-columns: 1fr; }.customer-readiness { padding: 20px; }.customer-readiness dl { grid-template-columns: 1fr 1fr; }.customer-readiness-actions { align-items: stretch; flex-direction: column; gap: 4px; }.customer-readiness-actions .customer-text-button { text-align: left; }
   .customer-snapshot-counts > div, .customer-snapshot-counts > div:first-child { border: 0; padding: 0; }
   .customer-area-grid, .customer-finding-details, .customer-results-path ol { grid-template-columns: 1fr; }
+  .customer-strength-card { grid-template-columns: 1fr; }
+  .customer-strength-source { padding-right: 0; padding-bottom: 14px; border-right: 0; border-bottom: 1px solid #e1e8e2; }
   .customer-next, .customer-footer, .customer-finding-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
   .customer-finding { padding: 22px; }
 }

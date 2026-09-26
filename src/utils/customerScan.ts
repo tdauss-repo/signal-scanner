@@ -8,6 +8,7 @@ import { primarySearchDestinations } from './searchVisibility'
 import { salesCockpitVisibility } from './salesVisibilityProjection'
 import { customerBusinessNoun, localBusinessModel } from './businessContext'
 import { reviewedBusinessProfile } from './businessProfileState'
+import { customerStrengthReviewItems, effectiveCustomerStrengths } from './customerStrengths'
 
 export const findingLifecycle = ['Detected', 'Evidence captured', 'Reviewed', 'Action proposed', 'Approved', 'Implemented', 'Re-scanned', 'Verified'] as const
 export type CustomerView = 'Business' | 'Scan' | 'Review' | 'Package' | 'Customer Review' | 'Verification'
@@ -493,6 +494,8 @@ export function summarizeCustomerScan(state: AuditState, items: AuditItem[], fix
         : snapshotOverall === 'Needs attention' ? 'The completed checks found supported visibility issues worth reviewing.'
           : snapshotOverall === 'Not yet scanned' ? 'Run a visibility scan to begin checking the business across its public presence.'
             : 'Some areas have not completed verification yet. Unavailable checks are not treated as business problems.'
+  const strengthReviewItems = customerStrengthReviewItems(state, items)
+  const effectiveStrengths = effectiveCustomerStrengths(state, items)
   return {
     areas, findings, websiteCompleted: completed.length, websiteGood: good,
     confirmationCount: findings.filter((fix) => effectivePackageFit(fix) === 'owner_action').length,
@@ -500,6 +503,13 @@ export function summarizeCustomerScan(state: AuditState, items: AuditItem[], fix
     awaitingReview: fixes.filter((fix) => fix.status !== 'pass' && !isPresentedFinding(state, fix)).length,
     cockpit: { confirmedIssues, knownFixes, deeperReview: cockpitVisibility.deeperReview, lookingGood: cockpitVisibility.lookingGood, searchRecommendations: cockpitVisibility.recommended, recommendedPlan },
     snapshot: { overall: snapshotOverall, detail: snapshotDetail, goodSignals, recommendedImprovements: findings.length, areasStillToVerify },
+    strengths: {
+      verified: strengthReviewItems.length,
+      included: effectiveStrengths.length,
+      hidden: strengthReviewItems.filter((item) => item.state === 'hidden').length,
+      refined: strengthReviewItems.filter((item) => item.state === 'included_refined').length,
+      needsReconfirmation: strengthReviewItems.filter((item) => item.state === 'needs_reconfirmation').length,
+    },
   }
 }
 
@@ -510,6 +520,7 @@ export interface CustomerReviewReadiness {
   dismissedFindings: number
   awaitingDisposition: number
   verifiedStrengths: number
+  strengthsNeedingReconfirmation: number
   needsReview: number
   scanIncomplete: boolean
   message: string
@@ -527,16 +538,19 @@ export function customerReviewReadiness(state: AuditState, summary: ReturnType<t
   const approvedFindings = primaryCandidates.filter((fix) => isPresentedFinding(state, fix)).length
   const dismissedFindings = primaryCandidates.filter((fix) => isDismissedCustomerFinding(state, fix)).length
   const awaitingDisposition = candidateFindings - approvedFindings - dismissedFindings
-  const verifiedStrengths = summary.cockpit.lookingGood.length || summary.snapshot.goodSignals
+  const verifiedStrengths = summary.strengths.included
+  const strengthsNeedingReconfirmation = summary.strengths.needsReconfirmation
   const needsReview = summary.cockpit.deeperReview.length
   const latestRun = state.visibilityRuns?.filter((run) => matchesEvidenceFingerprint(run.profileKey, state.profile)).at(-1)
   const scanIncomplete = visibilityRunStatus(latestRun) === 'running'
   const allCandidatesAdjudicated = awaitingDisposition === 0
-  const ready = !scanIncomplete && allCandidatesAdjudicated && (approvedFindings > 0 || candidateFindings === 0 && verifiedStrengths > 0)
+  const ready = !scanIncomplete && allCandidatesAdjudicated && strengthsNeedingReconfirmation === 0 && (approvedFindings > 0 || candidateFindings === 0 && verifiedStrengths > 0)
   const message = scanIncomplete
     ? 'The active visibility scan must reach a terminal state before customer export.'
     : !allCandidatesAdjudicated
     ? `${awaitingDisposition} primary candidate ${awaitingDisposition === 1 ? 'awaits' : 'await'} an operator decision before export.`
+    : strengthsNeedingReconfirmation
+      ? `${strengthsNeedingReconfirmation} verified ${strengthsNeedingReconfirmation === 1 ? 'strength needs' : 'strengths need'} operator reconciliation before export.`
     : ready
     ? approvedFindings > 0
       ? 'Every primary candidate has been reviewed. Approved findings can be exported with verified strengths and clearly labeled areas still to review.'
@@ -544,5 +558,5 @@ export function customerReviewReadiness(state: AuditState, summary: ReturnType<t
     : candidateFindings > 0
       ? 'No customer findings were approved. Complete enough evidence review to establish a verified strength or approve an appropriate customer finding.'
       : 'Complete enough evidence review to establish a verified strength or an approved customer finding.'
-  return { state: ready ? 'ready' : 'not_ready', candidateFindings, approvedFindings, dismissedFindings, awaitingDisposition, verifiedStrengths, needsReview, scanIncomplete, message }
+  return { state: ready ? 'ready' : 'not_ready', candidateFindings, approvedFindings, dismissedFindings, awaitingDisposition, verifiedStrengths, strengthsNeedingReconfirmation, needsReview, scanIncomplete, message }
 }

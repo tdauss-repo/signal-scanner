@@ -71,6 +71,7 @@ import { summarizeAIVisibilityEvidence } from './utils/aiPresence'
 import { projectPublicObservationToProfiles, summarizePublicPresence } from './utils/publicPresence'
 import { entityAction, normalizeSalesReadiness, questionAction, sortSalesActions } from './utils/salesReadiness'
 import { buildPackageScopeOverride, type PackageScopeInput } from './utils/packagePreparation'
+import { buildCustomerStrengthPresentation, type CustomerStrengthCandidate, type CustomerStrengthInput } from './utils/customerStrengths'
 
 const storageKey = 'local-signal-scanner-state'
 const activeViewStorageKey = 'business-scanner-active-view'
@@ -711,6 +712,17 @@ function App() {
       delete dismissals[fix.id]
       return { ...current, customerFindingRefinements: refinements, customerFindingReviews: reviews, customerFindingDismissals: dismissals, lastUpdated: new Date().toISOString() }
     })
+  }
+
+  const saveCustomerStrength = (strength: CustomerStrengthCandidate, input: CustomerStrengthInput) => {
+    setAuditState((current) => ({
+      ...current,
+      customerStrengthPresentations: {
+        ...current.customerStrengthPresentations,
+        [strength.id]: buildCustomerStrengthPresentation(strength, input),
+      },
+      lastUpdated: new Date().toISOString(),
+    }))
   }
 
   const savePackageScope = (fix: FixItem, input: PackageScopeInput) => {
@@ -2061,6 +2073,7 @@ function App() {
       onReview={reviewCustomerFinding}
       onSaveRefinement={saveCustomerFindingRefinement}
       onConfirmFinding={confirmCustomerFinding}
+      onSaveStrength={saveCustomerStrength}
       onSavePackageScope={savePackageScope}
       currentScanId={currentScanId}
       dirty={hasUnsavedChanges}

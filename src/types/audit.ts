@@ -145,8 +145,17 @@ export interface AuditState {
   packageScopeOverrides?: Record<string, PackageScopeOverride>
   /** Last explicit finding decision, retained only for operator reconciliation after evidence refresh. */
   customerFindingDecisionSnapshots?: Record<string, CustomerFindingDecisionSnapshot>
+  /** Customer-only strength inclusion and wording, bound to material positive evidence. */
+  customerStrengthPresentations?: Record<string, CustomerStrengthPresentation>
   /** Load-time identity conflicts retained after the compatibility profile is safely reconciled. */
   profileProjectionConflicts?: string[]
+}
+
+export interface CustomerStrengthPresentation {
+  evidenceKey: string
+  included: boolean
+  title?: string
+  summary?: string
 }
 
 export interface CustomerFindingRefinement {
