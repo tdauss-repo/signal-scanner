@@ -12,6 +12,7 @@ import type {
   SearchVisibilityTestState,
 } from '../types/audit'
 import { bingSearch, duckDuckGoSearch, googleMapsSearch, googleSearch } from './links'
+import { normalizeEvidenceTimestamp } from './evidenceTime'
 
 const splitList = (value: string) => value.split(/[,;\n]/).map((item) => item.trim()).filter(Boolean)
 const normalized = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
@@ -100,9 +101,50 @@ export const searchResultTypeLabel = (destination: SearchDestination, type: Sear
   return ({ official_website: 'Official website', directory_listing: 'Directory or listing', social_profile: 'Social profile', third_party_mention: 'Third-party mention', business_name_correct: 'Correct business name', address_correct: 'Correct address/location', phone_correct: 'Correct phone', website_correct: 'Correct website', category_correct: 'Correct category', not_found: 'Not found' })[type]
 }
 
+const publicHttpUrl = (value: string | undefined) => {
+  if (!value) return undefined
+  try {
+    const url = new URL(value)
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : undefined
+  } catch { return undefined }
+}
+
+export const canonicalProfileUrlForDestination = (destination: SearchDestination, value: string | undefined) => {
+  const safe = publicHttpUrl(value)
+  if (!safe || destination === 'DuckDuckGo') return undefined
+  const url = new URL(safe)
+  const host = url.hostname.replace(/^www\./, '').toLowerCase()
+  if (destination === 'Google Search' || destination === 'Google Maps') return host === 'google.com' && /\/maps\/place(?:[/?#]|$)/i.test(url.pathname) ? safe : undefined
+  if (destination === 'Bing Search') return host === 'bing.com' && /\/maps(?:[/?#]|$)/i.test(url.pathname) ? safe : undefined
+  if (destination === 'Apple Maps') return host === 'maps.apple.com' && /\/place(?:[/?#]|$)/i.test(url.pathname) ? safe : undefined
+  if (destination === 'Yelp') return host === 'yelp.com' && /\/biz(?:[/?#]|$)/i.test(url.pathname) ? safe : undefined
+  if (destination === 'Facebook') return (host === 'facebook.com' || host.endsWith('.facebook.com')) && !/^\/(?:search|login|help|share)(?:[/?#]|$)/i.test(url.pathname) && url.pathname !== '/' ? safe : undefined
+  return (host === 'instagram.com' || host.endsWith('.instagram.com')) && !/^\/(?:accounts|explore|reels?)(?:[/?#]|$)/i.test(url.pathname) && url.pathname !== '/' ? safe : undefined
+}
+
+export const brandVerificationQuery = (profile: BusinessProfile) => {
+  const location = [profile.city, profile.state].map((value) => value.trim()).filter(Boolean).join(' ')
+    || profile.targetLocation.trim()
+    || profile.localMarket.trim()
+  return [profile.businessName.trim(), location].filter(Boolean).join(' ')
+}
+
+export const verificationUrlFor = (
+  destination: SearchDestination,
+  query: string,
+  profile?: BusinessProfile,
+  brandPresence = false,
+) => publicPresenceUrl(destination, brandPresence && profile ? brandVerificationQuery(profile) || query : query)
+
+interface ObservationNormalizationContext {
+  profile?: BusinessProfile
+  brandPresence?: boolean
+}
+
 /** Single result-state invariant for UI edits, saved scans, and legacy imports. */
 export const normalizeSearchDestinationObservation = (
   observation: SearchDestinationObservation,
+  context: ObservationNormalizationContext = {},
 ): SearchDestinationObservation => {
   const allowed = new Set(resultTypesForDestination(observation.destination))
   let observedResultTypes = normalizeSearchResultTypes(observation.observedResultTypes).filter((type) => allowed.has(type))
@@ -116,7 +158,29 @@ export const normalizeSearchDestinationObservation = (
   const overallResult = observedResultTypes.includes('not_found') && !resultingPositive
     ? 'not_found'
     : observation.overallResult
-  return { ...observation, overallResult, observedResultTypes }
+  const matches = observation.automation?.assessment?.matches || []
+  const selected = observation.automation?.assessment?.selected
+  const observedResultUrl = publicHttpUrl(observation.observedResultUrl)
+    || publicHttpUrl(selected?.candidate.resultUrl)
+    || matches.map((match) => publicHttpUrl(match.candidate.resultUrl)).find(Boolean)
+  const canonicalProfileUrl = canonicalProfileUrlForDestination(observation.destination, observation.canonicalProfileUrl)
+    || canonicalProfileUrlForDestination(observation.destination, selected?.candidate.fields.publicProfileUrl)
+    || matches.map((match) => canonicalProfileUrlForDestination(observation.destination, match.candidate.fields.publicProfileUrl)).find(Boolean)
+  const verificationUrl = verificationUrlFor(
+    observation.destination,
+    observation.query,
+    context.profile,
+    context.brandPresence,
+  )
+  return {
+    ...observation,
+    overallResult,
+    observedResultTypes,
+    observedAt: normalizeEvidenceTimestamp(observation.observedAt),
+    verificationUrl,
+    ...(observedResultUrl ? { observedResultUrl } : { observedResultUrl: undefined }),
+    ...(canonicalProfileUrl ? { canonicalProfileUrl } : { canonicalProfileUrl: undefined }),
+  }
 }
 
 export const defaultSearchDestinationObservation = (
@@ -124,6 +188,7 @@ export const defaultSearchDestinationObservation = (
   query: string,
 ): SearchDestinationObservation => ({
   destination, query, overallResult: 'not_checked', observedResultTypes: [],
+  verificationUrl: verificationUrlFor(destination, query),
   observedAt: '', confidence: 'manual_needs_confirmation', evidenceNotes: '',
   competitorsObserved: '', recommendedAction: '', provenance: 'operator_observation',
   evidenceKind: 'unable_to_verify', reviewed: false,
@@ -160,7 +225,8 @@ export const buildSearchVisibilityQueries = (
   const services = !profileState || reviewed(profileState, 'primaryServices') ? splitList(profile.primaryServices) : []
   const secondary = !profileState || reviewed(profileState, 'industryTags') ? splitList(profile.industryTags) : []
   const queries: SearchVisibilityQuery[] = brand ? [{ id: 'search-brand-canonical', query: brand, role: 'Brand Presence', intentType: 'Brand search', priority: 'High' }] : []
-  if (brand && market && options?.includeLocationDiagnostic) queries.push({ id: 'search-brand-market', query: `${brand} ${market}`, role: 'Brand Presence', intentType: 'Brand search', priority: 'Medium', isDiagnostic: true })
+  const diagnosticMarket = profile.zip.trim() && !normalized(market).split(' ').includes(normalized(profile.zip)) ? `${market} ${profile.zip.trim()}` : market
+  if (brand && market && options?.includeLocationDiagnostic) queries.push({ id: 'search-brand-market', query: `${brand} ${diagnosticMarket}`, role: 'Brand Presence', intentType: 'Brand search', priority: 'Medium', isDiagnostic: true })
   if (category && market) queries.push({ id: 'search-core-category-market', query: `${category} ${market}`, role: 'Core Local Discovery', intentType: 'Category discovery', priority: 'High' })
   if (services[0] && market) queries.push({ id: 'search-core-service-market', query: `${services[0]} ${market}`, role: 'Core Local Discovery', intentType: 'Core service discovery', priority: 'High' })
   if (services[1] && market) queries.push({ id: 'search-supporting-service-market', query: `${services[1]} ${market}`, role: 'Supporting Discovery', intentType: 'Service-area discovery', priority: 'Medium' })

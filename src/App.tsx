@@ -434,7 +434,10 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
           Object.fromEntries(
             Object.entries(destinationObservations).map(([destination, observation]) => [
               destination,
-              normalizeSearchDestinationObservation({ ...observation, observedResultTypes: normalizeSearchResultTypes(observation.observedResultTypes ?? []) }),
+              normalizeSearchDestinationObservation(
+                { ...observation, observedResultTypes: normalizeSearchResultTypes(observation.observedResultTypes ?? []) },
+                { profile, brandPresence: queryId === 'search-brand-canonical' },
+              ),
             ]),
           ),
         ]),
@@ -832,7 +835,10 @@ function App() {
     query: SearchVisibilityQuery,
     observation: SearchDestinationObservation,
   ) => {
-    const normalizedObservation = normalizeSearchDestinationObservation(observation)
+    const normalizedObservation = normalizeSearchDestinationObservation(observation, {
+      profile: auditState.profile,
+      brandPresence: query.id === 'search-brand-canonical',
+    })
     updateState({
       searchDestinationObservations: {
         ...auditState.searchDestinationObservations,

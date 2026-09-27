@@ -2,7 +2,7 @@ import { evidenceFingerprint, matchesEvidenceFingerprint } from './evidenceFinge
 import { assessSearchCapture } from './searchResultExtraction'
 import { assessBusinessCandidates, reviewedProfileValue } from './entityMatcher'
 import { evaluateMachineReadability } from './machineReadability'
-import { resultTypesForDestination } from './searchVisibility'
+import { resultTypesForDestination, verificationUrlFor } from './searchVisibility'
 import type { SearchVisibilityObservedResultType } from '../types/audit'
 import { businessDirectoryKey } from './directorySuggestions'
 import type { AcquisitionResult } from '../types/acquisition'
@@ -78,7 +78,7 @@ const compactCapture = (capture: AcquisitionResult): AcquisitionResult => {
 export function mergeAutomatedObservation(previous: SearchDestinationObservation | undefined, incoming: SearchDestinationObservation): SearchDestinationObservation {
   if (previous && previous.query !== incoming.query) return incoming
   const manual = previous && (previous.reviewed || (previous.provenance !== 'automated_acquisition' && Boolean(previous.evidenceNotes.trim() || previous.competitorsObserved.trim() || previous.recommendedAction.trim() || !['not_checked', 'manual_review_needed'].includes(previous.overallResult))))
-  return manual ? { ...previous, automation: incoming.automation, reviewed: false } : {
+  return manual ? { ...previous, verificationUrl: incoming.verificationUrl, observedResultUrl: incoming.observedResultUrl, canonicalProfileUrl: incoming.canonicalProfileUrl, automation: incoming.automation, reviewed: false } : {
     ...incoming, competitorsObserved: previous?.competitorsObserved || '', recommendedAction: previous?.recommendedAction || '',
   }
 }
@@ -123,13 +123,14 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
   run.checks.push(website)
   const queries = buildSearchVisibilityQueries(profile, initial.businessProfile, { includeLocationDiagnostic: enhanced || Boolean(initial.searchDestinationObservations['search-brand-market']) })
   for (const query of queries) for (const destination of query.role === 'Brand Presence' ? searchDestinations : primarySearchDestinations) {
+    const verificationUrl = verificationUrlFor(destination, query.query, profile, query.id === 'search-brand-canonical')
     const prior = initial.searchDestinationObservations[query.id]?.[destination]?.automation
     const recorded = prior && initial.visibilityRuns?.some((record) => record.id === prior.runId && matchesEvidenceFingerprint(record.profileKey, profile)) ? prior.inspectedUrl : undefined
     const configured = [profile.knownListingUrl, ...profile.existingDirectoryUrls.split(/[\s,]+/)].find((url) => host(url) && host(url) === host(publicPresenceUrl(destination, query.query)) &&
       (destination !== 'Google Search' || new URL(url).pathname === '/search') &&
       (destination !== 'Google Maps' || new URL(url).pathname.startsWith('/maps')))
     run.checks.push({ ...check(`${query.id}:${destination}`, 'SearchMaps'), destination, queryId: query.id, query: query.query, queryMode: query.isDiagnostic ? 'location' : query.role === 'Brand Presence' ? 'brand' : 'discovery',
-      url: enhanced && query.isDiagnostic ? publicPresenceUrl(destination, query.query) : query.role === 'Brand Presence' ? configured || recorded || publicPresenceUrl(destination, query.query) : publicPresenceUrl(destination, query.query) })
+      url: destination === 'Google Search' ? verificationUrl : enhanced && query.isDiagnostic ? publicPresenceUrl(destination, query.query) : query.role === 'Brand Presence' ? configured || recorded || publicPresenceUrl(destination, query.query) : publicPresenceUrl(destination, query.query) })
   }
   // Only recorded sources; no guessed directories or seed mutation. Runtime additionally requires an explicit host allowlist.
   const directoryUrls = [...new Set([profile.knownListingUrl, ...profile.existingDirectoryUrls.split(/[\s,]+/), ...initial.directories.activeRows.filter((row) => row.businessId === businessDirectoryKey(profile)).map((row) => row.listingUrl)].filter((url) => /^https?:\/\//.test(url)))]
@@ -274,6 +275,9 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
         ? `${absenceCapture?.finalUrl || item.url} (bounded result region): ${assessment.ambiguityReasons.join(' ')}` : ''
       const normalizedEvidence = evidence || absenceEvidence
       const observation: SearchDestinationObservation = { ...defaultSearchDestinationObservation(item.destination, item.query!),
+        verificationUrl: verificationUrlFor(item.destination, item.query!, profile, item.queryMode === 'brand'),
+        ...(selected?.candidate.resultUrl ? { observedResultUrl: selected.candidate.resultUrl } : {}),
+        ...(selected?.candidate.fields.publicProfileUrl ? { canonicalProfileUrl: selected.candidate.fields.publicProfileUrl } : {}),
         observedAt: selected?.evidence[0]?.acquiredAt || captures.at(-1)?.acquiredAt || '', provenance: 'automated_acquisition', overallResult: assessment.automaticObservation ? 'found_match' : assessment.visibilityResult === 'not_found' ? 'not_found' : 'manual_review_needed',
         observedResultTypes: [...new Set(types)].filter((type) => resultTypesForDestination(item.destination!).includes(type)), evidenceNotes: normalizedEvidence,
         confidence: item.evidenceCaptured ? 'scanner_detected_public_page' : 'manual_needs_confirmation', evidenceKind: item.evidenceCaptured ? 'external_observation' : captures.some((capture) => ['success', 'partial'].includes(capture.outcome)) ? 'unable_to_verify' : 'acquisition_failure',
@@ -288,6 +292,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       item.interpreted = Boolean(best?.interpreted)
       item.state = best ? 'awaiting_review' : 'interactive_review_required'
       const observation = { ...defaultSearchDestinationObservation(item.destination, item.query!),
+        verificationUrl: verificationUrlFor(item.destination, item.query!, profile, item.queryMode === 'brand'),
         observedAt: best?.capture.acquiredAt || captures.at(-1)?.acquiredAt || '', provenance: 'automated_acquisition' as const,
         overallResult: 'manual_review_needed' as const, observedResultTypes: best?.types || [],
         evidenceNotes: best?.evidence || '', confidence: best ? 'scanner_detected_public_page' as const : 'manual_needs_confirmation' as const,

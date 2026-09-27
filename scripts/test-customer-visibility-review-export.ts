@@ -87,7 +87,7 @@ const serialized = serializeCustomerVisibilityReview(review)
 const qaText = customerVisibilityReviewQaText(review, true)
 assert.doesNotThrow(() => JSON.parse(serialized))
 for (const issue of review.confirmedIssues) for (const value of [issue.title, issue.summary, issue.foundLocalAction]) assert(qaText.includes(value), 'QA text reuses the exact customer-safe finding projection')
-for (const forbidden of ['brightdata', 'provider_permission_blocked', 'operator-only-run', 'operator-only raw evidence', 'internal note', 'confidence', 'blocker', 'provenance', 'resultRegionInspected', 'captures']) {
+for (const forbidden of ['brightdata', 'provider_permission_blocked', 'operator-only-run', 'operator-only raw evidence', 'internal note', 'confidence', 'blocker', 'provenance', 'resultRegionInspected', 'captures', 'verificationUrl', 'observedResultUrl', 'canonicalProfileUrl']) {
   assert.equal(serialized.toLowerCase().includes(forbidden.toLowerCase()), false, `customer export must omit ${forbidden}`)
   assert.equal(qaText.toLowerCase().includes(forbidden.toLowerCase()), false, `customer QA text must omit ${forbidden}`)
 }

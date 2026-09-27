@@ -88,7 +88,7 @@ export function acceptOperatorAssistedBrandObservation(previous: SearchDestinati
     overallResult: assessment.automaticObservation ? 'found_match' : conflict ? 'found_conflicting_information' : 'manual_review_needed',
     observedResultTypes: resultTypes(assessment).filter((type) => resultTypesForDestination('Google Search').includes(type)),
     confidence: assessment.automaticObservation ? 'operator_provided_page_text' : 'manual_needs_confirmation', evidenceKind: 'external_observation', evidenceNotes: summary,
-    reviewed: false, operatorAssisted: evidence })
+    reviewed: false, operatorAssisted: evidence }, { profile, brandPresence: true })
 }
 
 export const operatorAssistedEvidenceIsCurrent = (observation: SearchDestinationObservation, profile: BusinessProfile, profileState: BusinessProfileState) => Boolean(

@@ -623,6 +623,14 @@ export async function acquireGoogleMapsWithBrightData(config: SerpAcquisitionCon
   return { primaryProvider: 'brightdata_serp_api', selectedProvider: selected?.provider || null, fallbackTriggered: true, fallbackReason: serp.blocker, serp, browser, selected, outcome: selected ? 'success' : 'unavailable', blocker: selected ? 'none' : browser.blocker, resultRegionInspected: selected?.resultRegionInspected || false, candidates: selected?.candidates || [], elapsedMs: Math.round(performance.now() - started) }
 }
 
+const googleMapsProfileUrl = (value?: string) => {
+  if (!value) return undefined
+  try {
+    const url = new URL(value)
+    return /(?:^|\.)google\.com$/i.test(url.hostname) && /\/maps\//i.test(url.pathname) ? url.href : undefined
+  } catch { return undefined }
+}
+
 const matcherFields = (candidate: GoogleAcquisitionCandidate): BusinessResultCandidate['fields'] => {
   const fields: BusinessResultCandidate['fields'] = {}
   const observed: Partial<Record<EntityField, string | undefined>> = {
@@ -638,6 +646,7 @@ const matcherFields = (candidate: GoogleAcquisitionCandidate): BusinessResultCan
     postalCode: candidate.postalCode,
     category: candidate.category,
     placeIdentity: candidate.placeIdentity,
+    publicProfileUrl: googleMapsProfileUrl(candidate.resultUrl),
   }
   for (const [field, value] of Object.entries(observed)) if (value) fields[field as EntityField] = value
   return fields

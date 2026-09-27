@@ -226,10 +226,11 @@ assert.equal(isolated.automaticObservation, false, '9: evidence for one profile 
 
 const state: AuditState = { profile, businessProfile: reviewed(profile), checks: {}, notes: {}, evidenceConfidence: {}, lastUpdated: '', reportSummary: '', websiteAudit: normalizeWebsiteAuditWorkspaceState(undefined), selectedAIPlatform: 'Gemini', aiAnswerTests: {} as AuditState['aiAnswerTests'], searchVisibilityTests: {}, searchDestinationObservations: {}, voicePromptTests: {}, voiceAssistantObservations: [], directories: { activeRows: [], ignoredSuggestionIds: [] }, manualFixes: [], salesReadiness: { entityClarity: [], customerQuestions: [] } }
 let current = state
+const googleVerificationQuery = `${profile.businessName} ${profile.city} ${profile.state}`
 const run = await runVisibilityScan(state, { automationVersion: 2, async website() { return historical }, async acquire(url, method) {
   const query = new URL(url).searchParams.get('q') || ''
-  if (url.includes('google.com/search') && query === profile.businessName && method === 'server_fetch') return capture('<main>Loading result content</main>', { requestedUrl: url, finalUrl: url, method, outcome: 'partial' })
-  if (url.includes('google.com/search') && query === profile.businessName && method === 'rendered_browser') return capture('<main>Rendered result content</main>', { requestedUrl: url, finalUrl: url, method, renderedResultEvidence: renderedEvidence(url) })
+  if (url.includes('google.com/search') && query === googleVerificationQuery && method === 'server_fetch') return capture('<main>Loading result content</main>', { requestedUrl: url, finalUrl: url, method, outcome: 'partial' })
+  if (url.includes('google.com/search') && query === googleVerificationQuery && method === 'rendered_browser') return capture('<main>Rendered result content</main>', { requestedUrl: url, finalUrl: url, method, renderedResultEvidence: renderedEvidence(url) })
   return capture('', { requestedUrl: url, finalUrl: url, method, outcome: 'failed', error: 'Fixture unavailable', confidence: 'unavailable' })
 } }, (update) => { current = update(current) })
 const googleBrand = current.searchDestinationObservations['search-brand-canonical']['Google Search']!

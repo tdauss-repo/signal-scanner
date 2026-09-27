@@ -120,6 +120,34 @@ details and are hidden from normal navigation.
 - Design for future integrations without overcomplicating the initial version
 - Protect privacy and minimize unnecessary data collection
 
+## Brand Presence Evidence URL Contract
+
+Each destination observation keeps operator navigation, acquired evidence, and
+known platform identity separate:
+
+- `verificationUrl` is the clean destination/query URL intentionally generated
+  for operator verification. Google Search uses
+  `https://www.google.com/search?q=<encoded reviewed business name and bounded location>`
+  and never persists transient session or tracking parameters.
+- `observedResultUrl` is the result destination actually returned by acquired
+  evidence. It may be an ordinary business website page and is shown only in
+  operator evidence/acquisition detail.
+- `canonicalProfileUrl` is a genuine platform-specific business, listing, or
+  entity URL. It is populated only when the acquired candidate explicitly
+  identifies such a URL; an arbitrary organic result is never inferred to be a
+  profile.
+- `observedAt` is stored as UTC ISO-8601 and rendered in the operator/browser
+  local timezone. On load, legacy timezone-less datetime values are interpreted
+  as local wall-clock values and normalized to UTC without changing the time the
+  operator originally entered. Unparseable legacy values are retained for
+  operator review rather than assigned a guessed timezone.
+
+Generated verification destinations, acquired result URLs, and canonical
+platform profiles are separate concepts and must never be conflated. Legacy
+workspaces may conservatively reconstruct observed and canonical URLs from
+retained matcher evidence, but generated acquisition/query URLs never become
+observed results.
+
 ## Deployment Considerations
 The internal scanner and bounded API may be operated separately from Found
 Local Sites. The customer-safe JSON contract is the handoff boundary; direct

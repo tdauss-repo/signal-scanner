@@ -453,6 +453,12 @@ export interface SearchDestinationObservation extends DestinationEvidence {
   operatorAssisted?: OperatorAssistedBrowserEvidence
   destination: SearchDestination
   query: string
+  /** Clean operator destination generated for the verification task. */
+  verificationUrl: string
+  /** Acquired result destination, which may be an ordinary website page. */
+  observedResultUrl?: string
+  /** Genuine destination-specific profile/entity URL, only when explicitly observed. */
+  canonicalProfileUrl?: string
   overallResult: SearchVisibilityResult
   observedResultTypes: SearchVisibilityObservedResultType[]
   evidenceNotes: string

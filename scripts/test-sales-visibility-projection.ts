@@ -30,7 +30,7 @@ const discovered = projectSalesVisibility(automated(base('Yelp'), 'review_requir
 assert.equal(discovered.state, 'profile_discovered')
 assert.equal(discovered.customerFindingEligible, false)
 assert.equal(discovered.deliveryResponsibility, 'Manual verification required before recommendation')
-assert.equal(discovered.evidenceUrl, 'https://www.yelp.com/biz/example')
+assert.equal(discovered.actionUrl, 'https://www.yelp.com/biz/example')
 
 const groups = salesVisibilityGroups([{ ...automated(base(), 'found'), overallResult: 'found_match' }, { ...automated(base('Apple Maps'), 'unavailable') }])
 assert.equal(groups.lookingGood.length, 1)
