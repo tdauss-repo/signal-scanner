@@ -1553,6 +1553,83 @@ button.ghost {
   gap: 8px;
 }
 
+.brand-presence-evidence-detail {
+  background: #f7fbfd;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 10px 12px;
+}
+
+.brand-presence-evidence-detail > summary,
+.brand-presence-raw-evidence > summary {
+  color: var(--blue);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.brand-presence-evidence-detail[open] {
+  display: grid;
+  gap: 12px;
+}
+
+.brand-presence-evidence-summary {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.brand-presence-evidence-summary > div {
+  display: grid;
+  gap: 3px;
+  grid-template-columns: minmax(120px, 0.3fr) minmax(0, 1fr);
+}
+
+.brand-presence-evidence-summary dt {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.brand-presence-evidence-summary dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.brand-presence-evidence-summary a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.brand-presence-raw-evidence {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.brand-presence-raw-evidence-body {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  min-width: 0;
+}
+
+.brand-presence-raw-evidence pre {
+  background: #12212c;
+  border-radius: 6px;
+  color: #dcebf3;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 0;
+  max-height: 22rem;
+  max-width: 100%;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .full-width-label {
   display: grid;
   gap: 6px;

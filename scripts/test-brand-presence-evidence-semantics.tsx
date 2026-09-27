@@ -89,9 +89,9 @@ const markup = renderToStaticMarkup(<SearchVisibilityPanel
 assert(markup.includes('Website result discovered — verify business identity'))
 assert(markup.includes(`href="${organic.verificationUrl.replaceAll('&', '&amp;')}"`), 'primary Google action opens verificationUrl')
 assert(markup.includes('>Open Google Search</a>'))
-assert(markup.includes('Observed search result:'))
+assert(markup.includes('Observed result'))
 assert(markup.includes('montessoridownriver.com/infographic-parenting-book-recommendations'))
-assert(markup.includes('Observed at: 09/26/2026, 6:39 PM (local time)'))
+assert(markup.includes('09/26/2026, 6:39 PM (local time)'))
 assert(!markup.includes(`href="${observedResultUrl}">Open profile</a>`), 'observed organic page is never the profile action')
 
 console.log('Brand Presence evidence semantics PASS: URL roles, neutral wording/actions, canonical profiles, local time rendering, and saved-workspace compatibility.')

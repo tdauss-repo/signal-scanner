@@ -5,6 +5,9 @@ import { acceptOperatorAssistedBrandObservation, operatorAssistedEvidenceIsCurre
 import { projectSalesVisibility } from '../utils/salesVisibilityProjection'
 import { evidenceTimestampToLocalInput, formatEvidenceTimestamp, localInputToEvidenceTimestamp } from '../utils/evidenceTime'
 import { brandPresenceMismatchLabels, brandPresenceOutcomeLabels, brandPresenceVerificationIsStale, buildBrandPresenceVerification, currentBrandPresenceVerification, expectedBrandPresenceIdentity } from '../utils/brandPresenceVerification'
+import { brandPresenceEvidenceSummary, serializeBrandPresenceTechnicalEvidence, shortEvidenceUrl } from '../utils/brandPresenceEvidenceDetail'
+import type { SalesVisibilityProjection } from '../utils/salesVisibilityProjection'
+import { copyText } from '../utils/copyText'
 
 interface Props { profile: BusinessProfile; profileState: BusinessProfileState; legacyTests: Record<string, SearchVisibilityTestState>; observations: Record<string, Partial<Record<SearchDestination, SearchDestinationObservation>>>; onChange: (query: SearchVisibilityQuery, observation: SearchDestinationObservation) => void; onAddToActionPlan: (query: SearchVisibilityQuery) => void }
 const results: SearchVisibilityResult[] = ['not_checked', 'manual_review_needed', 'found_match', 'found_prominently', 'found_weak', 'found_conflicting_information', 'not_found', 'unable_to_verify']
@@ -84,6 +87,39 @@ function BrandPresenceVerification({ profile, profileState, query, value, onChan
   </section>
 }
 
+function BrandPresenceEvidenceDetail({ value, sales }: { value: SearchDestinationObservation; sales: SalesVisibilityProjection }) {
+  const [rawOpen, setRawOpen] = useState(false)
+  const [copyStatus, setCopyStatus] = useState('')
+  const summary = brandPresenceEvidenceSummary(value, sales)
+  const rawEvidence = rawOpen ? serializeBrandPresenceTechnicalEvidence(value) : ''
+  const copyRawEvidence = async () => {
+    const result = await copyText(rawEvidence || serializeBrandPresenceTechnicalEvidence(value))
+    setCopyStatus(result.copied ? 'Raw evidence copied.' : 'Copy was unavailable. Select the raw evidence below to copy it manually.')
+  }
+  return <details className="brand-presence-evidence-detail">
+    <summary>Operator evidence &amp; acquisition detail</summary>
+    <dl className="brand-presence-evidence-summary">
+      <div><dt>Acquisition</dt><dd>{summary.acquisition}</dd></div>
+      <div><dt>Result</dt><dd>{summary.result}</dd></div>
+      {summary.observedResultUrl ? <div><dt>Observed result</dt><dd><a href={summary.observedResultUrl} target="_blank" rel="noreferrer">{shortEvidenceUrl(summary.observedResultUrl)}</a></dd></div> : null}
+      {summary.knownProfileUrl ? <div><dt>Known profile</dt><dd><a href={summary.knownProfileUrl} target="_blank" rel="noreferrer">{shortEvidenceUrl(summary.knownProfileUrl)}</a></dd></div> : null}
+      {summary.observedAt ? <div><dt>Observed</dt><dd>{formatEvidenceTimestamp(summary.observedAt)} (local time)</dd></div> : null}
+      <div><dt>Source</dt><dd>{summary.source}</dd></div>
+      {summary.automationState ? <div><dt>Automation state</dt><dd>{summary.automationState}</dd></div> : null}
+      {summary.interpretation ? <div><dt>Interpretation</dt><dd>{summary.interpretation}</dd></div> : null}
+      {summary.reason ? <div><dt>Reason</dt><dd>{summary.reason}</dd></div> : null}
+      {summary.nextStep ? <div><dt>Next step</dt><dd>{summary.nextStep}</dd></div> : null}
+      <div><dt>Verification destination</dt><dd><a href={summary.verificationUrl} target="_blank" rel="noreferrer">{summary.verificationLabel}</a></dd></div>
+      {value.operatorVerification ? <><div><dt>Operator result</dt><dd>{brandPresenceOutcomeLabels[value.operatorVerification.outcome]}</dd></div><div><dt>Reviewed</dt><dd>{formatEvidenceTimestamp(value.operatorVerification.reviewedAt)} (local time)</dd></div>{value.operatorVerification.operatorObservedUrl ? <div><dt>Operator observed URL</dt><dd><a href={value.operatorVerification.operatorObservedUrl} target="_blank" rel="noreferrer">{shortEvidenceUrl(value.operatorVerification.operatorObservedUrl)}</a></dd></div> : null}{value.operatorVerification.mismatches.length ? <div><dt>Mismatches</dt><dd>{value.operatorVerification.mismatches.map((item) => brandPresenceMismatchLabels[item]).join(', ')}</dd></div> : null}{value.operatorVerification.note ? <div><dt>Operator note</dt><dd>{value.operatorVerification.note}</dd></div> : null}</> : null}
+    </dl>
+    <div className="directory-actions">{summary.observedResultUrl ? <a href={summary.observedResultUrl} target="_blank" rel="noreferrer">Open observed result</a> : null}<a href={summary.verificationUrl} target="_blank" rel="noreferrer">{sales.actionLabel}</a></div>
+    <details className="brand-presence-raw-evidence" onToggle={(event) => { setRawOpen(event.currentTarget.open); setCopyStatus('') }}>
+      <summary>Raw technical evidence</summary>
+      {rawOpen ? <div className="brand-presence-raw-evidence-body"><div className="directory-actions"><button type="button" className="secondary" onClick={() => void copyRawEvidence()}>Copy raw evidence</button>{copyStatus ? <span role="status">{copyStatus}</span> : null}</div><pre>{rawEvidence}</pre></div> : null}
+    </details>
+  </details>
+}
+
 
 export function SearchVisibilityPanel({ profile, profileState, legacyTests, observations, onChange, onAddToActionPlan }: Props) {
   const [diagnostic, setDiagnostic] = useState(Boolean(legacyTests['search-brand-market'] || observations['search-brand-market']))
@@ -97,9 +133,9 @@ export function SearchVisibilityPanel({ profile, profileState, legacyTests, obse
         <summary>{destination} — {sales.headline}</summary>
         <div className="destination-sales-summary"><p><strong>{sales.headline}</strong></p><p>{sales.explanation}</p><p><strong>Identity consistency:</strong> {sales.identitySummary}</p><p><strong>Next action:</strong> {sales.nextAction}</p></div>
         <div className="directory-actions"><a href={sales.actionUrl} target="_blank" rel="noreferrer">{sales.actionLabel}</a>{sales.knownProfileUrl ? <a href={sales.knownProfileUrl} target="_blank" rel="noreferrer">Open known profile</a> : null}</div>
-        {value.automation || value.operatorVerification ? <details><summary>Operator evidence & acquisition detail — {value.operatorVerification ? 'Operator review recorded' : value.automation?.automaticObservation ? 'Automatically matched observation' : 'Automated evidence — review required'}</summary>{value.observedResultUrl ? <p>Observed search result: <a href={value.observedResultUrl} target="_blank" rel="noreferrer">{displayUrl(value.observedResultUrl)}</a></p> : null}{value.canonicalProfileUrl ? <p>Canonical platform profile: <a href={value.canonicalProfileUrl} target="_blank" rel="noreferrer">{displayUrl(value.canonicalProfileUrl)}</a></p> : null}{value.automation ? <><p>Acquisition source/status: {value.provenance} · {value.automation.state}</p><p>Observed at: {formatEvidenceTimestamp(value.observedAt)} (local time)</p><p>{value.automation.evidence || 'No reliable interpretation. Use the public destination link for interactive review.'}</p>{value.automation.assessment ? <><p>Identity confidence: {value.automation.assessment.confidence} · Query mode: {value.automation.queryMode} · Blocker: {value.automation.assessment.blocker}</p><p>{value.automation.assessment.ambiguityReasons.join(' ')}</p><p>Result region inspected: {value.automation.assessment.resultRegionInspected ? 'Yes' : 'No'} · Provenance: {value.provenance}</p></> : null}<pre>{JSON.stringify(value.automation.captures, null, 2)}</pre></> : null}{value.operatorVerification ? <><p>Operator outcome: {brandPresenceOutcomeLabels[value.operatorVerification.outcome]} · {formatEvidenceTimestamp(value.operatorVerification.reviewedAt)} (local time)</p>{value.operatorVerification.operatorObservedUrl ? <p>Operator observed URL: <a href={value.operatorVerification.operatorObservedUrl} target="_blank" rel="noreferrer">{displayUrl(value.operatorVerification.operatorObservedUrl)}</a></p> : null}{value.operatorVerification.mismatches.length ? <p>Mismatches: {value.operatorVerification.mismatches.map((item) => brandPresenceMismatchLabels[item]).join(', ')}</p> : null}{value.operatorVerification.note ? <p>Operator note: {value.operatorVerification.note}</p> : null}</> : null}</details> : null}
-        {assistedGoogleBrand ? <OperatorAssistedGoogleBrand profile={profile} profileState={profileState} query={query} value={value} url={value.verificationUrl || publicPresenceUrl(destination, query.query)} onChange={onChange} /> : null}
         {query.role === 'Brand Presence' ? <BrandPresenceVerification profile={profile} profileState={profileState} query={query} value={value} onChange={onChange} /> : <><div className="search-observation-grid"><label>Review outcome<select value={value.overallResult} onChange={(event) => { const overallResult = event.target.value as SearchVisibilityResult; patch(query, destination, { overallResult, reviewed: false, observedAt: new Date().toISOString(), evidenceKind: overallResult === 'not_found' ? 'absence' : overallResult === 'unable_to_verify' ? 'unable_to_verify' : 'external_observation' }) }}><option value="found_match">Found — looks correct</option><option value="found_conflicting_information">Found — correction needed</option><option value="not_found">Not found</option><option value="unable_to_verify">Unable to determine</option>{results.filter((result) => !['found_match', 'found_conflicting_information', 'not_found', 'unable_to_verify'].includes(result)).map((result) => <option key={result} value={result}>{searchVisibilityResultLabel(result)}</option>)}</select></label><label>Observed at (local time)<input type="datetime-local" value={evidenceTimestampToLocalInput(value.observedAt)} onChange={(event) => patch(query, destination, { observedAt: localInputToEvidenceTimestamp(event.target.value) })}/></label><label className="checkbox-field"><input id={`${query.id}-${destination}-reviewed`} type="checkbox" checked={value.reviewed} onChange={(event) => patch(query, destination, { reviewed: event.target.checked })}/><span>Observation reviewed</span></label></div><fieldset className="result-type-fieldset"><legend>Observed result types</legend>{types.map((type) => <label className="result-type-option" key={type} htmlFor={`${query.id}-${destination}-${type}`}><input id={`${query.id}-${destination}-${type}`} type="checkbox" checked={value.observedResultTypes.includes(type)} onChange={(event) => patch(query, destination, { observedResultTypes: normalizeSearchResultTypes(event.target.checked ? [...value.observedResultTypes, type] : value.observedResultTypes.filter((item) => item !== type)) })}/><span>{searchResultTypeLabel(destination, type)}</span></label>)}</fieldset><div className="directory-row-grid"><label>Evidence notes<textarea value={value.evidenceNotes} onChange={(event) => patch(query, destination, { evidenceNotes: event.target.value })}/></label><label>Competitors observed <span className="customer-small">(or correction notes: name, address, phone, website, category, other)</span><textarea value={value.competitorsObserved} onChange={(event) => patch(query, destination, { competitorsObserved: event.target.value })}/></label></div><label className="full-width-label">Recommended action<textarea value={value.recommendedAction} onChange={(event) => patch(query, destination, { recommendedAction: event.target.value })}/></label></>}
+        {assistedGoogleBrand ? <OperatorAssistedGoogleBrand profile={profile} profileState={profileState} query={query} value={value} url={value.verificationUrl || publicPresenceUrl(destination, query.query)} onChange={onChange} /> : null}
+        {value.automation || value.operatorAssisted || value.operatorVerification ? <BrandPresenceEvidenceDetail value={value} sales={sales} /> : null}
       </details> })}
       {query.role === 'Brand Presence' ? null : <div className="directory-actions"><button type="button" onClick={() => onAddToActionPlan(query)}>Add reviewed primary evidence to Review</button></div>}
     </article>)}</div>

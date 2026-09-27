@@ -187,6 +187,15 @@ projection exposes only approved wording and effective strengths: fingerprints,
 provider details, timestamps, operator notes, mismatch metadata, and internal
 URLs remain in the scanner workspace.
 
+Brand Presence Review maintains a presentation boundary inside the operator
+workspace as well: the normal evidence disclosure is a concise projection of
+decision-relevant acquisition state, observed/canonical URLs, local display
+time, destination, and interpretation. It is not the raw acquisition record.
+Full provider captures, request/debug metadata, and matcher evidence remain
+available for diagnosis in a nested, collapsed, bounded technical disclosure.
+Operator evidence summary and raw acquisition/provider evidence are distinct
+presentation layers; technical data remains secondary to assisted verification.
+
 ## Deployment Considerations
 The internal scanner and bounded API may be operated separately from Found
 Local Sites. The customer-safe JSON contract is the handoff boundary; direct
