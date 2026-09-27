@@ -62,6 +62,7 @@ export function expectedBrandPresenceIdentity(
 const materialMatch = (match: EntityMatch) => ({
   candidate: {
     kind: match.candidate.kind,
+    sourceType: match.candidate.sourceType,
     resultUrl: match.candidate.resultUrl,
     fields: match.candidate.fields,
     schemaTypes: match.candidate.schemaTypes,
@@ -104,6 +105,7 @@ export function brandPresenceVerificationEvidenceKey(
       confidence: assessment.confidence,
       blocker: assessment.blocker,
       ambiguityReasons: assessment.ambiguityReasons,
+      googleIdentityDecision: assessment.googleIdentityDecision,
       selected: assessment.selected ? materialMatch(assessment.selected) : undefined,
       matches: assessment.matches.map(materialMatch),
     } : !assessment ? {

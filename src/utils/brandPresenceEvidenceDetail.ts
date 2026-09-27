@@ -14,6 +14,8 @@ export interface BrandPresenceEvidenceSummary {
   nextStep?: string
   verificationUrl: string
   verificationLabel: string
+  identityEvidence?: Array<{ label: string; result: string }>
+  decision?: string
 }
 
 const unavailable = (observation: SearchDestinationObservation) =>
@@ -47,6 +49,20 @@ const resultLabel = (observation: SearchDestinationObservation, sales: SalesVisi
   return 'No verified result'
 }
 
+const identityLabel = (field: string) => ({
+  name: 'Name', website: 'Website', address: 'Address', streetAddress: 'Address', phone: 'Phone',
+  locality: 'City', region: 'State', postalCode: 'ZIP',
+}[field] || field)
+
+const automaticIdentityEvidence = (observation: SearchDestinationObservation) => {
+  const decision = observation.automation?.assessment?.googleIdentityDecision
+  if (!decision) return undefined
+  return [
+    ...decision.matchedSignals.map((signal) => ({ label: identityLabel(signal.field), result: signal.field === 'name' ? 'Matches' : `Matches ${signal.observed}` })),
+    ...decision.conflictingSignals.map((signal) => ({ label: identityLabel(signal.field), result: `Conflicts: observed ${signal.observed}; reviewed ${signal.expected}` })),
+  ]
+}
+
 /** Decision-relevant operator summary projected from the retained evidence. */
 export function brandPresenceEvidenceSummary(
   observation: SearchDestinationObservation,
@@ -58,6 +74,7 @@ export function brandPresenceEvidenceSummary(
       : observation.automation ? 'Automated evidence'
         : observation.operatorVerification ? 'Operator verification'
           : 'Manual evidence'
+  const identityEvidence = automaticIdentityEvidence(observation)
   return {
     acquisition,
     result: resultLabel(observation, sales),
@@ -72,6 +89,10 @@ export function brandPresenceEvidenceSummary(
     }),
     verificationUrl: observation.verificationUrl,
     verificationLabel: `${observation.destination} verification query`,
+    ...(identityEvidence?.length ? { identityEvidence } : {}),
+    ...(observation.automation?.assessment?.googleIdentityDecision ? {
+      decision: observation.automation.assessment.googleIdentityDecision.decision === 'verified' ? 'Verified automatically' : 'Assisted verification required',
+    } : {}),
   }
 }
 

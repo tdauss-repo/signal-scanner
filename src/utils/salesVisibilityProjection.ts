@@ -1,12 +1,13 @@
 import type { BusinessProfile, BusinessProfileState, SearchDestination, SearchDestinationObservation } from '../types/audit'
 import { brandPresenceVerificationIsStale, currentBrandPresenceVerification } from './brandPresenceVerification'
+import { reviewedProfileValue } from './entityMatcher'
 import { canonicalProfileUrlForDestination, publicPresenceUrl } from './searchVisibility'
 
 export type SalesVisibilityState =
   | 'verified_correct' | 'verified_correction_needed' | 'not_found' | 'manual_verification_needed'
   | 'profile_discovered' | 'website_result_discovered' | 'verified_by_operator'
   | 'operator_correction_needed' | 'operator_not_found' | 'operator_unable_to_determine'
-  | 'reconfirmation_needed'
+  | 'reconfirmation_needed' | 'conflicting_evidence'
 
 export interface SalesVisibilityProjectionContext {
   profile?: BusinessProfile
@@ -26,6 +27,7 @@ export interface SalesVisibilityProjection {
   starterPackageEligible: boolean
   deliveryResponsibility: 'Found Local can implement' | 'Found Local can assist/guide' | 'Customer/platform ownership required' | 'Manual verification required before recommendation'
   operatorReviewRequired: boolean
+  automationSummary?: string
   knownProfileUrl?: string
   technicalDetail: Record<string, unknown>
 }
@@ -42,6 +44,7 @@ const labels: Record<SalesVisibilityState, string> = {
   operator_not_found: 'Not found during operator review',
   operator_unable_to_determine: 'Unable to determine',
   reconfirmation_needed: 'Verification changed — reconfirmation needed',
+  conflicting_evidence: 'Conflicting evidence — review needed',
 }
 
 /** Customer-safe interpretation. Raw acquisition and operator records remain separate. */
@@ -73,12 +76,15 @@ export function projectSalesVisibility(
   const observedResultUrl = observation.observedResultUrl || selectedCandidate?.resultUrl
   const verificationUrl = observation.verificationUrl || publicPresenceUrl(observation.destination, observation.query)
   const automatedReview = assessment?.operatorReviewRequired === true
+  const googleConflict = observation.destination === 'Google Search' && !assessment?.automaticObservation && (
+    assessment?.blocker === 'identifier_conflict' || assessment?.blocker === 'multiple_entities'
+  )
   const unavailable = assessment?.visibilityResult === 'unavailable' || automatedReview || observation.overallResult === 'manual_review_needed' || observation.overallResult === 'unable_to_verify' || observation.overallResult === 'not_checked'
-  const profileDiscovered = Boolean(acquiredProfileUrl && !assessment?.automaticObservation && !['not_found', 'unavailable'].includes(assessment?.visibilityResult || ''))
+  const profileDiscovered = Boolean(acquiredProfileUrl && !googleConflict && !assessment?.automaticObservation && !['not_found', 'unavailable'].includes(assessment?.visibilityResult || ''))
   const organicWebsiteResult = Boolean(
     observation.destination === 'Google Search' && observedResultUrl && !acquiredProfileUrl &&
     selectedCandidate?.kind === 'result_link' && selectedCandidate.fields.website &&
-    !observation.reviewed && assessment?.visibilityResult !== 'not_found',
+    !observation.reviewed && assessment?.visibilityResult !== 'not_found' && assessment?.googleIdentityDecision?.decision !== 'verified',
   )
   const conflicting = observation.overallResult === 'found_conflicting_information'
   const verified = Boolean(assessment?.automaticObservation && !automatedReview && !organicWebsiteResult)
@@ -92,6 +98,7 @@ export function projectSalesVisibility(
   else if (operatorVerification?.outcome === 'not_found') state = 'operator_not_found'
   else if (operatorVerification?.outcome === 'unable_to_determine') state = 'operator_unable_to_determine'
   else if (staleOperatorVerification) state = 'reconfirmation_needed'
+  else if (googleConflict) state = 'conflicting_evidence'
   else if (profileDiscovered) state = 'profile_discovered'
   else if (organicWebsiteResult) state = 'website_result_discovered'
   else if (unavailable || assessment?.visibilityResult === 'not_found') state = 'manual_verification_needed'
@@ -99,7 +106,12 @@ export function projectSalesVisibility(
   else if (verified || ['found_match', 'found_prominently'].includes(observation.overallResult) && observation.reviewed) state = 'verified_correct'
   else state = 'manual_verification_needed'
 
-  const baseExplanation = state === 'verified_correct' ? 'Automated evidence matched the reviewed business identity.'
+  const reviewedName = context.profile && context.profileState
+    ? reviewedProfileValue(context.profile, context.profileState, 'businessName')
+    : ''
+  const baseExplanation = state === 'verified_correct' && observation.destination === 'Google Search'
+    ? `Google Search shows business information that matches the reviewed details${reviewedName ? ` for ${reviewedName}` : ''}.`
+    : state === 'verified_correct' ? 'Automated evidence matched the reviewed business identity.'
     : state === 'verified_by_operator' ? 'The operator verified that the business identity shown at this destination matches the reviewed information.'
       : state === 'verified_correction_needed' ? 'A reviewed public result has a confirmed identity difference that should be corrected.'
         : state === 'operator_correction_needed' ? 'The operator found a destination result with business information that needs correction.'
@@ -108,6 +120,7 @@ export function projectSalesVisibility(
               : state === 'reconfirmation_needed' ? 'The business identity or material destination evidence changed after the prior operator review. Reconfirm it before using that decision.'
                 : state === 'profile_discovered' ? 'A likely public profile was discovered indirectly; its details have not yet been verified.'
                   : state === 'website_result_discovered' ? 'Google returned a page from the business website, but the business information shown in search has not yet been verified.'
+                    : state === 'conflicting_evidence' ? 'Acquired Google evidence contains identity details that conflict or identify multiple plausible entities. Operator review is required.'
                     : assessment?.visibilityResult === 'not_found' ? 'Automation did not find a sufficient match. This is not absence evidence; an operator must verify the destination.'
                       : 'This destination still needs an operator review. An unavailable or restricted check is not a business problem.'
   const explanation = evidenceConflict ? `${baseExplanation} This differs from the retained automated interpretation and should be reviewed.` : baseExplanation
@@ -117,6 +130,7 @@ export function projectSalesVisibility(
         : state === 'operator_unable_to_determine' ? `Revisit ${observation.destination} only when clearer evidence is available`
           : state === 'profile_discovered' ? `Open ${observation.destination} and verify business details`
             : state === 'website_result_discovered' ? 'Open Google Search and verify business details'
+              : state === 'conflicting_evidence' ? 'Open Google Search and resolve the conflicting business details'
               : `Open ${observation.destination} and record the review outcome`
   const customerFindingEligible = ['verified_correction_needed', 'operator_correction_needed', 'operator_not_found'].includes(state)
   const operatorReviewRequired = !['verified_correct', 'verified_by_operator', 'verified_correction_needed', 'operator_correction_needed', 'operator_not_found'].includes(state)
@@ -127,9 +141,11 @@ export function projectSalesVisibility(
       ? 'Automated check unavailable — verification needed'
       : labels[state],
     explanation,
-    identitySummary: ['verified_correct', 'verified_by_operator'].includes(state) ? 'Business identity aligns with reviewed details'
+    identitySummary: state === 'verified_correct' && observation.destination === 'Google Search' ? 'Matches reviewed business details'
+      : ['verified_correct', 'verified_by_operator'].includes(state) ? 'Business identity aligns with reviewed details'
       : ['verified_correction_needed', 'operator_correction_needed'].includes(state) ? 'A reviewed identity difference was observed'
         : state === 'operator_not_found' ? 'No matching presence was found during operator review'
+          : state === 'conflicting_evidence' ? 'Conflicts with reviewed business details'
           : 'Still requires verification',
     actionUrl: verificationUrl,
     actionLabel: `Open ${observation.destination}`,
@@ -141,6 +157,7 @@ export function projectSalesVisibility(
         : ['verified_correct', 'verified_by_operator'].includes(state) ? 'Customer/platform ownership required'
           : 'Manual verification required before recommendation',
     operatorReviewRequired,
+    ...(state === 'verified_correct' && observation.destination === 'Google Search' ? { automationSummary: 'Verified from acquired Google evidence' } : {}),
     ...(profileUrl ? { knownProfileUrl: profileUrl } : {}),
     technicalDetail: { ...technicalDetail, evidenceConflict },
   }

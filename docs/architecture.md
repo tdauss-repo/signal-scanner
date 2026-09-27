@@ -196,6 +196,33 @@ available for diagnosis in a nested, collapsed, bounded technical disclosure.
 Operator evidence summary and raw acquisition/provider evidence are distinct
 presentation layers; technical data remains secondary to assisted verification.
 
+### Google Search automatic identity verification
+
+Google Search acquisition applies a deterministic identity decision against the
+current reviewed Business Profile. Automatic verification requires at least two
+independent strong matched identifier groups from business name, official
+website domain, phone, or address; one must be business name or official domain.
+Category and locality fragments may explain evidence but do not independently
+meet the threshold. HTTP/HTTPS and `www` differences, phone punctuation, common
+street suffixes, case, punctuation, spacing, and state names/abbreviations are
+normalized conservatively.
+
+Knowledge-panel, local-place, and organic candidates retain their provider
+shape as provenance. Consistent representations may contribute together only
+when they share an asserted identity field. A lone domain result, name-only
+result, category, city, rating, or review count cannot verify identity. Any
+material conflicting identifier or multiple plausible entity blocks automatic
+verification and produces an explainable review-needed state.
+
+The objective of automated acquisition is to eliminate operator verification
+when acquired evidence is sufficient. Assisted verification is a fallback for
+incomplete, ambiguous, conflicting, or unavailable evidence. Generated Google
+verification URLs remain navigation only, and raw acquisition candidates are
+never overwritten by the identity decision. Automatically verified Google
+Search evidence may generate the existing Google-only strength candidate, but
+it still passes through include/hide/refine controls; matcher details and
+provider metadata never enter customer JSON.
+
 ## Deployment Considerations
 The internal scanner and bounded API may be operated separately from Found
 Local Sites. The customer-safe JSON contract is the handoff boundary; direct

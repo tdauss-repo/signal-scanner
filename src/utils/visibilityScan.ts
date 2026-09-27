@@ -244,7 +244,9 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
     if (item.destination && enhanced) {
       const assessments = captures.map((capture) => assessSearchCapture(capture, profile, initial.businessProfile, item.destination!, item.queryMode))
       const candidates = assessments.flatMap((assessment) => assessment.matches.map((match) => match.candidate))
-      const assessment = candidates.length ? assessBusinessCandidates(candidates, profile, initial.businessProfile, item.queryMode)
+      const assessment = candidates.length ? assessBusinessCandidates(candidates, profile, initial.businessProfile, item.queryMode, {
+        automaticIdentityPolicy: item.destination === 'Google Search' && item.queryMode === 'brand' ? 'google_search' : undefined,
+      })
         : assessments.find((value) => value.visibilityResult === 'not_found') || assessments.at(-1) || { matches: [], confidence: 'unavailable' as const, automaticObservation: false, visibilityResult: 'unavailable' as const, operatorReviewRequired: true, resultRegionInspected: false, ambiguityReasons: [item.error || 'No usable public evidence was captured.'], blocker: 'runtime_unavailable' as const, tier3Candidate: false }
       assessment.resultRegionInspected ||= assessments.some((value) => value.resultRegionInspected)
       if (!assessment.automaticObservation && !['identifier_conflict', 'unreviewed_profile', 'access_blocked', 'acquisition_failure', 'runtime_unavailable'].includes(assessment.blocker)) {

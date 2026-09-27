@@ -214,7 +214,9 @@ export function assessSearchCapture(capture: AcquisitionResult, profile: Busines
   if (capture.outcome === 'blocked' || isChallenge(capture) || loginGate) return { matches: [], confidence: 'unavailable', automaticObservation: false, visibilityResult: 'unavailable', operatorReviewRequired: true, resultRegionInspected: false, ambiguityReasons: ['Public capture encountered an access restriction or challenge. Manual public review is required; no bypass was attempted.'], blocker: 'access_blocked', tier3Candidate: false }
   if (!['success', 'partial'].includes(capture.outcome)) return { matches: [], confidence: 'unavailable', automaticObservation: false, visibilityResult: 'unavailable', operatorReviewRequired: true, resultRegionInspected: false, ambiguityReasons: [`Acquisition did not obtain a public page: ${capture.error || capture.outcome}. This is not evidence of absence.`], blocker: 'acquisition_failure', tier3Candidate: false }
   const candidates = searchResultExtractors.flatMap((extractor) => extractor.extract(capture))
-  const assessment = assessBusinessCandidates(candidates, profile, profileState, queryMode)
+  const assessment = assessBusinessCandidates(candidates, profile, profileState, queryMode, {
+    automaticIdentityPolicy: destination === 'Google Search' && queryMode === 'brand' ? 'google_search' : undefined,
+  })
   const resultRegionInspected = Boolean(capture.resultRegionInspected || capture.renderedResultEvidence?.resultRegionInspected || (candidates.length && /<(?:main|article)\b|role=["'](?:main|listitem)["']/i.test(capture.html || '')))
   assessment.resultRegionInspected = resultRegionInspected
   if (!assessment.matches.length && resultRegionInspected && reviewedProfileValue(profile, profileState, 'businessName')) {

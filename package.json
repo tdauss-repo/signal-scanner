@@ -45,7 +45,8 @@
     "test:destination-brightdata": "node --import tsx scripts/test-destination-brightdata.ts",
     "test:brand-presence-evidence-semantics": "node --import tsx scripts/test-brand-presence-evidence-semantics.tsx",
     "test:brand-presence-assisted-verification": "node --import tsx scripts/test-brand-presence-assisted-verification.tsx",
-    "test:brand-presence-evidence-detail": "node --import tsx scripts/test-brand-presence-evidence-detail.tsx"
+    "test:brand-presence-evidence-detail": "node --import tsx scripts/test-brand-presence-evidence-detail.tsx",
+    "test:google-search-auto-verification": "node --import tsx scripts/test-google-search-auto-verification.tsx"
   },
   "dependencies": {
     "express": "^5.2.1",

@@ -39,6 +39,7 @@ export interface CustomerStrengthInput {
 const materialEntityMatch = (match: EntityMatch) => ({
   candidate: {
     kind: match.candidate.kind,
+    sourceType: match.candidate.sourceType,
     resultUrl: match.candidate.resultUrl,
     fields: match.candidate.fields,
     schemaTypes: match.candidate.schemaTypes,
@@ -86,6 +87,7 @@ const materialSearchEvidence = (state: AuditState, queryId: string, observation:
       confidence: assessment.confidence,
       blocker: assessment.blocker,
       ambiguityReasons: assessment.ambiguityReasons,
+      googleIdentityDecision: assessment.googleIdentityDecision,
       selected: assessment.selected ? materialEntityMatch(assessment.selected) : undefined,
       matches: assessment.matches.map(materialEntityMatch),
     } : undefined,

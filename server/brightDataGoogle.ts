@@ -658,6 +658,7 @@ export function brightDataMatcherCandidates(acquisition: NormalizedGoogleAcquisi
   return acquisition.candidates.map((candidate) => ({
     id: candidate.id,
     kind: candidate.resultType === 'organic' ? 'result_link' : 'semantic_card',
+    sourceType: candidate.resultType,
     ...(candidate.resultUrl ? { resultUrl: candidate.resultUrl } : {}),
     fields: matcherFields(candidate),
     evidence: [{

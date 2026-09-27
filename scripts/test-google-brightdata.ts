@@ -233,6 +233,14 @@ assert.equal(browserProductionCapture.method, 'rendered_browser')
 assert.equal(browserMatch.automaticObservation, true)
 assert.equal(browserMatch.visibilityResult, 'found', '11: Browser API fallback candidates enter the same matcher')
 
+const knowledgePanel = { ...success('brightdata_serp_api'), candidates: normalizeSerpPayload({ knowledge: {
+  name: profile.businessName, website: profile.website, phone: profile.phone,
+  address: `${profile.streetAddress}, ${profile.city}, ${profile.state} ${profile.zip}`,
+} }) }
+const knowledgePanelMatch = assessSearchCapture(brightDataProductionCapture(runWith(knowledgePanel), knowledgePanel.requestedUrl), profile, reviewed(profile), 'Google Search', 'brand')
+assert.equal(knowledgePanelMatch.selected?.candidate.sourceType, 'knowledge_panel', 'normalized knowledge-panel provenance reaches the identity decision')
+assert.equal(knowledgePanelMatch.googleIdentityDecision?.decision, 'verified', 'knowledge-panel identifiers satisfy the bounded Google identity contract')
+
 const conflicting = { ...success('brightdata_serp_api'), candidates: normalizeSerpPayload({ knowledge: { name: 'Example Studio', website: 'https://different.example/', phone: '313-555-0100' } }) }
 const conflictAssessment = assessSearchCapture(brightDataProductionCapture(runWith(conflicting), conflicting.requestedUrl), profile, reviewed(profile), 'Google Search', 'brand')
 assert.equal(conflictAssessment.visibilityResult, 'review_required')
