@@ -148,6 +148,45 @@ workspaces may conservatively reconstruct observed and canonical URLs from
 retained matcher evidence, but generated acquisition/query URLs never become
 observed results.
 
+## Automation-assisted Brand Presence Verification Contract
+
+Unresolved Brand Presence observations use the existing destination record as
+one evidence envelope. Automated acquisition remains unchanged inside that
+record; an optional `operatorVerification` augments it with a structured
+outcome (`found_correct`, `found_correction_needed`, `not_found`, or
+`unable_to_determine`), `operator_verified` provenance, UTC review time,
+material-evidence fingerprint, bounded mismatches, optional operator-observed
+URL, and optional internal note. The comparison panel shows only current
+operator-reviewed or owner-confirmed Business Profile facts.
+
+The effective destination state follows these rules:
+
+- conclusive automated identity evidence may remain automatically verified;
+- a current operator `found_correct` result is verified by operator;
+- `found_correction_needed` and `not_found` may generate Review candidates but
+  never approve or package them;
+- `unable_to_determine`, acquisition failure, timeout, restriction, and an
+  automated no-match remain neutral;
+- if reviewed identity or material destination evidence changes, the prior
+  operator decision is preserved as history but becomes reconfirmation-needed.
+
+Material reconciliation excludes run IDs, timestamps, provider identity,
+transient request URLs, and capture metadata. It includes destination/query,
+reviewed business identity, acquired result/profile URLs, and semantic matcher
+evidence. Generated verification URLs are operator navigation, not acquired
+evidence. Operator-observed URLs do not overwrite `observedResultUrl`, and are
+classified as canonical profiles only when the destination-specific URL shape
+supports that classification. Operator review augments rather than overwrites
+raw acquisition evidence.
+
+Automation failure is not absence. Only an explicit operator `not_found`
+result is observed absence evidence. Positive operator verification enters the
+existing generated-strength include/hide/refine workflow; negative outcomes
+enter the existing candidate-to-approval Review workflow. The customer-safe
+projection exposes only approved wording and effective strengths: fingerprints,
+provider details, timestamps, operator notes, mismatch metadata, and internal
+URLs remain in the scanner workspace.
+
 ## Deployment Considerations
 The internal scanner and bounded API may be operated separately from Found
 Local Sites. The customer-safe JSON contract is the handoff boundary; direct

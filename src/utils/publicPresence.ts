@@ -3,6 +3,7 @@ import type { DirectoryAuditRow, DirectoryAuditState, SearchDestination, SearchD
 import { emptyDirectoryRow } from './directorySuggestions'
 import { buildSearchVisibilityQueries, primarySearchDestinations } from './searchVisibility'
 import { operatorAssistedEvidenceIsCurrent } from './operatorAssistedSearch'
+import { currentBrandPresenceVerification } from './brandPresenceVerification'
 
 const profileNameForDestination: Partial<Record<SearchDestination, string>> = {
   'Google Maps': 'Google Business Profile',
@@ -82,7 +83,7 @@ export const supportingPublicPresenceReviewedCount = (
   Boolean(item?.reviewed) && !primarySearchDestinations.includes(item!.destination),
 ).length : 0
 
-/** Attempt coverage is independent of finding quality and Action Plan review. Both query families count. */
+/** Attempt coverage is independent of finding quality and Review decisions. Both query families count. */
 export function summarizePublicPresence(state: import('../types/audit').AuditState) {
   const latest = state.visibilityRuns?.filter((run) => matchesEvidenceFingerprint(run.profileKey, state.profile)).at(-1)
   const records = new Map<string, { attempted: boolean; evidence: boolean; automatic: boolean; needsReview: boolean; reviewed: boolean }>()
@@ -91,15 +92,17 @@ export function summarizePublicPresence(state: import('../types/audit').AuditSta
     if (!observation || observation.query !== query.query) continue
     const automated = observation.automation
     const assisted = operatorAssistedEvidenceIsCurrent(observation, state.profile, state.businessProfile)
-    const attempted = Boolean(automated || observation.observedAt || observation.evidenceNotes.trim() || !['not_checked'].includes(observation.overallResult))
-    const evidence = Boolean(automated?.evidence || observation.operatorAssisted?.rawText || observation.evidenceNotes.trim())
+    const verification = currentBrandPresenceVerification(observation, state.profile, state.businessProfile)
+    const attempted = Boolean(automated || verification || observation.observedAt || observation.evidenceNotes.trim() || !['not_checked'].includes(observation.overallResult))
+    const evidence = Boolean(automated?.evidence || verification || observation.operatorAssisted?.rawText || observation.evidenceNotes.trim())
     const sourceRun = state.visibilityRuns?.find((run) => run.id === automated?.runId)
     const currentProfileEvidence = matchesEvidenceFingerprint(sourceRun?.profileKey, state.profile) && (!sourceRun?.profileReviewKey || matchesEvidenceFingerprint(sourceRun.profileReviewKey, state.businessProfile))
     const automatic = Boolean(automated?.automaticObservation && observation.provenance === 'automated_acquisition' && currentProfileEvidence)
     const normalizedReview = automated?.assessment?.operatorReviewRequired
-    const needsReview = assisted && observation.operatorAssisted?.assessment.operatorReviewRequired === false ? false : observation.provenance === 'automated_acquisition' && typeof normalizedReview === 'boolean'
-      ? normalizedReview : attempted && !observation.reviewed && !automatic
-    records.set(`${query.id}:${destination}`, { attempted, evidence, automatic, reviewed: observation.reviewed, needsReview })
+    const needsReview = verification ? verification.outcome === 'unable_to_determine'
+      : assisted && observation.operatorAssisted?.assessment.operatorReviewRequired === false ? false : observation.provenance === 'automated_acquisition' && typeof normalizedReview === 'boolean'
+        ? normalizedReview : attempted && !observation.reviewed && !automatic
+    records.set(`${query.id}:${destination}`, { attempted, evidence, automatic, reviewed: Boolean(verification || observation.reviewed), needsReview })
   }
   for (const check of latest?.checks.filter((check) => check.area === 'SearchMaps') || []) {
     const previous = records.get(check.id)

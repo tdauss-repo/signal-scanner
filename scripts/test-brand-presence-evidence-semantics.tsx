@@ -66,8 +66,9 @@ const legacyCanonical = normalizeSearchDestinationObservation({
 } as SearchDestinationObservation, { profile, brandPresence: true })
 assert.equal(legacyCanonical.observedResultUrl, canonicalUrl, 'saved-workspace matcher evidence restores observed result URL')
 assert.equal(legacyCanonical.canonicalProfileUrl, canonicalUrl, 'saved-workspace matcher evidence restores genuine canonical profile')
-assert.equal(projectSalesVisibility(legacyCanonical).actionUrl, canonicalUrl)
-assert.equal(projectSalesVisibility(legacyCanonical).actionLabel, 'Open profile')
+assert.equal(projectSalesVisibility(legacyCanonical).actionUrl, legacyCanonical.verificationUrl, 'primary action remains the verification destination')
+assert.equal(projectSalesVisibility(legacyCanonical).actionLabel, 'Open Yelp')
+assert.equal(projectSalesVisibility(legacyCanonical).knownProfileUrl, canonicalUrl, 'known profile remains a distinct secondary action')
 
 for (const destination of searchDestinations) {
   const neutral = normalizeSearchDestinationObservation(defaultSearchDestinationObservation(destination, profile.businessName), { profile, brandPresence: true })

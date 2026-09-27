@@ -436,7 +436,7 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
               destination,
               normalizeSearchDestinationObservation(
                 { ...observation, observedResultTypes: normalizeSearchResultTypes(observation.observedResultTypes ?? []) },
-                { profile, brandPresence: queryId === 'search-brand-canonical' },
+                { profile, brandPresence: queryId.startsWith('search-brand-') },
               ),
             ]),
           ),
@@ -837,7 +837,7 @@ function App() {
   ) => {
     const normalizedObservation = normalizeSearchDestinationObservation(observation, {
       profile: auditState.profile,
-      brandPresence: query.id === 'search-brand-canonical',
+      brandPresence: query.role === 'Brand Presence',
     })
     updateState({
       searchDestinationObservations: {

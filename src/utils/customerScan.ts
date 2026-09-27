@@ -5,7 +5,7 @@ import type { ScanArea, ScanState } from '../types/visibilityScan'
 import type { AuditItem, AuditState, CustomerFindingRefinement, FixItem } from '../types/audit'
 import { effectivePackageFit, isStarterEligible, sortSalesActions } from './salesReadiness'
 import { primarySearchDestinations } from './searchVisibility'
-import { salesCockpitVisibility } from './salesVisibilityProjection'
+import { projectSalesVisibility, salesCockpitVisibility } from './salesVisibilityProjection'
 import { customerBusinessNoun, localBusinessModel } from './businessContext'
 import { reviewedBusinessProfile } from './businessProfileState'
 import { customerStrengthReviewItems, effectiveCustomerStrengths } from './customerStrengths'
@@ -374,11 +374,11 @@ export function summarizeCustomerScan(state: AuditState, items: AuditItem[], fix
   const search = Object.entries(state.searchDestinationObservations)
     .filter(([id]) => queries.has(id))
     .flatMap(([, destinations]) => Object.values(destinations))
-    .filter((observation) => observation?.reviewed && Boolean(observation.evidenceNotes?.trim()))
-  const searchCompleted = search.filter((observation) => observation && !needsReview.includes(observation.overallResult))
+    .filter((observation) => observation && (observation.operatorVerification || observation.reviewed && Boolean(observation.evidenceNotes?.trim())))
+  const searchCompleted = search.filter((observation) => observation && !projectSalesVisibility(observation, { profile: state.profile, profileState: state.businessProfile }).operatorReviewRequired)
   const primaryComplete = [...queries].every((queryId) => primarySearchDestinations.every((destination) => {
     const observation = state.searchDestinationObservations[queryId]?.[destination]
-    return observation?.reviewed && observation.evidenceNotes.trim() && !needsReview.includes(observation.overallResult)
+    return observation && !projectSalesVisibility(observation, { profile: state.profile, profileState: state.businessProfile }).operatorReviewRequired
   }))
   const ai = Object.values(state.aiAnswerTests).flatMap((test) => test.observations)
     .filter((observation) => observation.operatorReviewed && observation.evidenceMode === 'consumer_observation' && Boolean(observation.rawResponse.trim() || observation.evidenceNotes.trim()))
@@ -394,7 +394,7 @@ export function summarizeCustomerScan(state: AuditState, items: AuditItem[], fix
     fixes.filter(canReviewFinding).map((fix) => [fix.id, fix]),
   ).values()])
   const knownFixes = confirmedIssues.filter((fix) => ['starter', 'owner_action'].includes(effectivePackageFit(fix)))
-  const cockpitVisibility = salesCockpitVisibility(Object.entries(state.searchDestinationObservations).flatMap(([queryId, destinations]) => Object.values(destinations).filter(Boolean).map((observation) => ({ queryId, observation }))))
+  const cockpitVisibility = salesCockpitVisibility(Object.entries(state.searchDestinationObservations).flatMap(([queryId, destinations]) => Object.values(destinations).filter(Boolean).map((observation) => ({ queryId, observation }))), { profile: state.profile, profileState: state.businessProfile })
   const recommendedPlan = findings.some(isStarterEligible) ? 'Starter Visibility Cleanup' : null
   const websiteFailed = scanError || state.websiteAudit.latestAttempt?.ok === false
   const websiteStatus: CustomerAreaStatus = loading ? 'Scan in progress' : websiteFailed ? 'Confirmation needed'
@@ -408,7 +408,7 @@ export function summarizeCustomerScan(state: AuditState, items: AuditItem[], fix
             : 'Website content and technical signals have not been checked yet.' },
     { title: 'Search & Maps', status: search.length === 0 ? unreviewed
         : searchCompleted.length < search.length ? 'Confirmation needed'
-          : searchCompleted.some((item) => !['found_match', 'found_prominently'].includes(item?.overallResult || '')) ? 'Opportunities identified' : !primaryComplete ? 'Confirmation needed' : 'Looking good',
+          : cockpitVisibility.recommended.length ? 'Opportunities identified' : !primaryComplete ? 'Confirmation needed' : 'Looking good',
       detail: searchCompleted.length ? `${searchCompleted.length} destination observations reviewed. This describes only the recorded searches, not overall search coverage.`
         : 'Search and map results need a separate, destination-by-destination review.' },
     { title: 'Business Information', status: businessReviewed === 0 ? unreviewed : confirmations ? 'Confirmation needed'

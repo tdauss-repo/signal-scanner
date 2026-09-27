@@ -1,7 +1,17 @@
-import type { SearchDestination, SearchDestinationObservation } from '../types/audit'
+import type { BusinessProfile, BusinessProfileState, SearchDestination, SearchDestinationObservation } from '../types/audit'
+import { brandPresenceVerificationIsStale, currentBrandPresenceVerification } from './brandPresenceVerification'
 import { canonicalProfileUrlForDestination, publicPresenceUrl } from './searchVisibility'
 
-export type SalesVisibilityState = 'verified_correct' | 'verified_correction_needed' | 'not_found' | 'manual_verification_needed' | 'profile_discovered' | 'website_result_discovered'
+export type SalesVisibilityState =
+  | 'verified_correct' | 'verified_correction_needed' | 'not_found' | 'manual_verification_needed'
+  | 'profile_discovered' | 'website_result_discovered' | 'verified_by_operator'
+  | 'operator_correction_needed' | 'operator_not_found' | 'operator_unable_to_determine'
+  | 'reconfirmation_needed'
+
+export interface SalesVisibilityProjectionContext {
+  profile?: BusinessProfile
+  profileState?: BusinessProfileState
+}
 
 export interface SalesVisibilityProjection {
   destination: SearchDestination
@@ -16,22 +26,33 @@ export interface SalesVisibilityProjection {
   starterPackageEligible: boolean
   deliveryResponsibility: 'Found Local can implement' | 'Found Local can assist/guide' | 'Customer/platform ownership required' | 'Manual verification required before recommendation'
   operatorReviewRequired: boolean
+  knownProfileUrl?: string
   technicalDetail: Record<string, unknown>
 }
 
 const labels: Record<SalesVisibilityState, string> = {
-  verified_correct: 'Verified — looks correct',
+  verified_correct: 'Verified automatically',
   verified_correction_needed: 'Verified — needs correction',
   not_found: 'Not found',
-  manual_verification_needed: 'Manual verification needed',
+  manual_verification_needed: 'Verification needed',
   profile_discovered: 'Profile discovered — verify details',
   website_result_discovered: 'Website result discovered — verify business identity',
+  verified_by_operator: 'Verified by operator',
+  operator_correction_needed: 'Correction needed',
+  operator_not_found: 'Not found during operator review',
+  operator_unable_to_determine: 'Unable to determine',
+  reconfirmation_needed: 'Verification changed — reconfirmation needed',
 }
 
-/** Customer-safe projection. Acquisition/matcher results remain the authority. */
-export function projectSalesVisibility(observation: SearchDestinationObservation): SalesVisibilityProjection {
+/** Customer-safe interpretation. Raw acquisition and operator records remain separate. */
+export function projectSalesVisibility(
+  observation: SearchDestinationObservation,
+  context: SalesVisibilityProjectionContext = {},
+): SalesVisibilityProjection {
   const assessment = observation.automation?.assessment
   const selectedCandidate = assessment?.selected?.candidate || assessment?.matches[0]?.candidate
+  const operatorVerification = currentBrandPresenceVerification(observation, context.profile, context.profileState)
+  const staleOperatorVerification = brandPresenceVerificationIsStale(observation, context.profile, context.profileState)
   const technicalDetail = {
     provider: observation.automation?.captures.at(-1)?.provider,
     blocker: assessment?.blocker,
@@ -41,62 +62,97 @@ export function projectSalesVisibility(observation: SearchDestinationObservation
     resultRegionInspected: assessment?.resultRegionInspected,
     provenance: observation.provenance,
     candidates: assessment?.matches,
+    operatorVerification,
+    staleOperatorVerification,
   }
-  // Compatibility fallback is deliberately asymmetric: only an explicit
-  // publicProfileUrl can reconstruct a canonical profile, while resultUrl is
-  // retained solely as observed acquisition evidence.
-  const profileUrl = canonicalProfileUrlForDestination(
+  const acquiredProfileUrl = canonicalProfileUrlForDestination(
     observation.destination,
     observation.canonicalProfileUrl || selectedCandidate?.fields.publicProfileUrl,
   )
+  const profileUrl = operatorVerification?.classifiedCanonicalProfileUrl || acquiredProfileUrl
   const observedResultUrl = observation.observedResultUrl || selectedCandidate?.resultUrl
   const verificationUrl = observation.verificationUrl || publicPresenceUrl(observation.destination, observation.query)
   const automatedReview = assessment?.operatorReviewRequired === true
   const unavailable = assessment?.visibilityResult === 'unavailable' || automatedReview || observation.overallResult === 'manual_review_needed' || observation.overallResult === 'unable_to_verify' || observation.overallResult === 'not_checked'
-  // Discovery is deliberately weaker than an automatic match: a platform URL
-  // found in retained candidates is a useful review link, never verification.
-  const profileDiscovered = Boolean(profileUrl && !assessment?.automaticObservation && !['not_found', 'unavailable'].includes(assessment?.visibilityResult || ''))
+  const profileDiscovered = Boolean(acquiredProfileUrl && !assessment?.automaticObservation && !['not_found', 'unavailable'].includes(assessment?.visibilityResult || ''))
   const organicWebsiteResult = Boolean(
-    observation.destination === 'Google Search' && observedResultUrl && !profileUrl &&
+    observation.destination === 'Google Search' && observedResultUrl && !acquiredProfileUrl &&
     selectedCandidate?.kind === 'result_link' && selectedCandidate.fields.website &&
     !observation.reviewed && assessment?.visibilityResult !== 'not_found',
   )
-  const websiteResultDiscovered = organicWebsiteResult
   const conflicting = observation.overallResult === 'found_conflicting_information'
   const verified = Boolean(assessment?.automaticObservation && !automatedReview && !organicWebsiteResult)
-  const notFound = observation.overallResult === 'not_found' && assessment?.visibilityResult === 'not_found' && assessment.resultRegionInspected === true
-  const state: SalesVisibilityState = profileDiscovered ? 'profile_discovered'
-    : websiteResultDiscovered ? 'website_result_discovered'
-    : unavailable ? 'manual_verification_needed'
-      : notFound ? 'not_found'
-        : conflicting && verified ? 'verified_correction_needed'
-          : verified || ['found_match', 'found_prominently'].includes(observation.overallResult) && observation.reviewed ? 'verified_correct'
-            : 'manual_verification_needed'
-  const actionUrl = state === 'profile_discovered' && profileUrl ? profileUrl : verificationUrl
-  const actionLabel = state === 'profile_discovered' ? 'Open profile' : `Open ${observation.destination}`
-  const explanation = state === 'verified_correct' ? 'A matching business result was inspected and aligns with the reviewed business details.'
-    : state === 'verified_correction_needed' ? 'A reviewed public result has a confirmed identity difference that should be corrected.'
-      : state === 'not_found' ? 'A usable result region was inspected and no sufficient business match was found.'
-        : state === 'profile_discovered' ? 'A likely public profile was discovered indirectly; its details have not yet been verified.'
-          : state === 'website_result_discovered' ? 'Google returned a page from the business website, but the business information shown in search has not yet been verified.'
-          : 'This destination still needs an operator review. An unavailable or restricted check is not a business problem.'
-  const nextAction = state === 'verified_correct' ? 'No action needed'
-    : state === 'verified_correction_needed' ? 'Review the confirmed difference and propose the appropriate correction'
-      : state === 'not_found' ? 'Confirm the absence, then assess practical listing remediation'
-        : state === 'profile_discovered' ? 'Open profile and verify business details'
-          : state === 'website_result_discovered' ? 'Open Google Search and verify business details'
-            : `Open ${observation.destination} and record the review outcome`
-  return { destination: observation.destination, state, headline: labels[state], explanation,
-    identitySummary: state === 'verified_correct' ? 'Business identity aligns with reviewed details' : state === 'verified_correction_needed' ? 'A reviewed identity difference was observed' : 'Still requires verification',
-    actionUrl, actionLabel, nextAction, customerFindingEligible: state === 'verified_correction_needed' || state === 'not_found', starterPackageEligible: state === 'verified_correction_needed' || state === 'not_found',
-    deliveryResponsibility: state === 'verified_correction_needed' ? 'Found Local can implement' : state === 'not_found' ? 'Found Local can assist/guide' : state === 'verified_correct' ? 'Customer/platform ownership required' : 'Manual verification required before recommendation',
-    operatorReviewRequired: !['verified_correct', 'verified_correction_needed', 'not_found'].includes(state), technicalDetail }
+  const evidenceConflict = Boolean(operatorVerification && verified && (
+    operatorVerification.outcome === 'found_correct' ? conflicting : true
+  ))
+
+  let state: SalesVisibilityState
+  if (operatorVerification?.outcome === 'found_correct') state = 'verified_by_operator'
+  else if (operatorVerification?.outcome === 'found_correction_needed') state = 'operator_correction_needed'
+  else if (operatorVerification?.outcome === 'not_found') state = 'operator_not_found'
+  else if (operatorVerification?.outcome === 'unable_to_determine') state = 'operator_unable_to_determine'
+  else if (staleOperatorVerification) state = 'reconfirmation_needed'
+  else if (profileDiscovered) state = 'profile_discovered'
+  else if (organicWebsiteResult) state = 'website_result_discovered'
+  else if (unavailable || assessment?.visibilityResult === 'not_found') state = 'manual_verification_needed'
+  else if (conflicting && verified) state = 'verified_correction_needed'
+  else if (verified || ['found_match', 'found_prominently'].includes(observation.overallResult) && observation.reviewed) state = 'verified_correct'
+  else state = 'manual_verification_needed'
+
+  const baseExplanation = state === 'verified_correct' ? 'Automated evidence matched the reviewed business identity.'
+    : state === 'verified_by_operator' ? 'The operator verified that the business identity shown at this destination matches the reviewed information.'
+      : state === 'verified_correction_needed' ? 'A reviewed public result has a confirmed identity difference that should be corrected.'
+        : state === 'operator_correction_needed' ? 'The operator found a destination result with business information that needs correction.'
+          : state === 'operator_not_found' ? 'The operator checked this destination and did not find a matching business presence.'
+            : state === 'operator_unable_to_determine' ? 'The operator attempted verification but could not determine a reliable result. The destination remains neutral.'
+              : state === 'reconfirmation_needed' ? 'The business identity or material destination evidence changed after the prior operator review. Reconfirm it before using that decision.'
+                : state === 'profile_discovered' ? 'A likely public profile was discovered indirectly; its details have not yet been verified.'
+                  : state === 'website_result_discovered' ? 'Google returned a page from the business website, but the business information shown in search has not yet been verified.'
+                    : assessment?.visibilityResult === 'not_found' ? 'Automation did not find a sufficient match. This is not absence evidence; an operator must verify the destination.'
+                      : 'This destination still needs an operator review. An unavailable or restricted check is not a business problem.'
+  const explanation = evidenceConflict ? `${baseExplanation} This differs from the retained automated interpretation and should be reviewed.` : baseExplanation
+  const nextAction = ['verified_correct', 'verified_by_operator'].includes(state) ? 'No action needed'
+    : ['verified_correction_needed', 'operator_correction_needed'].includes(state) ? 'Review the confirmed difference and propose the appropriate correction'
+      : state === 'operator_not_found' ? 'Review the observed absence before recommending listing work'
+        : state === 'operator_unable_to_determine' ? `Revisit ${observation.destination} only when clearer evidence is available`
+          : state === 'profile_discovered' ? `Open ${observation.destination} and verify business details`
+            : state === 'website_result_discovered' ? 'Open Google Search and verify business details'
+              : `Open ${observation.destination} and record the review outcome`
+  const customerFindingEligible = ['verified_correction_needed', 'operator_correction_needed', 'operator_not_found'].includes(state)
+  const operatorReviewRequired = !['verified_correct', 'verified_by_operator', 'verified_correction_needed', 'operator_correction_needed', 'operator_not_found'].includes(state)
+  return {
+    destination: observation.destination,
+    state,
+    headline: state === 'manual_verification_needed' && assessment?.visibilityResult === 'unavailable'
+      ? 'Automated check unavailable — verification needed'
+      : labels[state],
+    explanation,
+    identitySummary: ['verified_correct', 'verified_by_operator'].includes(state) ? 'Business identity aligns with reviewed details'
+      : ['verified_correction_needed', 'operator_correction_needed'].includes(state) ? 'A reviewed identity difference was observed'
+        : state === 'operator_not_found' ? 'No matching presence was found during operator review'
+          : 'Still requires verification',
+    actionUrl: verificationUrl,
+    actionLabel: `Open ${observation.destination}`,
+    nextAction,
+    customerFindingEligible,
+    starterPackageEligible: state === 'verified_correction_needed',
+    deliveryResponsibility: state === 'verified_correction_needed' ? 'Found Local can implement'
+      : ['operator_correction_needed', 'operator_not_found'].includes(state) ? 'Customer/platform ownership required'
+        : ['verified_correct', 'verified_by_operator'].includes(state) ? 'Customer/platform ownership required'
+          : 'Manual verification required before recommendation',
+    operatorReviewRequired,
+    ...(profileUrl ? { knownProfileUrl: profileUrl } : {}),
+    technicalDetail: { ...technicalDetail, evidenceConflict },
+  }
 }
 
-export const salesVisibilityGroups = (observations: SearchDestinationObservation[]) => {
-  const all = observations.map(projectSalesVisibility)
+export const salesVisibilityGroups = (
+  observations: SearchDestinationObservation[],
+  context: SalesVisibilityProjectionContext = {},
+) => {
+  const all = observations.map((observation) => projectSalesVisibility(observation, context))
   return {
-    lookingGood: all.filter((item) => item.state === 'verified_correct'),
+    lookingGood: all.filter((item) => ['verified_correct', 'verified_by_operator'].includes(item.state)),
     recommended: all.filter((item) => item.customerFindingEligible),
     stillToVerify: all.filter((item) => item.operatorReviewRequired),
   }
@@ -104,25 +160,22 @@ export const salesVisibilityGroups = (observations: SearchDestinationObservation
 
 export interface SalesVisibilityRecord { queryId: string; observation: SearchDestinationObservation }
 
-/**
- * Customer Scan rolls query evidence up intentionally. Brand proof is a
- * strength; an unresolved Bing location diagnostic is a separate review
- * question, while repeated manual fallbacks collapse to one destination.
- */
-export function salesCockpitVisibility(records: SalesVisibilityRecord[]) {
-  const projected = records.map(({ queryId, observation }) => ({ queryId, ...projectSalesVisibility(observation) }))
+export function salesCockpitVisibility(
+  records: SalesVisibilityRecord[],
+  context: SalesVisibilityProjectionContext = {},
+) {
+  const projected = records.map(({ queryId, observation }) => ({ queryId, ...projectSalesVisibility(observation, context) }))
   const byDestination = new Map<SearchDestination, typeof projected>()
   for (const item of projected) byDestination.set(item.destination, [...(byDestination.get(item.destination) || []), item])
   const lookingGood: typeof projected = []
   const recommended: typeof projected = []
   const deeperReview: Array<typeof projected[number] & { displayDestination: string }> = []
   for (const [destination, entries] of byDestination) {
-    const positive = entries.find((item) => item.state === 'verified_correct')
+    const positive = entries.find((item) => ['verified_correct', 'verified_by_operator'].includes(item.state))
     const issue = entries.find((item) => item.customerFindingEligible)
     const unresolved = entries.filter((item) => item.operatorReviewRequired)
     if (positive) lookingGood.push(positive)
     if (issue && !positive) recommended.push(issue)
-    // Only Bing's distinct location diagnostic accompanies a branded win.
     const reviewEntries = positive && destination === 'Bing Search'
       ? unresolved.filter((item) => item.queryId.includes('market')) : positive ? [] : unresolved
     const review = reviewEntries[0]

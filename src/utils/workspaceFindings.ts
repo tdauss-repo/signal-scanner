@@ -5,6 +5,7 @@ import { applyCurrentCatalogMetadata } from './catalogMetadata'
 import { mergeIntelligentFindings } from './findingIntelligence'
 import { buildFixPlan } from './scoring'
 import { classifyAuditFixForSales } from './salesReadiness'
+import { deriveBrandPresenceFindings } from './brandPresenceVerification'
 
 /** The existing Workbench evaluator, shared with scan-run accounting. */
 export function workspaceFindings(state: AuditState, items: AuditItem[] = buildAuditItems(state.profile, state.businessProfile).map(applyCurrentCatalogMetadata)) {
@@ -25,6 +26,7 @@ export function workspaceFindings(state: AuditState, items: AuditItem[] = buildA
       })
       .filter((fix) => !(specificEntityFinding && fix.id === 'website-schema')),
     ...state.manualFixes,
+    ...deriveBrandPresenceFindings(state),
     ...machine,
   ])
 }

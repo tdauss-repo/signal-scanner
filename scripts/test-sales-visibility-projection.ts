@@ -23,14 +23,15 @@ assert.equal(discrepancy.starterPackageEligible, true)
 assert.equal(discrepancy.deliveryResponsibility, 'Found Local can implement')
 
 const absence = projectSalesVisibility({ ...automated(base(), 'not_found'), overallResult: 'not_found' })
-assert.equal(absence.state, 'not_found')
-assert.equal(absence.customerFindingEligible, true)
+assert.equal(absence.state, 'manual_verification_needed')
+assert.equal(absence.customerFindingEligible, false, 'an automated no-match is not operator-observed absence')
 
 const discovered = projectSalesVisibility(automated(base('Yelp'), 'review_required', { matches: [{ candidate: { fields: { publicProfileUrl: 'https://www.yelp.com/biz/example', }, resultUrl: 'https://www.yelp.com/biz/example' } }] }))
 assert.equal(discovered.state, 'profile_discovered')
 assert.equal(discovered.customerFindingEligible, false)
 assert.equal(discovered.deliveryResponsibility, 'Manual verification required before recommendation')
-assert.equal(discovered.actionUrl, 'https://www.yelp.com/biz/example')
+assert.match(discovered.actionUrl, /^https:\/\/www\.yelp\.com\/search\?/, 'primary action remains the generated verification destination')
+assert.equal(discovered.knownProfileUrl, 'https://www.yelp.com/biz/example')
 
 const groups = salesVisibilityGroups([{ ...automated(base(), 'found'), overallResult: 'found_match' }, { ...automated(base('Apple Maps'), 'unavailable') }])
 assert.equal(groups.lookingGood.length, 1)

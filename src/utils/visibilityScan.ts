@@ -78,8 +78,11 @@ const compactCapture = (capture: AcquisitionResult): AcquisitionResult => {
 export function mergeAutomatedObservation(previous: SearchDestinationObservation | undefined, incoming: SearchDestinationObservation): SearchDestinationObservation {
   if (previous && previous.query !== incoming.query) return incoming
   const manual = previous && (previous.reviewed || (previous.provenance !== 'automated_acquisition' && Boolean(previous.evidenceNotes.trim() || previous.competitorsObserved.trim() || previous.recommendedAction.trim() || !['not_checked', 'manual_review_needed'].includes(previous.overallResult))))
-  return manual ? { ...previous, verificationUrl: incoming.verificationUrl, observedResultUrl: incoming.observedResultUrl, canonicalProfileUrl: incoming.canonicalProfileUrl, automation: incoming.automation, reviewed: false } : {
-    ...incoming, competitorsObserved: previous?.competitorsObserved || '', recommendedAction: previous?.recommendedAction || '',
+  return manual ? { ...previous, verificationUrl: incoming.verificationUrl, observedResultUrl: incoming.observedResultUrl || previous.observedResultUrl, canonicalProfileUrl: incoming.canonicalProfileUrl || previous.canonicalProfileUrl, automation: incoming.automation, reviewed: false } : {
+    ...incoming, observedResultUrl: incoming.observedResultUrl || previous?.observedResultUrl,
+    canonicalProfileUrl: incoming.canonicalProfileUrl || previous?.canonicalProfileUrl,
+    competitorsObserved: previous?.competitorsObserved || '', recommendedAction: previous?.recommendedAction || '',
+    operatorVerification: previous?.operatorVerification,
   }
 }
 

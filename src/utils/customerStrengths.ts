@@ -69,6 +69,14 @@ const materialSearchEvidence = (state: AuditState, queryId: string, observation:
     evidenceKind: observation.evidenceKind,
     confidence: observation.confidence,
     reviewed: observation.reviewed,
+    operatorVerification: observation.operatorVerification ? {
+      evidenceKey: observation.operatorVerification.evidenceKey,
+      outcome: observation.operatorVerification.outcome,
+      mismatches: observation.operatorVerification.mismatches,
+      operatorObservedUrl: observation.operatorVerification.operatorObservedUrl,
+      classifiedCanonicalProfileUrl: observation.operatorVerification.classifiedCanonicalProfileUrl,
+      provenance: observation.operatorVerification.provenance,
+    } : undefined,
     queryMode: observation.automation?.queryMode,
     assessment: assessment ? {
       visibilityResult: assessment.visibilityResult,
@@ -126,7 +134,7 @@ export function customerStrengthCandidates(state: AuditState, items: AuditItem[]
   const records = Object.entries(state.searchDestinationObservations).flatMap(([queryId, destinations]) =>
     Object.values(destinations).filter((observation): observation is SearchDestinationObservation => Boolean(observation)).map((observation) => ({ queryId, observation })),
   )
-  const searchStrengths = salesCockpitVisibility(records).lookingGood.map((entry) => {
+  const searchStrengths = salesCockpitVisibility(records, { profile: state.profile, profileState: state.businessProfile }).lookingGood.map((entry) => {
     const observation = state.searchDestinationObservations[entry.queryId]?.[entry.destination]
     if (!observation) throw new Error(`Missing current strength evidence for ${entry.destination}`)
     const material = materialSearchEvidence(state, entry.queryId, observation)

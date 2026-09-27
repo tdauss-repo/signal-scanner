@@ -2,6 +2,8 @@ import type {
   AuditItem,
   BusinessProfile,
   BusinessProfileState,
+  BrandPresenceMismatch,
+  BrandPresenceOperatorVerification,
   CheckStatus,
   SearchVisibilityFindingPriority,
   SearchDestination,
@@ -109,6 +111,30 @@ const publicHttpUrl = (value: string | undefined) => {
   } catch { return undefined }
 }
 
+const verificationOutcomes = new Set(['found_correct', 'found_correction_needed', 'not_found', 'unable_to_determine'])
+const verificationMismatches = new Set<BrandPresenceMismatch>(['business_name', 'address', 'phone', 'website', 'category', 'duplicate_conflicting_listing', 'other'])
+const normalizeOperatorVerification = (
+  destination: SearchDestination,
+  value: SearchDestinationObservation['operatorVerification'],
+): BrandPresenceOperatorVerification | undefined => {
+  if (!value || value.destination !== destination || !verificationOutcomes.has(value.outcome) || !value.evidenceKey) return undefined
+  const operatorObservedUrl = publicHttpUrl(value.operatorObservedUrl)
+  const classifiedCanonicalProfileUrl = canonicalProfileUrlForDestination(destination, value.classifiedCanonicalProfileUrl)
+    || canonicalProfileUrlForDestination(destination, operatorObservedUrl)
+  return {
+    version: 1,
+    destination,
+    evidenceKey: value.evidenceKey,
+    outcome: value.outcome,
+    reviewedAt: normalizeEvidenceTimestamp(value.reviewedAt),
+    provenance: 'operator_verified',
+    ...(operatorObservedUrl ? { operatorObservedUrl } : {}),
+    ...(classifiedCanonicalProfileUrl ? { classifiedCanonicalProfileUrl } : {}),
+    mismatches: Array.from(new Set((Array.isArray(value.mismatches) ? value.mismatches : []).filter((item): item is BrandPresenceMismatch => verificationMismatches.has(item)))),
+    note: typeof value.note === 'string' ? value.note : '',
+  }
+}
+
 export const canonicalProfileUrlForDestination = (destination: SearchDestination, value: string | undefined) => {
   const safe = publicHttpUrl(value)
   if (!safe || destination === 'DuckDuckGo') return undefined
@@ -180,6 +206,7 @@ export const normalizeSearchDestinationObservation = (
     verificationUrl,
     ...(observedResultUrl ? { observedResultUrl } : { observedResultUrl: undefined }),
     ...(canonicalProfileUrl ? { canonicalProfileUrl } : { canonicalProfileUrl: undefined }),
+    operatorVerification: normalizeOperatorVerification(observation.destination, observation.operatorVerification),
   }
 }
 

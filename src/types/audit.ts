@@ -448,9 +448,43 @@ export type SearchDestination =
   | 'Facebook'
   | 'Instagram'
 
+export type BrandPresenceVerificationOutcome =
+  | 'found_correct'
+  | 'found_correction_needed'
+  | 'not_found'
+  | 'unable_to_determine'
+
+export type BrandPresenceMismatch =
+  | 'business_name'
+  | 'address'
+  | 'phone'
+  | 'website'
+  | 'category'
+  | 'duplicate_conflicting_listing'
+  | 'other'
+
+/**
+ * A human decision made from the generated verification destination. This is
+ * additive evidence: it never replaces the automated acquisition record on
+ * the containing observation.
+ */
+export interface BrandPresenceOperatorVerification {
+  version: 1
+  destination: SearchDestination
+  evidenceKey: string
+  outcome: BrandPresenceVerificationOutcome
+  reviewedAt: string
+  provenance: 'operator_verified'
+  operatorObservedUrl?: string
+  classifiedCanonicalProfileUrl?: string
+  mismatches: BrandPresenceMismatch[]
+  note: string
+}
+
 export interface SearchDestinationObservation extends DestinationEvidence {
   automation?: PresenceAutomation
   operatorAssisted?: OperatorAssistedBrowserEvidence
+  operatorVerification?: BrandPresenceOperatorVerification
   destination: SearchDestination
   query: string
   /** Clean operator destination generated for the verification task. */
