@@ -70,6 +70,15 @@ assert.deepEqual(new Set(mary.googleIdentityDecision?.matchedSignals.map((signal
 assert(mary.googleIdentityDecision?.sourceTypes.includes('knowledge_panel'), 'knowledge-panel provenance is retained explicitly')
 assert.deepEqual(maryCandidates, rawCandidates, '13: identity classification does not mutate raw acquired candidates')
 
+const liveShape = assess([
+  candidate('live-panel', { name: 'Montessori Center of Downriver in Southgate, Michigan', address: '15575 Northline Rd, Southgate, MI 48195', phone: '(734) 282-6465', category: 'Preschool' }),
+  candidate('live-about-page', { name: 'About Our School' }, { kind: 'result_link', sourceType: 'organic', resultUrl: 'http://montessoridownriver.com/about/' }),
+  candidate('live-home-result', { name: profile.businessName }, { kind: 'result_link', sourceType: 'organic', resultUrl: 'http://montessoridownriver.com/' }),
+  candidate('nearby-competitor', { name: 'Creative Montessori Center | Southgate MI' }, { kind: 'result_link', sourceType: 'organic', resultUrl: 'https://www.facebook.com/creative-montessori/' }),
+])
+assert.equal(liveShape.automaticObservation, true, 'official page titles and nearby SERP competitors do not contradict a strongly matched knowledge-panel identity')
+assert.equal(liveShape.blocker, 'none')
+
 assert.equal(assess([candidate('name-domain-city', { name: profile.businessName, locality: 'Southgate' }, { kind: 'result_link', sourceType: 'organic', resultUrl: organicUrl })]).automaticObservation, true, '2: name + domain + city verifies')
 assert.equal(assess([candidate('name-address', { name: profile.businessName, address: '15575 Northline Rd, Southgate, MI 48195' })]).automaticObservation, true, '3: name + address verifies')
 assert.equal(assess([candidate('name-phone', { name: profile.businessName, phone: '(734) 282-6465' })]).automaticObservation, true, '4: name + phone verifies')

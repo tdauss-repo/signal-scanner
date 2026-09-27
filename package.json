@@ -9,6 +9,7 @@
     "api": "npm run server",
     "dev:all": "node scripts/dev-all.mjs",
     "diagnose:website": "node scripts/diagnose-website-fetch.mjs",
+    "diagnose:google-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-google-acquisition.ts",
     "test:proving-001": "node --import tsx scripts/test-website-audit.ts && node --import tsx scripts/test-website-evidence-contract.ts",
     "test:proving-002": "node --import tsx scripts/test-browser-website-observation.ts",
     "test:profile-separation": "node --import tsx scripts/test-profile-separation.ts",
@@ -46,7 +47,8 @@
     "test:brand-presence-evidence-semantics": "node --import tsx scripts/test-brand-presence-evidence-semantics.tsx",
     "test:brand-presence-assisted-verification": "node --import tsx scripts/test-brand-presence-assisted-verification.tsx",
     "test:brand-presence-evidence-detail": "node --import tsx scripts/test-brand-presence-evidence-detail.tsx",
-    "test:google-search-auto-verification": "node --import tsx scripts/test-google-search-auto-verification.tsx"
+    "test:google-search-auto-verification": "node --import tsx scripts/test-google-search-auto-verification.tsx",
+    "test:google-acquisition-runtime": "node --import tsx scripts/test-google-acquisition-runtime.ts"
   },
   "dependencies": {
     "express": "^5.2.1",

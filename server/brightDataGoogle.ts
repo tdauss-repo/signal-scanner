@@ -14,6 +14,10 @@ export type GoogleAcquisitionBlocker =
   | 'embedded_5xx'
   | 'provider_captcha'
   | 'provider_failure'
+  | 'provider_timeout'
+  | 'network_failure'
+  | 'authentication_failure'
+  | 'zone_configuration_error'
   | 'malformed_response'
   | 'missing_result_region'
   | 'structurally_insufficient'
@@ -279,7 +283,15 @@ export function classifySerpResponse(input: { status: number; headers?: Record<s
   const payload = unwrapSerpPayload(input.parsed)
   const embeddedStatus = finiteNumber(payload.status_code, record(input.parsed).status_code)
   const body = responseText(input.parsed)
-  if (errorCode) return { usable: false, blocker: /captcha/i.test(errorCode) ? 'provider_captcha' : 'provider_failure', resultRegionInspected: false, payload, candidates: [], challengeClassification: /captcha/i.test(errorCode) ? 'provider_captcha' : 'none' }
+  if (errorCode) {
+    const blocker: GoogleAcquisitionBlocker = /captcha/i.test(errorCode) ? 'provider_captcha'
+      : /auth|token|credential|unauthor/i.test(errorCode) ? 'authentication_failure'
+        : /zone/i.test(errorCode) ? 'zone_configuration_error'
+          : /timeout/i.test(errorCode) ? 'provider_timeout'
+            : 'provider_failure'
+    return { usable: false, blocker, resultRegionInspected: false, payload, candidates: [], challengeClassification: blocker === 'provider_captcha' ? 'provider_captcha' : 'none' }
+  }
+  if ([401, 403].includes(input.status)) return { usable: false, blocker: 'authentication_failure', resultRegionInspected: false, payload, candidates: [], challengeClassification: 'none' }
   if (input.status >= 500) return { usable: false, blocker: 'http_5xx', resultRegionInspected: false, payload, candidates: [], challengeClassification: /captcha/i.test(body) ? 'provider_captcha' : 'none' }
   if (input.status >= 400) return { usable: false, blocker: 'http_error', resultRegionInspected: false, payload, candidates: [], challengeClassification: 'none' }
   if (embeddedStatus && embeddedStatus >= 500) return { usable: false, blocker: 'embedded_5xx', resultRegionInspected: false, payload, candidates: [], challengeClassification: /captcha/i.test(body) ? 'provider_captcha' : 'none' }
@@ -322,7 +334,11 @@ export async function acquireBrightDataSerp(config: SerpAcquisitionConfig, reque
       diagnostic: { requestSent: true, retries: 0, httpStatus: response.status, statusText: response.statusText || null, responseId: headerValue(response.headers, 'x-response-id') || null, brightDataErrorCode: headerValue(response.headers, 'x-brd-error-code') || null, reportedSearchEngine: text(general.search_engine) || null, reportedLocation: text(general.location) || null }, rawResponse: parsed,
     }
   } catch (error) {
-    return { contractVersion: 1, provider: 'brightdata_serp_api', provenance: 'brightdata_serp_api', query: config.query, requestedUrl, outcome: 'unavailable', usable: false, resultRegionInspected: false, candidates: [], blocker: 'provider_failure', challengeClassification: 'none', elapsedMs: Math.round(performance.now() - started), rawProviderMetadataReference: config.rawProviderMetadataReference, diagnostic: { requestSent: true, retries: 0, error: error instanceof Error ? error.message : String(error) }, rawResponse: { error: 'request_failed' } }
+    const message = error instanceof Error ? error.message : String(error)
+    const blocker: GoogleAcquisitionBlocker = /timeout|aborted/i.test(`${error instanceof Error ? error.name : ''} ${message}`) ? 'provider_timeout'
+      : /fetch failed|network|ENOTFOUND|ECONN|EAI_AGAIN/i.test(message) ? 'network_failure'
+        : 'provider_failure'
+    return { contractVersion: 1, provider: 'brightdata_serp_api', provenance: 'brightdata_serp_api', query: config.query, requestedUrl, outcome: 'unavailable', usable: false, resultRegionInspected: false, candidates: [], blocker, challengeClassification: 'none', elapsedMs: Math.round(performance.now() - started), rawProviderMetadataReference: config.rawProviderMetadataReference, diagnostic: { requestSent: true, retries: 0, error: message.slice(0, 300) }, rawResponse: { error: 'request_failed' } }
   }
 }
 
@@ -600,7 +616,7 @@ export interface MapsOrchestratorDependencies {
 }
 
 const browserFallbackEligible = (blocker: GoogleAcquisitionBlocker) => [
-  'http_5xx', 'http_error', 'embedded_5xx', 'provider_captcha', 'provider_failure', 'malformed_response', 'missing_result_region', 'structurally_insufficient',
+  'http_5xx', 'http_error', 'embedded_5xx', 'provider_captcha', 'provider_failure', 'provider_timeout', 'network_failure', 'malformed_response', 'missing_result_region', 'structurally_insufficient',
 ].includes(blocker)
 
 export async function acquireGoogleWithBrightData(config: SerpAcquisitionConfig & { browserCdpUrl: string; playwrightModule?: string; browserMetadataReference: string }, dependencies: OrchestratorDependencies = {}): Promise<GoogleBrightDataRun> {
@@ -675,8 +691,13 @@ export function brightDataMatcherCandidates(acquisition: NormalizedGoogleAcquisi
 /** Production-safe capture: normalized evidence and bounded diagnostics only; credentials/raw provider payloads are omitted. */
 export function brightDataProductionCapture(run: GoogleBrightDataRun, requestedUrl: string, checkedDestination: 'Google Search' | 'Google Maps' = 'Google Search'): AcquisitionResult {
   const acquiredAt = new Date().toISOString()
-  const attempts = [run.serp, ...(run.browser ? [run.browser] : [])].map((attempt) => ({ provider: attempt.provider, outcome: attempt.outcome, blocker: attempt.blocker, elapsedMs: attempt.elapsedMs }))
+  const attempts = [run.serp, ...(run.browser ? [run.browser] : [])].map((attempt) => {
+    const statusCode = attempt.diagnostic.httpStatus
+    return { provider: attempt.provider, outcome: attempt.outcome, blocker: attempt.blocker, elapsedMs: attempt.elapsedMs,
+      ...(typeof statusCode === 'number' ? { statusCode } : {}) }
+  })
   if (run.selected) {
+    const statusCode = run.selected.diagnostic.httpStatus
     return {
       version: 1,
       requestedUrl,
@@ -692,9 +713,11 @@ export function brightDataProductionCapture(run: GoogleBrightDataRun, requestedU
       resultRegionInspected: run.selected.resultRegionInspected,
       blocker: run.selected.blocker,
       providerAttempts: attempts,
+      ...(typeof statusCode === 'number' ? { statusCode } : {}),
     }
   }
   const last = run.browser || run.serp
+  const statusCode = last.diagnostic.httpStatus
   return {
     version: 1,
     requestedUrl,
@@ -710,6 +733,7 @@ export function brightDataProductionCapture(run: GoogleBrightDataRun, requestedU
     resultRegionInspected: false,
     blocker: run.blocker,
     providerAttempts: attempts,
+    ...(typeof statusCode === 'number' ? { statusCode } : {}),
     error: `Google acquisition unavailable: ${run.blocker}`,
   }
 }

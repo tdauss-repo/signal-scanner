@@ -22,6 +22,24 @@ const unavailable = (observation: SearchDestinationObservation) =>
   observation.automation?.assessment?.visibilityResult === 'unavailable' ||
   ['failed'].includes(observation.automation?.state || '')
 
+const acquisitionFailureReason = (observation: SearchDestinationObservation) => {
+  const capture = observation.automation?.captures.at(-1)
+  const blocker = capture?.blocker || observation.automation?.assessment?.blocker || ''
+  const error = capture?.error || ''
+  if (blocker === 'provider_timeout' || /timed out|TimeoutError/i.test(error)) return 'Provider timeout.'
+  if (blocker === 'authentication_failure') return 'Provider authentication unavailable.'
+  if (blocker === 'zone_configuration_error' || blocker === 'configuration_missing') return 'Provider configuration unavailable.'
+  if (blocker === 'network_failure') return 'Provider network request failed.'
+  if (blocker === 'runtime_exception') return 'Acquisition server could not complete the request.'
+  if (blocker === 'http_5xx' || blocker === 'embedded_5xx') return 'Provider service returned an error.'
+  if (blocker === 'http_error') return capture?.statusCode ? `Provider request returned HTTP ${capture.statusCode}.` : 'Provider request returned an error.'
+  if (['malformed_response', 'structurally_insufficient'].includes(blocker)) return 'Provider response could not be parsed into usable evidence.'
+  if (blocker === 'missing_result_region' || blocker === 'provider_failure') return 'Provider returned no usable response.'
+  if (['provider_captcha', 'access_failure', 'access_blocked'].includes(blocker)) return 'Provider access was restricted.'
+  if (blocker === 'acquisition_failure') return 'Acquisition server unavailable.'
+  return 'Provider could not complete this check.'
+}
+
 const automationStateLabel = (observation: SearchDestinationObservation) => {
   if (!observation.automation) return undefined
   if (unavailable(observation)) return 'Unavailable'
@@ -84,7 +102,7 @@ export function brandPresenceEvidenceSummary(
     source: observation.destination,
     ...(automationStateLabel(observation) ? { automationState: automationStateLabel(observation) } : {}),
     ...(!failed ? { interpretation: sales.explanation } : {
-      reason: 'Provider could not complete this check.',
+      reason: acquisitionFailureReason(observation),
       nextStep: 'Use assisted verification.',
     }),
     verificationUrl: observation.verificationUrl,

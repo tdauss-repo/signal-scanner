@@ -35,6 +35,17 @@ const brightDataConfigured = () => Boolean(
   || process.env.BRIGHTDATA_BROWSER_CDP_URL,
 )
 
+export type GoogleRuntimeConfigurationStatus = 'configured' | 'partial' | 'unconfigured'
+export function googleSearchRuntimeConfigurationStatus(): GoogleRuntimeConfigurationStatus {
+  const token = Boolean(process.env.BRIGHTDATA_API_TOKEN?.trim())
+  const zone = Boolean(process.env.BRIGHTDATA_SERP_ZONE?.trim())
+  return token && zone ? 'configured' : token || zone || Boolean(process.env.BRIGHTDATA_BROWSER_CDP_URL?.trim()) ? 'partial' : 'unconfigured'
+}
+
+const runtimeFailureBlocker = (error: unknown) => /timeout|aborted/i.test(`${error instanceof Error ? error.name : ''} ${error instanceof Error ? error.message : String(error)}`)
+  ? 'provider_timeout'
+  : 'runtime_exception'
+
 /**
  * Google-only production provider. An entirely unconfigured runtime explicitly
  * yields to the retained direct acquisition ladder; partial or failed provider
@@ -66,7 +77,8 @@ export async function acquireGoogleSearchRuntime(value: string) {
         browserMetadataReference: 'runtime:brightdata_browser_api',
       })
       return { capture: brightDataProductionCapture(run, value) }
-    } catch {
+    } catch (error) {
+      const blocker = runtimeFailureBlocker(error)
       return { capture: {
         version: 1 as const,
         requestedUrl: value,
@@ -77,8 +89,8 @@ export async function acquireGoogleSearchRuntime(value: string) {
         confidence: 'unavailable' as const,
         notes: ['Bright Data Google acquisition failed. This is not evidence that the business is absent.'],
         resultRegionInspected: false,
-        blocker: 'acquisition_failure',
-        error: 'Bright Data Google acquisition failed.',
+        blocker,
+        error: `Bright Data Google acquisition unavailable: ${blocker}.`,
       } }
     }
   } finally { active = false }
@@ -113,7 +125,8 @@ export async function acquireGoogleMapsRuntime(value: string) {
         browserMetadataReference: 'runtime:brightdata_maps_browser_api',
       })
       return { capture: brightDataProductionCapture(run, value, 'Google Maps') }
-    } catch {
+    } catch (error) {
+      const blocker = runtimeFailureBlocker(error)
       return { capture: {
         version: 1 as const,
         requestedUrl: value,
@@ -125,8 +138,8 @@ export async function acquireGoogleMapsRuntime(value: string) {
         confidence: 'unavailable' as const,
         notes: ['Bright Data Google Maps acquisition failed. This is not evidence that the business is absent.'],
         resultRegionInspected: false,
-        blocker: 'acquisition_failure',
-        error: 'Bright Data Google Maps acquisition failed.',
+        blocker,
+        error: `Bright Data Google Maps acquisition unavailable: ${blocker}.`,
       } }
     }
   } finally { active = false }

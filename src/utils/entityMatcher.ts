@@ -41,6 +41,8 @@ export function matchBusinessCandidate(candidate: BusinessResultCandidate, profi
   const conflictingFields: EntityMatch['conflictingFields'] = []
   const missingFields: EntityField[] = []
   const unreviewedProfileFields: EntityField[] = []
+  const organicOfficialPageTitle = candidate.sourceType === 'organic' && Boolean(candidate.resultUrl) &&
+    normalizedEntityField('website', candidate.resultUrl || '') === normalizedEntityField('website', reviewedProfileValue(profile, profileState, 'website'))
   for (const [key, profileField] of Object.entries(fieldMap)) {
     const field = key as EntityField
     const observed = candidate.fields[field]
@@ -56,7 +58,7 @@ export function matchBusinessCandidate(candidate: BusinessResultCandidate, profi
     if (!observed) continue
     const comparison = { field, expected, observed }
     if (field === 'name' ? strongNameMatch(expected, observed) : normalizedEntityField(field, expected) === normalizedEntityField(field, observed)) matchedFields.push(comparison)
-    else if (field !== 'category' && field !== 'publicProfileUrl') conflictingFields.push(comparison)
+    else if (field !== 'category' && field !== 'publicProfileUrl' && !(field === 'name' && organicOfficialPageTitle)) conflictingFields.push(comparison)
   }
   if (candidate.fields.address) {
     const parts = (['streetAddress', 'city', 'state', 'zip'] as const).map((field) => reviewedProfileValue(profile, profileState, field))
@@ -200,7 +202,10 @@ function googleAutomaticIdentityDecision(
 ): GoogleIdentityDecision {
   const cluster = matches.filter((match) => match === selected || sameIdentity(selected, match))
   const matchedSignals = uniqueComparisons(cluster.flatMap((match) => match.matchedFields))
-  const conflictingSignals = uniqueConflictComparisons(matches.flatMap((match) => match.conflictingFields))
+  // SERPs routinely contain nearby competitors. Only conflicts inside the
+  // selected identity cluster can contradict the reviewed business; the
+  // aggregate multiple/conflicting checks separately block competing entities.
+  const conflictingSignals = uniqueConflictComparisons(cluster.flatMap((match) => match.conflictingFields))
   const groups = new Set(matchedSignals.map((signal) => identitySignalGroup(signal.field)))
   const hasPrimaryIdentity = groups.has('name') || groups.has('website')
   const matchedFields = new Set(cluster.flatMap((match) => match.matchedFields.map((field) => field.field)))

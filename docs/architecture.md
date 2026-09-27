@@ -214,6 +214,12 @@ result, category, city, rating, or review count cannot verify identity. Any
 material conflicting identifier or multiple plausible entity blocks automatic
 verification and produces an explainable review-needed state.
 
+Organic document titles are not automatically business-name assertions. A
+nonmatching title on the reviewed official domain (for example, an About page)
+does not conflict with an otherwise matched knowledge-panel entity, and an
+ordinary nearby competitor result does not contradict that entity unless it
+plausibly claims the reviewed identity through a material identifier.
+
 The objective of automated acquisition is to eliminate operator verification
 when acquired evidence is sufficient. Assisted verification is a fallback for
 incomplete, ambiguous, conflicting, or unavailable evidence. Generated Google
@@ -222,6 +228,31 @@ never overwritten by the identity decision. Automatically verified Google
 Search evidence may generate the existing Google-only strength candidate, but
 it still passes through include/hide/refine controls; matcher details and
 provider metadata never enter customer JSON.
+
+### Configured Google acquisition runtime
+
+`npm run dev:configured` is the authoritative local development launch. Node
+loads `.env.runtime.local` into the parent process, and `scripts/dev-all.mjs`
+inherits that environment into both Express on port 5174 and Vite on port 5173;
+Vite proxies `/api` to Express. The API health response and startup log expose
+only whether Google Search acquisition configuration is configured, partial, or
+unconfigured. They never expose credential values.
+
+Google Brand acquisition has an 85-second scan-operation boundary, aligned
+between the Bright Data SERP request boundary (60 seconds) and the frontend API
+request boundary (90 seconds). The ordinary 30-second operation boundary still
+applies elsewhere. This prevents a valid, slower structured Google response
+from being discarded before normalization while retaining overall scan and
+late-response safeguards.
+
+Provider authentication, zone configuration, timeout, network, HTTP, response
+shape, missing-result-region, and access failures remain distinct bounded
+diagnostic classes. Operator presentation stays neutral, but may show the
+sanitized failure category. Raw response bodies, headers, tokens, and zones are
+not part of the operator summary or customer export. The safe
+`diagnose:google-acquisition` command uses the configured structured SERP path,
+does not invoke Chromium, and prints counts and field availability rather than
+raw provider data.
 
 ## Deployment Considerations
 The internal scanner and bounded API may be operated separately from Found

@@ -109,6 +109,12 @@ const failureMarkup = renderToStaticMarkup(<SearchVisibilityPanel profile={profi
 assert(failureMarkup.includes('Provider could not complete this check.'))
 assert(!failureMarkup.includes('STACK_AND_PROVIDER_RESPONSE'), 'provider response remains outside the normal collapsed view')
 
+const timedOut = normalizeSearchDestinationObservation({
+  ...unavailable,
+  automation: { ...unavailable.automation!, captures: [{ ...capture, outcome: 'failed', confidence: 'unavailable', blocker: 'provider_timeout', error: 'Google Search acquisition timed out after 85000 ms.' }] },
+}, { profile, brandPresence: true })
+assert.equal(brandPresenceEvidenceSummary(timedOut, projectSalesVisibility(timedOut, { profile, profileState })).reason, 'Provider timeout.', 'bounded provider cause is visible without raw diagnostics')
+
 const state: AuditState = {
   profile, businessProfile: profileState, checks: {}, notes: {}, evidenceConfidence: {}, lastUpdated: '2026-09-26T22:39:00Z', reportSummary: '',
   websiteAudit: normalizeWebsiteAuditWorkspaceState(undefined), selectedAIPlatform: 'Gemini', aiAnswerTests: {} as AuditState['aiAnswerTests'], searchVisibilityTests: {},

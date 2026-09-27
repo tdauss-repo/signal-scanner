@@ -29,9 +29,13 @@ export interface ScanDependencies {
   cancelled?: () => boolean
   /** Test/runtime override. Application defaults keep each operation and the entire run bounded. */
   operationTimeoutMs?: number
+  /** Brand Google Search override; explicit general test/runtime overrides still win when omitted. */
+  googleBrandOperationTimeoutMs?: number
   overallTimeoutMs?: number
 }
 const defaultOperationTimeoutMs = 30_000
+/** Bright Data SERP permits 60 seconds and the browser-to-API request permits 90 seconds. */
+export const defaultGoogleBrandOperationTimeoutMs = 85_000
 const defaultOverallTimeoutMs = 180_000
 class VisibilityScanTimeoutError extends Error {
   constructor(message: string) { super(message); this.name = 'VisibilityScanTimeoutError' }
@@ -95,10 +99,12 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
   let state = structuredClone(initial)
   const deadline = Date.now() + Math.max(1, dependencies.overallTimeoutMs ?? defaultOverallTimeoutMs)
   const operationTimeoutMs = Math.max(1, dependencies.operationTimeoutMs ?? defaultOperationTimeoutMs)
-  const awaitBounded = async <T>(work: () => Promise<T>, label: string): Promise<T> => {
+  const googleBrandOperationTimeoutMs = Math.max(1, dependencies.googleBrandOperationTimeoutMs
+    ?? (dependencies.operationTimeoutMs === undefined ? defaultGoogleBrandOperationTimeoutMs : operationTimeoutMs))
+  const awaitBounded = async <T>(work: () => Promise<T>, label: string, operationLimitMs = operationTimeoutMs): Promise<T> => {
     const remaining = deadline - Date.now()
     if (remaining <= 0) throw new VisibilityScanTimeoutError(`The visibility scan reached its overall time limit before ${label} could complete.`)
-    const timeoutMs = Math.min(operationTimeoutMs, remaining)
+    const timeoutMs = Math.min(operationLimitMs, remaining)
     let timeout: ReturnType<typeof setTimeout> | undefined
     try {
       return await Promise.race([
@@ -191,7 +197,8 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
     const dedicatedProvider = item.destination === 'Google Search' ? googleProvider : item.destination === 'Google Maps' ? googleMapsProvider : undefined
     if (dedicatedProvider) {
       try {
-        const capture = await awaitBounded(() => dedicatedProvider(item.url!), `${item.destination || 'destination'} acquisition`)
+        const timeoutMs = item.destination === 'Google Search' && item.queryMode === 'brand' ? googleBrandOperationTimeoutMs : operationTimeoutMs
+        const capture = await awaitBounded(() => dedicatedProvider(item.url!), `${item.destination || 'destination'} acquisition`, timeoutMs)
         if (!alive()) return run
         if (capture) {
           captures.push(capture)
@@ -215,7 +222,8 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
           }
         }
       } catch (error) {
-        captures.push({ version: 1, requestedUrl: item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch', provider: item.destination === 'Google Maps' ? 'brightdata-google-maps-request' : 'brightdata-google-request', outcome: 'failed', confidence: 'unavailable', notes: ['Google provider request failed. This is not evidence that the business is absent.'], blocker: 'acquisition_failure', error: String(error) })
+        const blocker = error instanceof VisibilityScanTimeoutError ? 'provider_timeout' : 'acquisition_failure'
+        captures.push({ version: 1, requestedUrl: item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch', provider: item.destination === 'Google Maps' ? 'brightdata-google-maps-request' : 'brightdata-google-request', outcome: 'failed', confidence: 'unavailable', notes: ['Google provider request failed. This is not evidence that the business is absent.'], blocker, error: String(error) })
         dedicatedGoogleHandled = true
       }
     }

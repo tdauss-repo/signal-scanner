@@ -46,6 +46,12 @@ assert.equal(browserCalls, 0, '1: usable SERP evidence stops before Browser API'
 const captchaSerp = await acquireBrightDataSerp(serpConfig, async () => ({ status: 502, headers: { 'x-brd-error-code': 'captcha_failed' }, bodyText: JSON.stringify({ error: 'captcha' }) }))
 assert.equal(captchaSerp.outcome, 'unavailable')
 assert.equal(captchaSerp.blocker, 'provider_captcha')
+assert.equal(classifySerpResponse({ status: 401, parsed: { error: 'unauthorized' } }).blocker, 'authentication_failure')
+assert.equal(classifySerpResponse({ status: 400, headers: { 'x-brd-error-code': 'invalid_zone' }, parsed: { error: 'invalid request' } }).blocker, 'zone_configuration_error')
+const timedOutSerp = await acquireBrightDataSerp(serpConfig, async () => { throw new DOMException('The operation was aborted due to timeout', 'TimeoutError') })
+assert.equal(timedOutSerp.blocker, 'provider_timeout')
+const networkSerp = await acquireBrightDataSerp(serpConfig, async () => { throw new TypeError('fetch failed') })
+assert.equal(networkSerp.blocker, 'network_failure')
 browserCalls = 0
 const captchaFallback = await acquireGoogleWithBrightData(orchestratorConfig, {
   acquireSerp: async () => captchaSerp,
@@ -214,11 +220,13 @@ assert.notEqual(failedMapsAssessment.visibilityResult, 'not_found', '25: failure
 
 const officialOrganic = {
   ...success('brightdata_serp_api'),
+  diagnostic: { httpStatus: 200 },
   candidates: normalizeSerpPayload({ organic: [{ source: 'Example publisher label', title: 'Example Studio — Official Site', link: 'https://example.com/', rank: 1 }] }),
 }
 const serpProductionCapture = brightDataProductionCapture(runWith(officialOrganic), officialOrganic.requestedUrl)
 const serpMatch = assessSearchCapture(serpProductionCapture, profile, reviewed(profile), 'Google Search', 'brand')
 assert.equal(serpProductionCapture.provider, 'brightdata_serp_api')
+assert.equal(serpProductionCapture.statusCode, 200, 'sanitized provider status survives production handoff')
 assert.equal(serpMatch.automaticObservation, true)
 assert.equal(serpMatch.visibilityResult, 'found', '10: production SERP candidates enter the existing matcher')
 assert(serpMatch.selected?.matchedFields.some((field) => field.field === 'website'))

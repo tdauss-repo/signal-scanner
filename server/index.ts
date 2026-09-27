@@ -1,4 +1,4 @@
-import { acquireGoogleMapsRuntime, acquireGoogleSearchRuntime, acquireRuntime } from './acquisitionRuntime.ts'
+import { acquireGoogleMapsRuntime, acquireGoogleSearchRuntime, acquireRuntime, googleSearchRuntimeConfigurationStatus } from './acquisitionRuntime.ts'
 import express from 'express'
 import type { ErrorRequestHandler } from 'express'
 import { discoverDirectoryCandidates } from './directoryCandidates.ts'
@@ -14,7 +14,7 @@ const port = Number(process.env.PORT ?? 5174)
 app.use(express.json({ limit: '32kb' }))
 
 app.get('/api/health', (_request, response) => {
-  response.json({ ok: true, service: 'business-scanner-tool-api' })
+  response.json({ ok: true, service: 'business-scanner-tool-api', googleSearchAcquisition: googleSearchRuntimeConfigurationStatus() })
 })
 
 app.post('/api/acquire-public-presence', async (request, response) => {
@@ -148,4 +148,5 @@ app.use(jsonErrorHandler)
 
 app.listen(port, () => {
   console.log(`Business Scanner Tool API listening on http://localhost:${port}`)
+  console.log(`Google Search acquisition configuration: ${googleSearchRuntimeConfigurationStatus()}`)
 })

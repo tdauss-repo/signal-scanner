@@ -42,7 +42,7 @@ export interface AcquisitionResult {
   blocker?: string
   /** Public destination represented by a provider-normalized capture. */
   checkedDestination?: SearchDestination
-  providerAttempts?: Array<{ provider: string; outcome: 'success' | 'unavailable'; blocker: string; elapsedMs: number }>
+  providerAttempts?: Array<{ provider: string; outcome: 'success' | 'unavailable'; blocker: string; elapsedMs: number; statusCode?: number }>
   notes: string[]
   confidence: 'captured' | 'operator_supplied' | 'unavailable'
   error?: string
