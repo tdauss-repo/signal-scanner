@@ -31,6 +31,8 @@ export interface ScanDependencies {
   acquireGoogle?(url: string): Promise<AcquisitionResult | undefined>
   /** Dedicated Google Maps provider with the same unconfigured fallback contract. */
   acquireGoogleMaps?(url: string): Promise<AcquisitionResult | undefined>
+  /** Dedicated native Bing Brand Search provider. Other Bing query modes retain their existing path. */
+  acquireBing?(url: string): Promise<AcquisitionResult | undefined>
   cancelled?: () => boolean
   /** Test/runtime override. Application defaults keep each operation and the entire run bounded. */
   operationTimeoutMs?: number
@@ -64,6 +66,12 @@ export const applicationScanDependencies: ScanDependencies = {
     const response = await fetch('/api/acquire-google-maps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(90_000) })
     const body = await response.json()
     if (!response.ok) throw new Error(body.error || 'Google Maps acquisition request failed.')
+    return body.capture
+  },
+  async acquireBing(url) {
+    const response = await fetch('/api/acquire-bing-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(20_000) })
+    const body = await response.json()
+    if (!response.ok) throw new Error(body.error || 'Bing acquisition request failed.')
     return body.capture
   },
 }
@@ -209,14 +217,18 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
     if (!alive()) return run
     start(item)
     const captures: AcquisitionResult[] = []
-    let dedicatedGoogleHandled = false
+    let dedicatedProviderHandled = false
     // A caller that spreads application dependencies and replaces only `acquire`
     // is supplying a complete fixture/CLI provider and must not inherit a live API call.
     const googleProvider = dependencies.acquireGoogle === applicationScanDependencies.acquireGoogle
       && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireGoogle
     const googleMapsProvider = dependencies.acquireGoogleMaps === applicationScanDependencies.acquireGoogleMaps
       && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireGoogleMaps
-    const dedicatedProvider = item.destination === 'Google Search' ? googleProvider : item.destination === 'Google Maps' ? googleMapsProvider : undefined
+    const bingProvider = dependencies.acquireBing === applicationScanDependencies.acquireBing
+      && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireBing
+    const dedicatedProvider = item.destination === 'Google Search' ? googleProvider
+      : item.destination === 'Google Maps' ? googleMapsProvider
+        : item.destination === 'Bing Search' && item.queryMode === 'brand' ? bingProvider : undefined
     if (dedicatedProvider) {
       try {
         const timeoutMs = item.destination === 'Google Search' && item.queryMode === 'brand' ? googleBrandOperationTimeoutMs : operationTimeoutMs
@@ -224,7 +236,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
         if (!alive()) return run
         if (capture) {
           captures.push(capture)
-          dedicatedGoogleHandled = true
+          dedicatedProviderHandled = true
           item.captures = captures.map(compactCapture)
           publish()
           if (item.destination === 'Google Maps' && item.queryMode === 'brand' && !(capture.outcome === 'success' && capture.resultRegionInspected)) {
@@ -245,11 +257,13 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
         }
       } catch (error) {
         const blocker = error instanceof VisibilityScanTimeoutError ? 'provider_timeout' : 'acquisition_failure'
-        captures.push({ version: 1, requestedUrl: item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch', provider: item.destination === 'Google Maps' ? 'brightdata-google-maps-request' : 'brightdata-google-request', outcome: 'failed', confidence: 'unavailable', notes: ['Google provider request failed. This is not evidence that the business is absent.'], blocker, error: String(error) })
-        dedicatedGoogleHandled = true
+        const provider = item.destination === 'Google Maps' ? 'brightdata-google-maps-request'
+          : item.destination === 'Google Search' ? 'brightdata-google-request' : 'bing-native-request'
+        captures.push({ version: 1, requestedUrl: item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch', provider, outcome: 'failed', confidence: 'unavailable', notes: [`${item.destination || 'Destination'} provider request failed. This is not evidence that the business is absent.`], blocker, error: String(error) })
+        dedicatedProviderHandled = true
       }
     }
-    if (!dedicatedGoogleHandled) {
+    if (!dedicatedProviderHandled) {
       for (const method of ['server_fetch', 'rendered_browser'] as const) {
         if (!alive()) return run
         try {
@@ -275,7 +289,9 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       const assessments = captures.map((capture) => assessSearchCapture(capture, profile, initial.businessProfile, item.destination!, item.queryMode))
       const candidates = assessments.flatMap((assessment) => assessment.matches.map((match) => match.candidate))
       const assessment = candidates.length ? assessBusinessCandidates(candidates, profile, initial.businessProfile, item.queryMode, {
-        automaticIdentityPolicy: item.destination === 'Google Search' && item.queryMode === 'brand' ? 'google_search' : undefined,
+        automaticIdentityPolicy: item.queryMode !== 'brand' ? undefined
+          : item.destination === 'Google Search' ? 'google_search'
+            : item.destination === 'Bing Search' ? 'bing_search' : undefined,
       })
         : assessments.find((value) => value.visibilityResult === 'not_found') || assessments.at(-1) || { matches: [], confidence: 'unavailable' as const, automaticObservation: false, visibilityResult: 'unavailable' as const, operatorReviewRequired: true, resultRegionInspected: false, ambiguityReasons: [item.error || 'No usable public evidence was captured.'], blocker: 'runtime_unavailable' as const, tier3Candidate: false }
       assessment.resultRegionInspected ||= assessments.some((value) => value.resultRegionInspected)

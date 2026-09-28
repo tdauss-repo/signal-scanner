@@ -44,10 +44,10 @@ const googleLocation = { ...automated(base(), 'review_required'), overallResult:
 const cockpit = salesCockpitVisibility([
   { queryId: 'search-brand-canonical', observation: bingBrand }, { queryId: 'search-brand-market', observation: bingLocation },
   { queryId: 'search-brand-canonical', observation: googleBrand }, { queryId: 'search-brand-market', observation: googleLocation },
-  { queryId: 'search-brand-market', observation: { ...automated(base('Apple Maps'), 'unavailable'), overallResult: 'unable_to_verify' as const } },
+  { queryId: 'search-brand-canonical', observation: { ...automated(base('Apple Maps'), 'unavailable'), overallResult: 'unable_to_verify' as const } },
 ])
 assert.equal(cockpit.lookingGood.filter((item) => item.destination === 'Bing Search').length, 1)
-assert.equal(cockpit.deeperReview.filter((item) => item.displayDestination === 'Bing location visibility').length, 1)
+assert.equal(cockpit.deeperReview.filter((item) => item.displayDestination === 'Bing location visibility').length, 0, 'Location Diagnostic remains separate from Brand Presence neutral destinations')
 assert.equal(cockpit.deeperReview.some((item) => item.destination === 'Google Search'), false)
 assert.equal(cockpit.deeperReview.filter((item) => item.destination === 'Apple Maps').length, 1)
 console.log('Sales visibility projection PASS: neutral acquisition failures, profile discovery, verified positives, evidence-backed recommendations, and operator-only technical detail.')

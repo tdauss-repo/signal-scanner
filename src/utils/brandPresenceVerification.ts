@@ -106,6 +106,7 @@ export function brandPresenceVerificationEvidenceKey(
       blocker: assessment.blocker,
       ambiguityReasons: assessment.ambiguityReasons,
       googleIdentityDecision: assessment.googleIdentityDecision,
+      bingIdentityDecision: assessment.bingIdentityDecision,
       selected: assessment.selected ? materialMatch(assessment.selected) : undefined,
       matches: assessment.matches.map(materialMatch),
     } : !assessment ? {

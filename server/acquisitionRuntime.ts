@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url'
 import { chromiumSandboxEnabled, publicUrl, renderedBrowserProvider, serverFetchProvider, type BrowserLauncher } from './acquisition.ts'
 import { acquireGoogleMapsWithBrightData, acquireGoogleWithBrightData, brightDataProductionCapture } from './brightDataGoogle.ts'
+import { acquireBingSearch } from './bingSearch.ts'
 import type { AcquisitionProvider, AcquisitionResult } from '../src/types/acquisition.ts'
 
 const destinationHosts = ['www.google.com', 'www.bing.com', 'maps.apple.com', 'duckduckgo.com', 'www.yelp.com', 'www.facebook.com', 'www.instagram.com']
@@ -150,6 +151,18 @@ export async function acquireGoogleMapsRuntime(value: string) {
         error: `Bright Data Google Maps acquisition unavailable: ${blocker}.`,
       } }
     }
+  } finally { active = false }
+}
+
+export async function acquireBingSearchRuntime(value: string) {
+  const url = runtimeAllowedUrl(value)
+  if (url.hostname.replace(/^www\./, '') !== 'bing.com' || url.pathname !== '/search' || !url.searchParams.get('q')?.trim()) {
+    throw new Error('Bing acquisition requires a Bing Search query URL.')
+  }
+  if (active) throw new Error('Public acquisition busy. Retry this check later.')
+  active = true
+  try {
+    return { capture: await acquireBingSearch(url.href) }
   } finally { active = false }
 }
 

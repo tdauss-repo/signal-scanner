@@ -42,6 +42,8 @@ export interface GoogleIdentityDecision {
   sourceTypes: NonNullable<BusinessResultCandidate['sourceType']>[]
   rule: 'two_strong_identifiers_with_name_or_domain_no_conflict'
 }
+/** Explainable Bing Brand decision. Kept separate from Google provenance even though the bounded rule is shared. */
+export type BingIdentityDecision = GoogleIdentityDecision
 export interface SearchEntityAssessment {
   matches: EntityMatch[]
   selected?: EntityMatch
@@ -55,4 +57,6 @@ export interface SearchEntityAssessment {
   tier3Candidate: boolean
   /** Explainable Google-only aggregate identity decision. Raw acquired candidates remain unchanged. */
   googleIdentityDecision?: GoogleIdentityDecision
+  /** Explainable Bing Brand identity decision. Raw acquired candidates remain unchanged. */
+  bingIdentityDecision?: BingIdentityDecision
 }

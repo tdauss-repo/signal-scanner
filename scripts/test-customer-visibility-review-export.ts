@@ -36,8 +36,8 @@ const fixes = [
   fix('website-title', 'Supporting observation stays outside the primary queue'),
 ]
 state.searchDestinationObservations = {
-  'search-brand-canonical': { 'Google Search': observation('Google Search', 'found'), 'Google Maps': observation('Google Maps', 'found'), Yelp: observation('Yelp', 'review_required', 'https://www.yelp.com/biz/montessori-example') },
-  'search-brand-market': { Yelp: observation('Yelp', 'review_required', 'https://www.yelp.com/biz/montessori-example'), 'Apple Maps': observation('Apple Maps', 'review_required') },
+  'search-brand-canonical': { 'Google Search': observation('Google Search', 'found'), 'Google Maps': observation('Google Maps', 'found'), Yelp: observation('Yelp', 'review_required', 'https://www.yelp.com/biz/montessori-example'), 'Apple Maps': observation('Apple Maps', 'review_required') },
+  'search-brand-market': { Yelp: observation('Yelp', 'review_required', 'https://www.yelp.com/biz/montessori-example') },
 }
 const primaryFixes = fixes.filter((item) => item.id !== 'website-title')
 const summary = () => summarizeCustomerScan(state, [], fixes)

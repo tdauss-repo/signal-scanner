@@ -1,8 +1,8 @@
 import type { BusinessProfile, BusinessProfileField, BusinessProfileState } from '../types/audit'
-import type { BusinessResultCandidate, EntityField, EntityMatch, FieldComparison, GoogleIdentityDecision, SearchEntityAssessment, SearchQueryMode } from '../types/entityMatch'
+import type { BingIdentityDecision, BusinessResultCandidate, EntityField, EntityMatch, FieldComparison, GoogleIdentityDecision, SearchEntityAssessment, SearchQueryMode } from '../types/entityMatch'
 
 export interface BusinessCandidateAssessmentOptions {
-  automaticIdentityPolicy?: 'google_search'
+  automaticIdentityPolicy?: 'google_search' | 'bing_search'
 }
 
 export const normalizedWords = (value: string) => value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ')
@@ -173,14 +173,19 @@ export function assessBusinessCandidates(candidates: BusinessResultCandidate[], 
   const googleIdentityDecision = options.automaticIdentityPolicy === 'google_search' && selected
     ? googleAutomaticIdentityDecision(selected, matches, sameIdentity, multiple, conflictingEvidence)
     : undefined
-  const reasons = [...(selected?.ambiguityReasons || ['No identifiable business result was extracted.']), ...(multiple ? ['Multiple plausible business records require disambiguation; fields were not combined across candidates.'] : []), ...(conflictingEvidence && !selected?.conflictingFields.length ? ['Another plausible result representation conflicts with reviewed profile fields.'] : []), ...(googleIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Google evidence did not contain the required independent identity signals for automatic verification.'] : [])]
-  const automaticObservation = googleIdentityDecision
-    ? googleIdentityDecision.decision === 'verified'
+  const bingIdentityDecision = options.automaticIdentityPolicy === 'bing_search' && selected
+    ? bingAutomaticIdentityDecision(selected, matches, sameIdentity, multiple, conflictingEvidence)
+    : undefined
+  const explicitIdentityDecision = googleIdentityDecision || bingIdentityDecision
+  const reasons = [...(selected?.ambiguityReasons || ['No identifiable business result was extracted.']), ...(multiple ? ['Multiple plausible business records require disambiguation; fields were not combined across candidates.'] : []), ...(conflictingEvidence && !selected?.conflictingFields.length ? ['Another plausible result representation conflicts with reviewed profile fields.'] : []), ...(googleIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Google evidence did not contain the required independent identity signals for automatic verification.'] : []), ...(bingIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Bing evidence did not contain the required independent identity signals for automatic verification.'] : [])]
+  const automaticObservation = explicitIdentityDecision
+    ? explicitIdentityDecision.decision === 'verified'
     : Boolean(selected?.automaticObservation && !multiple && !conflictingEvidence)
   return { matches, selected, confidence: automaticObservation ? 'high' : selected ? selected.confidence === 'high' ? 'medium' : selected.confidence : 'unavailable', automaticObservation,
     visibilityResult: automaticObservation ? 'found' : 'review_required', operatorReviewRequired: !automaticObservation, resultRegionInspected: false,
     ambiguityReasons: automaticObservation ? [] : reasons, blocker: automaticObservation ? 'none' : multiple ? 'multiple_entities' : conflictingEvidence ? 'identifier_conflict' : selected?.unreviewedProfileFields.some((field) => selected.candidate.fields[field]) ? 'unreviewed_profile' : 'insufficient_identity', tier3Candidate: false,
-    ...(googleIdentityDecision ? { googleIdentityDecision } : {}) }
+    ...(googleIdentityDecision ? { googleIdentityDecision } : {}),
+    ...(bingIdentityDecision ? { bingIdentityDecision } : {}) }
 }
 
 const identitySignalGroup = (field: EntityField) => field === 'streetAddress' || field === 'address' ? 'address' : field
@@ -231,6 +236,35 @@ function googleAutomaticIdentityDecision(
   const nameAndDomainOnly = groups.size === 2 && groups.has('name') && groups.has('website')
   const hasLocationContext = ['locality', 'region', 'postalCode'].some((field) => matchedFields.has(field as EntityField))
   const verified = groups.size >= 2 && hasPrimaryIdentity && !(internalOrganicOnly && nameAndDomainOnly && !hasLocationContext) && !multiple && !conflictingEvidence && !conflictingSignals.length
+  return {
+    version: 1,
+    decision: verified ? 'verified' : 'review_required',
+    matchedSignals,
+    conflictingSignals,
+    candidateIds: cluster.map((match) => match.candidate.id),
+    sourceTypes: [...new Set(cluster.flatMap((match) => match.candidate.sourceType ? [match.candidate.sourceType] : []))],
+    rule: 'two_strong_identifiers_with_name_or_domain_no_conflict',
+  }
+}
+
+/**
+ * Bing uses the same reviewed-field comparisons as every destination. Its
+ * explicit Brand decision only aggregates representations of the selected
+ * identity and never treats a result title, rank or snippet as a signal.
+ */
+function bingAutomaticIdentityDecision(
+  selected: EntityMatch,
+  matches: EntityMatch[],
+  sameIdentity: (left: EntityMatch, right: EntityMatch) => boolean,
+  multiple: boolean,
+  conflictingEvidence: boolean,
+): BingIdentityDecision {
+  const cluster = matches.filter((match) => match === selected || sameIdentity(selected, match))
+  const matchedSignals = uniqueComparisons(cluster.flatMap((match) => match.matchedFields))
+  const conflictingSignals = uniqueConflictComparisons(cluster.flatMap((match) => match.conflictingFields))
+  const groups = new Set(matchedSignals.map((signal) => identitySignalGroup(signal.field)))
+  const verified = groups.size >= 2 && (groups.has('name') || groups.has('website')) &&
+    !multiple && !conflictingEvidence && !conflictingSignals.length
   return {
     version: 1,
     decision: verified ? 'verified' : 'review_required',

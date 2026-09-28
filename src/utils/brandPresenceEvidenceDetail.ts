@@ -83,6 +83,7 @@ const automaticIdentityEvidence = (observation: SearchDestinationObservation, sa
     result: signal.field === 'name' ? 'Matches' : `Matches ${signal.observed}`,
   }))
   const decision = observation.automation?.assessment?.googleIdentityDecision
+    || observation.automation?.assessment?.bingIdentityDecision
     || observation.retainedGoogleVerification?.automation.assessment?.googleIdentityDecision
   if (!decision) return undefined
   return [
@@ -132,8 +133,8 @@ export function brandPresenceEvidenceSummary(
     ...(identityEvidence?.length ? { identityEvidence } : {}),
     ...(derived ? { decision: derived.freshness === 'recent' ? 'Verified from recent evidence' : 'Verified automatically' }
       : retained ? { decision: 'Verified from recent evidence' }
-      : observation.automation?.assessment?.googleIdentityDecision ? {
-        decision: observation.automation.assessment.googleIdentityDecision.decision === 'verified' ? 'Verified automatically' : 'Assisted verification required',
+      : observation.automation?.assessment?.googleIdentityDecision || observation.automation?.assessment?.bingIdentityDecision ? {
+        decision: (observation.automation.assessment.googleIdentityDecision || observation.automation.assessment.bingIdentityDecision)?.decision === 'verified' ? 'Verified automatically' : 'Assisted verification required',
       } : {}),
   }
 }

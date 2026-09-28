@@ -10,6 +10,7 @@
     "dev:all": "node scripts/dev-all.mjs",
     "diagnose:website": "node scripts/diagnose-website-fetch.mjs",
     "diagnose:google-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-google-acquisition.ts",
+    "diagnose:bing-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-bing-acquisition.ts",
     "test:proving-001": "node --import tsx scripts/test-website-audit.ts && node --import tsx scripts/test-website-evidence-contract.ts",
     "test:proving-002": "node --import tsx scripts/test-browser-website-observation.ts",
     "test:profile-separation": "node --import tsx scripts/test-profile-separation.ts",
@@ -52,7 +53,8 @@
     "test:google-acquisition-resilience": "node --import tsx scripts/test-google-acquisition-resilience.tsx",
     "test:google-acquisition-runtime": "node --import tsx scripts/test-google-acquisition-runtime.ts",
     "test:google-maps-derived-verification": "node --import tsx scripts/test-google-maps-derived-verification.tsx",
-    "test:address-identity-normalization": "node --import tsx scripts/test-address-identity-normalization.ts"
+    "test:address-identity-normalization": "node --import tsx scripts/test-address-identity-normalization.ts",
+    "test:bing-search-auto-verification": "node --import tsx scripts/test-bing-search-auto-verification.tsx"
   },
   "dependencies": {
     "express": "^5.2.1",

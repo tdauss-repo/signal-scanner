@@ -106,6 +106,7 @@ const semanticFields: Record<string, EntityField> = { name: 'name', telephone: '
 export const semanticResultExtractor: SearchResultExtractor = {
   id: 'semantic-public-card-v1',
   extract(capture) {
+    const bingOrganic = host(capture.finalUrl || capture.requestedUrl) === 'bing.com' ? { sourceType: 'organic' as const } : {}
     const root = semanticTree(capture.html || '')
     const elements = descendants(root)
     const scopes = elements.filter((element) => /schema.org\/(LocalBusiness|Organization|School|[A-Za-z]*Business|Store|Restaurant|Place)/i.test(element.attrs.itemtype || '') || ['article', 'li'].includes(element.tag) || ['article', 'listitem'].includes(element.attrs.role)).slice(0, 100)
@@ -144,7 +145,7 @@ export const semanticResultExtractor: SearchResultExtractor = {
       const displayed = displayedResultUrl([namedLink ? content(namedLink) : '', content(scope)], capture)
       if (!resultDestination && displayed) resultDestination = displayed
       if (fields.website) fields.website = safeUrl(fields.website, capture.requestedUrl)
-      if (fields.name) candidates.push({ id: `${capture.requestedUrl}#card-${index}`, kind: 'semantic_card', ...(resultDestination ? { resultUrl: resultDestination } : {}), fields, evidence: [reference(capture, `semantic-card[${index}]`, content(scope))] })
+      if (fields.name) candidates.push({ id: `${capture.requestedUrl}#card-${index}`, kind: 'semantic_card', ...bingOrganic, ...(resultDestination ? { resultUrl: resultDestination } : {}), fields, evidence: [reference(capture, `semantic-card[${index}]`, content(scope))] })
     }
     // Direct semantic links provide partial name/domain evidence, never a complete entity by themselves.
     for (const [index, link] of elements.filter((element) => element.tag === 'a').slice(0, 300).entries()) {
@@ -155,7 +156,7 @@ export const semanticResultExtractor: SearchResultExtractor = {
       if (host(url) === host(capture.requestedUrl) && !/\/maps\/place\//i.test(url)) continue
       const fields: BusinessResultCandidate['fields'] = { name }
       if (host(url) === host(capture.requestedUrl)) { fields.publicProfileUrl = url; fields.placeIdentity = url }
-      candidates.push({ id: `${capture.requestedUrl}#link-${index}`, kind: 'result_link', ...(host(url) !== host(capture.requestedUrl) ? { resultUrl: url } : {}), fields, evidence: [reference(capture, `a[${index}]`, `${name} — ${url}`)] })
+      candidates.push({ id: `${capture.requestedUrl}#link-${index}`, kind: 'result_link', ...bingOrganic, ...(host(url) !== host(capture.requestedUrl) ? { resultUrl: url } : {}), fields, evidence: [reference(capture, `a[${index}]`, `${name} — ${url}`)] })
     }
     return candidates.slice(0, 100)
   },
@@ -202,7 +203,9 @@ export const renderedResultExtractor: SearchResultExtractor = {
       if (!resultDestination && !fields.phone) return []
       const evidence = [reference(capture, observed.locator, `${observed.excerpt}\n${observed.links.map((item) => `${item.text} — ${item.url}`).join('\n')}`)]
       if (displayed && !link) evidence.push(reference(capture, `${observed.locator} displayed destination`, `${(observed.displayedUrls || []).join(' | ')} ${observed.links.map((item) => item.text).join(' | ')}`.trim() || observed.excerpt))
-      return [{ id: `${capture.requestedUrl}#rendered-result-${index}`, kind: 'semantic_card' as const, ...(resultDestination ? { resultUrl: resultDestination } : {}), fields,
+      return [{ id: `${capture.requestedUrl}#rendered-result-${index}`, kind: 'semantic_card' as const,
+        ...(host(capture.finalUrl || capture.requestedUrl) === 'bing.com' ? { sourceType: 'organic' as const } : {}),
+        ...(resultDestination ? { resultUrl: resultDestination } : {}), fields,
         evidence }]
     })
   },
@@ -215,7 +218,9 @@ export function assessSearchCapture(capture: AcquisitionResult, profile: Busines
   if (!['success', 'partial'].includes(capture.outcome)) return { matches: [], confidence: 'unavailable', automaticObservation: false, visibilityResult: 'unavailable', operatorReviewRequired: true, resultRegionInspected: false, ambiguityReasons: [`Acquisition did not obtain a public page: ${capture.error || capture.outcome}. This is not evidence of absence.`], blocker: 'acquisition_failure', tier3Candidate: false }
   const candidates = searchResultExtractors.flatMap((extractor) => extractor.extract(capture))
   const assessment = assessBusinessCandidates(candidates, profile, profileState, queryMode, {
-    automaticIdentityPolicy: destination === 'Google Search' && queryMode === 'brand' ? 'google_search' : undefined,
+    automaticIdentityPolicy: queryMode !== 'brand' ? undefined
+      : destination === 'Google Search' ? 'google_search'
+        : destination === 'Bing Search' ? 'bing_search' : undefined,
   })
   const resultRegionInspected = Boolean(capture.resultRegionInspected || capture.renderedResultEvidence?.resultRegionInspected || (candidates.length && /<(?:main|article)\b|role=["'](?:main|listitem)["']/i.test(capture.html || '')))
   assessment.resultRegionInspected = resultRegionInspected

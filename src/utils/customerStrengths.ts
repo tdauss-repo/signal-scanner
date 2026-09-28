@@ -111,6 +111,7 @@ const materialSearchEvidence = (
       blocker: assessment.blocker,
       ambiguityReasons: assessment.ambiguityReasons,
       googleIdentityDecision: assessment.googleIdentityDecision,
+      bingIdentityDecision: assessment.bingIdentityDecision,
       selected: assessment.selected ? materialEntityMatch(assessment.selected) : undefined,
       matches: assessment.matches.map(materialEntityMatch),
     } : undefined,

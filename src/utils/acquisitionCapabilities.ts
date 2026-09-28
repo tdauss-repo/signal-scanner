@@ -1,7 +1,7 @@
 import type { SearchDestination } from '../types/audit'
 
 export type AcquisitionProductionStatus = 'production' | 'manual_fallback'
-export type AcquisitionShape = 'structured_then_browser' | 'native_fetch_then_browser' | 'manual'
+export type AcquisitionShape = 'structured_then_browser' | 'native_fetch_then_assisted' | 'native_fetch_then_browser' | 'manual'
 
 export interface DestinationAcquisitionCapability {
   destination: SearchDestination
@@ -32,8 +32,8 @@ export const destinationAcquisitionCapabilities: DestinationAcquisitionCapabilit
     blockerTypes: ['provider failure', 'challenge or consent wall', 'map shell without an inspected place region'],
   },
   {
-    destination: 'Bing Search', preferredProvider: 'Found Local server fetch', fallbackProvider: 'Found Local rendered browser',
-    productionStatus: 'production', shape: 'native_fetch_then_browser', automaticFound: true, automaticNotFound: true,
+    destination: 'Bing Search', preferredProvider: 'Found Local bounded Bing fetch', fallbackProvider: 'Assisted verification',
+    productionStatus: 'production', shape: 'native_fetch_then_assisted', automaticFound: true, automaticNotFound: true,
     blockerTypes: ['transport failure', 'challenge or access restriction', 'result region not inspected'],
   },
   {

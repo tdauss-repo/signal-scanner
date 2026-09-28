@@ -247,6 +247,37 @@ generic review-needed states; unavailable acquisition remains neutral. Current
 operator-assisted outcomes retain their existing semantics, while historical
 operator records remain stored without overriding newer conclusive automation.
 
+### Bing Search Brand Presence verification
+
+Bing Brand Presence uses one bounded native server request to the clean
+`bing.com/search?q=...` verification query. The request does not execute
+scripts, follow an unreviewed redirect, launch a browser, maintain a profile,
+or bypass an access restriction. A normal Bing result region is normalized by
+the shared structured, semantic, and result-link extractors; transport, HTTP,
+access, and missing-result-region failures retain distinct internal blockers
+and remain neutral. Assisted verification is the fallback when this bounded
+acquisition is unavailable or insufficient.
+
+The Bing identity decision reuses the reviewed Business Profile comparison and
+normalization contract. Automatic verification requires at least two distinct
+strong matched groups from business name, official domain, phone, or address;
+one group must be business name or official domain, and no material conflict or
+second plausible identity may exist. Result rank, snippet text, a title alone,
+a domain alone, category, and third-party publisher identity are insufficient.
+The acquired result URL remains observed evidence and is not promoted to a
+canonical profile URL.
+
+A verified Bing Brand result is presented as “Verified automatically,” removes
+the required assisted-verification control, and may support the destination-
+specific Bing Search strength through the existing include/hide/refine flow.
+It does not prove Bing Maps presence, ranking, or broad search performance.
+Brand Presence neutral counts and customer “Still being verified” output use
+the Brand query only; unresolved Location Diagnostic or Core Local Discovery
+queries remain separate and cannot override the Brand identity result.
+Successful Brand Presence identity verification is separate from local-intent
+discovery performance. Candidate details, matcher decisions, provider names,
+blockers, and acquisition metadata remain outside customer JSON.
+
 ### Configured Google acquisition runtime
 
 `npm run dev:configured` is the authoritative local development launch. Node
