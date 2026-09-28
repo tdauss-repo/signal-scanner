@@ -50,7 +50,8 @@
     "test:google-search-auto-verification": "node --import tsx scripts/test-google-search-auto-verification.tsx",
     "test:google-auto-verification-projection": "node --import tsx scripts/test-google-auto-verification-projection.tsx",
     "test:google-acquisition-resilience": "node --import tsx scripts/test-google-acquisition-resilience.tsx",
-    "test:google-acquisition-runtime": "node --import tsx scripts/test-google-acquisition-runtime.ts"
+    "test:google-acquisition-runtime": "node --import tsx scripts/test-google-acquisition-runtime.ts",
+    "test:google-maps-derived-verification": "node --import tsx scripts/test-google-maps-derived-verification.tsx"
   },
   "dependencies": {
     "express": "^5.2.1",

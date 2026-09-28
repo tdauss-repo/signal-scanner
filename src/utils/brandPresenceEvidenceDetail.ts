@@ -52,6 +52,9 @@ const automationStateLabel = (observation: SearchDestinationObservation) => {
 }
 
 const resultLabel = (observation: SearchDestinationObservation, sales: SalesVisibilityProjection) => {
+  if (sales.derivedGoogleMapsVerification) return sales.state === 'verified_recent'
+    ? 'Maps business identity verified from recent Google evidence'
+    : 'Maps business identity verified'
   if (sales.state === 'verified_recent') return 'Business identity verified from recent evidence'
   if (unavailable(observation)) return 'No verified result'
   if (sales.state === 'website_result_discovered') return 'Website result discovered'
@@ -74,7 +77,11 @@ const identityLabel = (field: string) => ({
   locality: 'City', region: 'State', postalCode: 'ZIP',
 }[field] || field)
 
-const automaticIdentityEvidence = (observation: SearchDestinationObservation) => {
+const automaticIdentityEvidence = (observation: SearchDestinationObservation, sales: SalesVisibilityProjection) => {
+  if (sales.derivedGoogleMapsVerification) return sales.derivedGoogleMapsVerification.matchedSignals.map((signal) => ({
+    label: identityLabel(signal.field),
+    result: signal.field === 'name' ? 'Matches' : `Matches ${signal.observed}`,
+  }))
   const decision = observation.automation?.assessment?.googleIdentityDecision
     || observation.retainedGoogleVerification?.automation.assessment?.googleIdentityDecision
   if (!decision) return undefined
@@ -91,33 +98,40 @@ export function brandPresenceEvidenceSummary(
 ): BrandPresenceEvidenceSummary {
   const failed = unavailable(observation)
   const retained = sales.state === 'verified_recent' ? observation.retainedGoogleVerification : undefined
-  const acquisition = retained ? 'Recent automated evidence retained'
+  const derived = sales.derivedGoogleMapsVerification
+  const acquisition = derived?.freshness === 'recent' ? 'Recent derived evidence retained'
+    : derived ? 'Derived automated evidence'
+    : retained ? 'Recent automated evidence retained'
     : failed ? 'Automated check unavailable'
     : observation.operatorAssisted ? 'Operator-assisted evidence'
       : observation.automation ? 'Automated evidence'
         : observation.operatorVerification ? 'Operator verification'
           : 'Manual evidence'
-  const identityEvidence = automaticIdentityEvidence(observation)
+  const identityEvidence = automaticIdentityEvidence(observation, sales)
   return {
     acquisition,
     result: resultLabel(observation, sales),
     ...(observation.observedResultUrl || retained?.observedResultUrl ? { observedResultUrl: observation.observedResultUrl || retained?.observedResultUrl } : {}),
     ...(sales.knownProfileUrl ? { knownProfileUrl: sales.knownProfileUrl } : {}),
-    ...(observation.observedAt ? { observedAt: observation.observedAt } : {}),
-    ...(retained?.verifiedAt ? { lastVerifiedAt: retained.verifiedAt } : {}),
-    source: observation.destination,
-    ...(automationStateLabel(observation) ? { automationState: automationStateLabel(observation) } : {}),
-    ...(!failed || retained ? { interpretation: sales.explanation } : {
+    ...(derived?.freshness === 'fresh' ? { observedAt: derived.verifiedAt }
+      : observation.observedAt ? { observedAt: observation.observedAt } : {}),
+    ...(derived?.freshness === 'recent' ? { lastVerifiedAt: derived.verifiedAt }
+      : retained?.verifiedAt ? { lastVerifiedAt: retained.verifiedAt } : {}),
+    source: derived ? 'Google Search knowledge panel' : observation.destination,
+    ...(derived?.freshness === 'fresh' ? { automationState: 'Completed' }
+      : automationStateLabel(observation) ? { automationState: automationStateLabel(observation) } : {}),
+    ...(!failed || retained || derived ? { interpretation: sales.explanation } : {
       reason: acquisitionFailureReason(observation),
       nextStep: 'Use assisted verification.',
     }),
-    ...(failed && retained ? {
+    ...(failed && (retained || derived) ? {
       reason: acquisitionFailureReason(observation),
     } : {}),
     verificationUrl: observation.verificationUrl,
     verificationLabel: `${observation.destination} verification query`,
     ...(identityEvidence?.length ? { identityEvidence } : {}),
-    ...(retained ? { decision: 'Verified from recent evidence' }
+    ...(derived ? { decision: derived.freshness === 'recent' ? 'Verified from recent evidence' : 'Verified automatically' }
+      : retained ? { decision: 'Verified from recent evidence' }
       : observation.automation?.assessment?.googleIdentityDecision ? {
         decision: observation.automation.assessment.googleIdentityDecision.decision === 'verified' ? 'Verified automatically' : 'Assisted verification required',
       } : {}),
@@ -129,7 +143,7 @@ export function brandPresenceEvidenceSummary(
  * persistence; serialization happens only after the operator opens the nested
  * technical disclosure.
  */
-export function brandPresenceTechnicalEvidence(observation: SearchDestinationObservation) {
+export function brandPresenceTechnicalEvidence(observation: SearchDestinationObservation, sales?: SalesVisibilityProjection) {
   return {
     destination: observation.destination,
     query: observation.query,
@@ -142,13 +156,14 @@ export function brandPresenceTechnicalEvidence(observation: SearchDestinationObs
     canonicalProfileUrl: observation.canonicalProfileUrl,
     automation: observation.automation,
     retainedGoogleVerification: observation.retainedGoogleVerification,
+    derivedGoogleMapsVerification: sales?.derivedGoogleMapsVerification,
     operatorAssisted: observation.operatorAssisted,
     operatorVerification: observation.operatorVerification,
   }
 }
 
-export const serializeBrandPresenceTechnicalEvidence = (observation: SearchDestinationObservation) =>
-  JSON.stringify(brandPresenceTechnicalEvidence(observation), null, 2)
+export const serializeBrandPresenceTechnicalEvidence = (observation: SearchDestinationObservation, sales?: SalesVisibilityProjection) =>
+  JSON.stringify(brandPresenceTechnicalEvidence(observation, sales), null, 2)
 
 /** Full href is retained separately; labels omit query/hash and bound long paths. */
 export function shortEvidenceUrl(value: string, maxLength = 100) {

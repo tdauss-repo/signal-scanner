@@ -5,6 +5,7 @@ import { customerBusinessNoun, localBusinessModel } from './businessContext'
 import { evidenceFingerprint } from './evidenceFingerprint'
 import { effectiveGoogleAutomaticIdentityState } from './googleAcquisitionResilience'
 import { salesCockpitVisibility } from './salesVisibilityProjection'
+import type { SalesVisibilityProjection } from './salesVisibilityProjection'
 
 export interface CustomerStrengthCandidate {
   id: string
@@ -54,7 +55,26 @@ const materialEntityMatch = (match: EntityMatch) => ({
   ambiguityReasons: match.ambiguityReasons,
 })
 
-const materialSearchEvidence = (state: AuditState, queryId: string, observation: SearchDestinationObservation) => {
+const materialSearchEvidence = (
+  state: AuditState,
+  queryId: string,
+  observation: SearchDestinationObservation,
+  projection?: SalesVisibilityProjection,
+) => {
+  const derivedMaps = projection?.derivedGoogleMapsVerification
+  if (derivedMaps) {
+    const profile = reviewedBusinessProfile(state.profile, state.businessProfile)
+    return {
+      version: 'found-local-material-strength-v1',
+      source: 'search_destination',
+      id: 'search:Google Maps',
+      profile: { businessName: profile.businessName },
+      queryId,
+      destination: 'Google Maps',
+      derivedEvidenceKey: derivedMaps.evidenceKey,
+      provenance: derivedMaps.provenance,
+    }
+  }
   const retained = effectiveGoogleAutomaticIdentityState(observation, { profile: state.profile, profileState: state.businessProfile }) === 'verified_recent'
     ? observation.retainedGoogleVerification : undefined
   const assessment = retained?.automation.assessment || observation.automation?.assessment
@@ -142,14 +162,16 @@ export function customerStrengthCandidates(state: AuditState, items: AuditItem[]
   const searchStrengths = salesCockpitVisibility(records, { profile: state.profile, profileState: state.businessProfile }).lookingGood.map((entry) => {
     const observation = state.searchDestinationObservations[entry.queryId]?.[entry.destination]
     if (!observation) throw new Error(`Missing current strength evidence for ${entry.destination}`)
-    const material = materialSearchEvidence(state, entry.queryId, observation)
+    const material = materialSearchEvidence(state, entry.queryId, observation, entry)
     return {
       id: `search:${entry.destination}`,
       source: 'search_destination' as const,
       sourceTitle: entry.destination,
       evidenceSummary: entry.explanation,
       defaultTitle: entry.destination,
-      defaultSummary: `We verified that the business identity shown in ${entry.destination} matches the reviewed information${profile.businessName ? ` for ${profile.businessName}` : ''}.`,
+      defaultSummary: entry.destination === 'Google Maps'
+        ? `We verified that ${profile.businessName || 'the business'} has a Google Maps business profile matching the reviewed business information.`
+        : `We verified that the business identity shown in ${entry.destination} matches the reviewed information${profile.businessName ? ` for ${profile.businessName}` : ''}.`,
       evidenceKey: evidenceFingerprint(material),
     }
   })

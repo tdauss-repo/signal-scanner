@@ -2,7 +2,7 @@ import { evidenceFingerprint, matchesEvidenceFingerprint } from './evidenceFinge
 import { currentMachineReadability, summarizeMachineReadability } from './machineReadability'
 import { scanAreaState, scanStateLabel, visibilityRunStatus } from './visibilityScanState'
 import type { ScanArea, ScanState } from '../types/visibilityScan'
-import type { AuditItem, AuditState, CustomerFindingRefinement, FixItem } from '../types/audit'
+import type { AuditItem, AuditState, CustomerFindingRefinement, FixItem, SearchDestinationObservation } from '../types/audit'
 import { effectivePackageFit, isStarterEligible, sortSalesActions } from './salesReadiness'
 import { primarySearchDestinations } from './searchVisibility'
 import { projectSalesVisibility, salesCockpitVisibility } from './salesVisibilityProjection'
@@ -373,12 +373,21 @@ export function summarizeCustomerScan(state: AuditState, items: AuditItem[], fix
   const queries = new Set(items.filter((item) => item.area === 'keywords').map((item) => item.id))
   const search = Object.entries(state.searchDestinationObservations)
     .filter(([id]) => queries.has(id))
-    .flatMap(([, destinations]) => Object.values(destinations))
-    .filter((observation) => observation && (observation.operatorVerification || observation.reviewed && Boolean(observation.evidenceNotes?.trim())))
-  const searchCompleted = search.filter((observation) => observation && !projectSalesVisibility(observation, { profile: state.profile, profileState: state.businessProfile }).operatorReviewRequired)
+    .flatMap(([queryId, destinations]) => Object.values(destinations)
+      .filter((observation): observation is SearchDestinationObservation => Boolean(observation && (observation.operatorVerification || observation.reviewed && Boolean(observation.evidenceNotes?.trim()))))
+      .map((observation) => ({ queryId, observation })))
+  const searchCompleted = search.filter(({ queryId, observation }) => !projectSalesVisibility(observation, {
+    profile: state.profile,
+    profileState: state.businessProfile,
+    googleSearchObservation: state.searchDestinationObservations[queryId]?.['Google Search'],
+  }).operatorReviewRequired)
   const primaryComplete = [...queries].every((queryId) => primarySearchDestinations.every((destination) => {
     const observation = state.searchDestinationObservations[queryId]?.[destination]
-    return observation && !projectSalesVisibility(observation, { profile: state.profile, profileState: state.businessProfile }).operatorReviewRequired
+    return observation && !projectSalesVisibility(observation, {
+      profile: state.profile,
+      profileState: state.businessProfile,
+      googleSearchObservation: state.searchDestinationObservations[queryId]?.['Google Search'],
+    }).operatorReviewRequired
   }))
   const ai = Object.values(state.aiAnswerTests).flatMap((test) => test.observations)
     .filter((observation) => observation.operatorReviewed && observation.evidenceMode === 'consumer_observation' && Boolean(observation.rawResponse.trim() || observation.evidenceNotes.trim()))

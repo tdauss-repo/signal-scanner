@@ -304,6 +304,41 @@ Provider and retention metadata remain outside customer JSON and package scope.
 A transient acquisition failure does not erase recent trustworthy verified
 evidence, but retained evidence must never be represented as fresh.
 
+### Cross-destination Google Maps verification
+
+A verified Google Search knowledge panel or local-place candidate may establish
+Google Maps presence without requiring a separate successful Maps acquisition.
+This derived result is allowed only when the current Google Search identity
+decision is verified, the same candidate contains a real Maps place identity or
+canonical `google.com/maps/place` URL, the candidate matches the reviewed
+business name plus phone, address, or official domain, and no material conflict
+or second plausible Maps entity exists. The source Google acquisition must use
+the current reviewed-identity fingerprint and remain inside the same seven-day
+Google Brand freshness window.
+
+The projection records `derived_from_google_search` provenance, a material key
+formed from reviewed identity, place identity/canonical Maps URL, and matched
+identity signals, and a reference to the Search candidate. It does not copy the
+Search provider payload into the Maps observation and never represents the
+derived result as a successful direct Maps acquisition. Tracking-only Maps URL
+parameters, timestamps, run IDs, and provider request metadata are excluded
+from material reconciliation.
+
+Fresh direct Maps verification has first precedence. A current direct Maps
+identity conflict or explicit current operator correction blocks a derived
+positive result. When direct Maps acquisition is unavailable, qualifying Search
+evidence produces “Verified automatically”; qualifying retained Search evidence
+produces “Verified from recent evidence” and preserves the failed current
+refresh as a separate fact. Expiry, reviewed business identity changes, or a
+later conflict remove the derived eligibility and restore assisted verification.
+
+Derived Maps verification proves only that a matching Maps entity is present
+and identity-consistent. It does not prove profile ownership, claimed status,
+ranking, optimization quality, or completeness. It may support the separate
+Google Maps strength through the normal include/hide/refine workflow; place
+identity, provider details, fingerprints, provenance internals, and acquisition
+history remain outside Customer Visibility Review JSON.
+
 ## Deployment Considerations
 The internal scanner and bounded API may be operated separately from Found
 Local Sites. The customer-safe JSON contract is the handoff boundary; direct
