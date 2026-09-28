@@ -39,7 +39,12 @@ if (!query) {
   }
   const usefulFields = [...new Set(candidates.flatMap((candidate) => Object.keys(candidate.fields)))]
   console.log(JSON.stringify({
+    endpointPath: '/api/acquire-bing-search',
+    runtimePath: 'acquireBingSearchRuntime',
     requestAttempted: true,
+    nativeRequestAttempted: capture?.provider === 'bing-native-fetch',
+    provider: capture?.provider || 'bing-native-request',
+    method: capture?.method || 'server_fetch',
     resultState: capture?.outcome || 'unavailable',
     elapsedMs: Math.round(performance.now() - started),
     status: capture?.statusCode || 0,

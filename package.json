@@ -54,7 +54,8 @@
     "test:google-acquisition-runtime": "node --import tsx scripts/test-google-acquisition-runtime.ts",
     "test:google-maps-derived-verification": "node --import tsx scripts/test-google-maps-derived-verification.tsx",
     "test:address-identity-normalization": "node --import tsx scripts/test-address-identity-normalization.ts",
-    "test:bing-search-auto-verification": "node --import tsx scripts/test-bing-search-auto-verification.tsx"
+    "test:bing-search-auto-verification": "node --import tsx scripts/test-bing-search-auto-verification.tsx",
+    "test:bing-acquisition-routing": "node --import tsx scripts/test-bing-acquisition-routing.ts"
   },
   "dependencies": {
     "express": "^5.2.1",

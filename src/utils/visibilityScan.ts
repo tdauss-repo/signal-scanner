@@ -76,6 +76,19 @@ export const applicationScanDependencies: ScanDependencies = {
   },
 }
 
+export type DestinationAcquisitionRoute = 'google_search' | 'google_maps' | 'bing_native_search' | 'generic'
+
+/** Brand destination dispatch is explicit so dedicated routes cannot silently enter the generic ladder. */
+export function destinationAcquisitionRoute(
+  destination: VisibilityCheck['destination'],
+  queryMode: VisibilityCheck['queryMode'],
+): DestinationAcquisitionRoute {
+  if (destination === 'Google Search') return 'google_search'
+  if (destination === 'Google Maps') return 'google_maps'
+  if (destination === 'Bing Search' && queryMode === 'brand') return 'bing_native_search'
+  return 'generic'
+}
+
 type StateUpdate = (state: AuditState) => AuditState
 const compactCapture = (capture: AcquisitionResult): AcquisitionResult => {
   const compact = { ...capture, visibleText: pageText(capture).slice(0, 6000) }
@@ -169,7 +182,9 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       (destination !== 'Google Search' || new URL(url).pathname === '/search') &&
       (destination !== 'Google Maps' || new URL(url).pathname.startsWith('/maps')))
     run.checks.push({ ...check(`${query.id}:${destination}`, 'SearchMaps'), destination, queryId: query.id, query: query.query, queryMode: query.isDiagnostic ? 'location' : query.role === 'Brand Presence' ? 'brand' : 'discovery',
-      url: destination === 'Google Search' ? verificationUrl : enhanced && query.isDiagnostic ? publicPresenceUrl(destination, query.query) : query.role === 'Brand Presence' ? configured || recorded || publicPresenceUrl(destination, query.query) : publicPresenceUrl(destination, query.query) })
+      url: destination === 'Google Search' || destination === 'Bing Search' && query.id === 'search-brand-canonical'
+        ? verificationUrl
+        : enhanced && query.isDiagnostic ? publicPresenceUrl(destination, query.query) : query.role === 'Brand Presence' ? configured || recorded || publicPresenceUrl(destination, query.query) : publicPresenceUrl(destination, query.query) })
   }
   // Only recorded sources; no guessed directories or seed mutation. Runtime additionally requires an explicit host allowlist.
   const directoryUrls = [...new Set([profile.knownListingUrl, ...profile.existingDirectoryUrls.split(/[\s,]+/), ...initial.directories.activeRows.filter((row) => row.businessId === businessDirectoryKey(profile)).map((row) => row.listingUrl)].filter((url) => /^https?:\/\//.test(url)))]
@@ -218,17 +233,16 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
     start(item)
     const captures: AcquisitionResult[] = []
     let dedicatedProviderHandled = false
+    const acquisitionRoute = destinationAcquisitionRoute(item.destination, item.queryMode)
     // A caller that spreads application dependencies and replaces only `acquire`
     // is supplying a complete fixture/CLI provider and must not inherit a live API call.
     const googleProvider = dependencies.acquireGoogle === applicationScanDependencies.acquireGoogle
       && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireGoogle
     const googleMapsProvider = dependencies.acquireGoogleMaps === applicationScanDependencies.acquireGoogleMaps
       && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireGoogleMaps
-    const bingProvider = dependencies.acquireBing === applicationScanDependencies.acquireBing
-      && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireBing
-    const dedicatedProvider = item.destination === 'Google Search' ? googleProvider
-      : item.destination === 'Google Maps' ? googleMapsProvider
-        : item.destination === 'Bing Search' && item.queryMode === 'brand' ? bingProvider : undefined
+    const dedicatedProvider = acquisitionRoute === 'google_search' ? googleProvider
+      : acquisitionRoute === 'google_maps' ? googleMapsProvider
+        : acquisitionRoute === 'bing_native_search' ? dependencies.acquireBing : undefined
     if (dedicatedProvider) {
       try {
         const timeoutMs = item.destination === 'Google Search' && item.queryMode === 'brand' ? googleBrandOperationTimeoutMs : operationTimeoutMs
@@ -256,12 +270,25 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
           }
         }
       } catch (error) {
-        const blocker = error instanceof VisibilityScanTimeoutError ? 'provider_timeout' : 'acquisition_failure'
+        const errorText = `${error instanceof Error ? error.name : ''} ${error instanceof Error ? error.message : String(error)}`
+        const blocker = error instanceof VisibilityScanTimeoutError ? 'provider_timeout'
+          : /Bing native acquisition busy/i.test(errorText) ? 'capacity_busy'
+            : /Failed to fetch|network/i.test(errorText) ? 'network_failure' : 'acquisition_failure'
         const provider = item.destination === 'Google Maps' ? 'brightdata-google-maps-request'
           : item.destination === 'Google Search' ? 'brightdata-google-request' : 'bing-native-request'
         captures.push({ version: 1, requestedUrl: item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch', provider, outcome: 'failed', confidence: 'unavailable', notes: [`${item.destination || 'Destination'} provider request failed. This is not evidence that the business is absent.`], blocker, error: String(error) })
         dedicatedProviderHandled = true
       }
+    }
+    if (acquisitionRoute === 'bing_native_search' && !dedicatedProvider) {
+      captures.push({
+        version: 1, requestedUrl: item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch',
+        provider: 'bing-native-request', checkedDestination: 'Bing Search', outcome: 'unavailable', confidence: 'unavailable',
+        resultRegionInspected: false, blocker: 'runtime_unavailable',
+        notes: ['The dedicated Bing Brand acquisition route was unavailable. This is not evidence that the business is absent.'],
+        error: 'Dedicated Bing Brand acquisition dependency unavailable.',
+      })
+      dedicatedProviderHandled = true
     }
     if (!dedicatedProviderHandled) {
       for (const method of ['server_fetch', 'rendered_browser'] as const) {

@@ -249,6 +249,23 @@ operator records remain stored without overriding newer conclusive automation.
 
 ### Bing Search Brand Presence verification
 
+Brand Presence destination dispatch is explicit:
+
+| Destination | Acquisition route |
+| --- | --- |
+| Google Search | Dedicated Google Search acquisition |
+| Google Maps | Dedicated Google Maps acquisition |
+| Bing Search | Dedicated bounded native Bing acquisition |
+| Apple Maps, DuckDuckGo, Yelp, Facebook, Instagram | Existing destination/generic path |
+
+Bing Search Brand Presence must not fall through to generic public acquisition
+or its rendered-browser fallback. Missing dedicated wiring and native Bing
+failures produce one Bing-specific neutral capture instead. Native Bing work
+uses a separate bounded runtime lane from the existing shared Google and
+generic/browser lane, so a late or active unrelated request does not report
+Bing as busy while the existing Google/generic concurrency protection remains
+unchanged.
+
 Bing Brand Presence uses one bounded native server request to the clean
 `bing.com/search?q=...` verification query. The request does not execute
 scripts, follow an unreviewed redirect, launch a browser, maintain a profile,

@@ -31,6 +31,7 @@ const acquisitionFailureReason = (observation: SearchDestinationObservation) => 
   if (blocker === 'authentication_failure') return 'Provider authentication unavailable.'
   if (blocker === 'zone_configuration_error' || blocker === 'configuration_missing') return 'Provider configuration unavailable.'
   if (blocker === 'network_failure') return 'Provider network request failed.'
+  if (blocker === 'capacity_busy') return 'A dedicated acquisition for this destination is already in progress.'
   if (blocker === 'runtime_exception') return 'Acquisition server could not complete the request.'
   if (blocker === 'http_5xx' || blocker === 'embedded_5xx') return 'Provider service returned an error.'
   if (blocker === 'http_error') return capture?.statusCode ? `Provider request returned HTTP ${capture.statusCode}.` : 'Provider request returned an error.'

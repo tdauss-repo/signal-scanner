@@ -27,8 +27,15 @@ export async function runtimeRenderedProvider(): Promise<AcquisitionProvider | u
   }
 }
 
-// A single bounded acquisition per request; the shared runner decides whether to escalate.
-let active = false
+type AcquisitionLane = 'shared' | 'bing_native'
+const activeLanes = new Set<AcquisitionLane>()
+
+/** Dedicated native Bing work does not contend with unrelated Google or generic/browser work. */
+export async function runInAcquisitionLane<T>(lane: AcquisitionLane, work: () => Promise<T>): Promise<T> {
+  if (activeLanes.has(lane)) throw new Error(`${lane === 'bing_native' ? 'Bing native' : 'Public'} acquisition busy. Retry this check later.`)
+  activeLanes.add(lane)
+  try { return await work() } finally { activeLanes.delete(lane) }
+}
 
 const brightDataConfigured = () => Boolean(
   process.env.BRIGHTDATA_API_TOKEN
@@ -66,9 +73,7 @@ export async function acquireGoogleSearchRuntime(value: string) {
   const query = url.searchParams.get('q')?.trim()
   if (!query) throw new Error('Google Search query is required.')
   if (!brightDataConfigured()) return { unavailable: true as const, notConfigured: true as const }
-  if (active) throw new Error('Public acquisition busy. Retry this check later.')
-  active = true
-  try {
+  return runInAcquisitionLane('shared', async () => {
     try {
       const run = await acquireGoogleWithBrightData({
         query,
@@ -102,7 +107,7 @@ export async function acquireGoogleSearchRuntime(value: string) {
         error: `Bright Data Google acquisition unavailable: ${blocker}.`,
       } }
     }
-  } finally { active = false }
+  })
 }
 
 export async function acquireGoogleMapsRuntime(value: string) {
@@ -117,9 +122,7 @@ export async function acquireGoogleMapsRuntime(value: string) {
   }
   if (!query) throw new Error('Google Maps search query is required.')
   if (!brightDataConfigured()) return { unavailable: true as const, notConfigured: true as const }
-  if (active) throw new Error('Public acquisition busy. Retry this check later.')
-  active = true
-  try {
+  return runInAcquisitionLane('shared', async () => {
     try {
       const run = await acquireGoogleMapsWithBrightData({
         query,
@@ -151,7 +154,7 @@ export async function acquireGoogleMapsRuntime(value: string) {
         error: `Bright Data Google Maps acquisition unavailable: ${blocker}.`,
       } }
     }
-  } finally { active = false }
+  })
 }
 
 export async function acquireBingSearchRuntime(value: string) {
@@ -159,21 +162,15 @@ export async function acquireBingSearchRuntime(value: string) {
   if (url.hostname.replace(/^www\./, '') !== 'bing.com' || url.pathname !== '/search' || !url.searchParams.get('q')?.trim()) {
     throw new Error('Bing acquisition requires a Bing Search query URL.')
   }
-  if (active) throw new Error('Public acquisition busy. Retry this check later.')
-  active = true
-  try {
-    return { capture: await acquireBingSearch(url.href) }
-  } finally { active = false }
+  return runInAcquisitionLane('bing_native', async () => ({ capture: await acquireBingSearch(url.href) }))
 }
 
 export async function acquireRuntime(value: string, method: string) {
   runtimeAllowedUrl(value)
   if (!['server_fetch', 'rendered_browser'].includes(method)) throw new Error('Unsupported acquisition method.')
-  if (active) throw new Error('Public acquisition busy. Retry this check later.')
-  active = true
-  try {
+  return runInAcquisitionLane('shared', async () => {
     const provider = method === 'server_fetch' ? serverFetchProvider : await runtimeRenderedProvider()
     if (!provider) return { unavailable: true as const }
     return { capture: await provider.acquire(value) }
-  } finally { active = false }
+  })
 }
