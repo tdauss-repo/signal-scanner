@@ -229,6 +229,16 @@ Search evidence may generate the existing Google-only strength candidate, but
 it still passes through include/hide/refine controls; matcher details and
 provider metadata never enter customer JSON.
 
+The current explicit Google assessment is authoritative for destination
+presentation. A `verified` identity decision is effective only when the same
+assessment records a found automatic observation, no required operator review,
+and no blocker. That state takes precedence over retained compatibility fields
+such as an earlier `manual_review_needed` result, operator-observation
+provenance, or a stale prior verification. Conflicts take precedence over
+generic review-needed states; unavailable acquisition remains neutral. Current
+operator-assisted outcomes retain their existing semantics, while historical
+operator records remain stored without overriding newer conclusive automation.
+
 ### Configured Google acquisition runtime
 
 `npm run dev:configured` is the authoritative local development launch. Node

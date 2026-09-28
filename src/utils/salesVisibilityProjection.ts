@@ -32,6 +32,37 @@ export interface SalesVisibilityProjection {
   technicalDetail: Record<string, unknown>
 }
 
+export type GoogleAutomaticIdentityState = 'verified' | 'conflict' | 'verification_needed' | 'unavailable'
+
+/**
+ * Current Google automation is authoritative over retained compatibility
+ * fields on the observation envelope. Those fields may describe an earlier
+ * operator/manual state after a rescan has supplied a newer assessment.
+ */
+export function effectiveGoogleAutomaticIdentityState(
+  observation: SearchDestinationObservation,
+): GoogleAutomaticIdentityState | undefined {
+  if (observation.destination !== 'Google Search') return undefined
+  const assessment = observation.automation?.assessment
+  if (!assessment) return undefined
+  if (
+    assessment.googleIdentityDecision?.decision === 'verified' &&
+    assessment.automaticObservation === true &&
+    assessment.operatorReviewRequired === false &&
+    assessment.visibilityResult === 'found' &&
+    assessment.blocker === 'none'
+  ) return 'verified'
+  const conflictBlocker = assessment.blocker === 'identifier_conflict' || assessment.blocker === 'multiple_entities'
+  if (
+    assessment.googleIdentityDecision?.decision === 'review_required' && (
+      assessment.googleIdentityDecision.conflictingSignals.length > 0 ||
+      conflictBlocker
+    ) || !assessment.googleIdentityDecision && !assessment.automaticObservation && conflictBlocker
+  ) return 'conflict'
+  if (assessment.visibilityResult === 'unavailable') return 'unavailable'
+  return 'verification_needed'
+}
+
 const labels: Record<SalesVisibilityState, string> = {
   verified_correct: 'Verified automatically',
   verified_correction_needed: 'Verified — needs correction',
@@ -75,11 +106,11 @@ export function projectSalesVisibility(
   const profileUrl = operatorVerification?.classifiedCanonicalProfileUrl || acquiredProfileUrl
   const observedResultUrl = observation.observedResultUrl || selectedCandidate?.resultUrl
   const verificationUrl = observation.verificationUrl || publicPresenceUrl(observation.destination, observation.query)
-  const automatedReview = assessment?.operatorReviewRequired === true
-  const googleConflict = observation.destination === 'Google Search' && !assessment?.automaticObservation && (
-    assessment?.blocker === 'identifier_conflict' || assessment?.blocker === 'multiple_entities'
-  )
-  const unavailable = assessment?.visibilityResult === 'unavailable' || automatedReview || observation.overallResult === 'manual_review_needed' || observation.overallResult === 'unable_to_verify' || observation.overallResult === 'not_checked'
+  const googleAutomaticState = effectiveGoogleAutomaticIdentityState(observation)
+  const googleAutomaticVerified = googleAutomaticState === 'verified'
+  const automatedReview = assessment?.operatorReviewRequired === true && !googleAutomaticVerified
+  const googleConflict = googleAutomaticState === 'conflict'
+  const unavailable = !googleAutomaticVerified && (assessment?.visibilityResult === 'unavailable' || automatedReview || observation.overallResult === 'manual_review_needed' || observation.overallResult === 'unable_to_verify' || observation.overallResult === 'not_checked')
   const profileDiscovered = Boolean(acquiredProfileUrl && !googleConflict && !assessment?.automaticObservation && !['not_found', 'unavailable'].includes(assessment?.visibilityResult || ''))
   const organicWebsiteResult = Boolean(
     observation.destination === 'Google Search' && observedResultUrl && !acquiredProfileUrl &&
@@ -87,7 +118,7 @@ export function projectSalesVisibility(
     !observation.reviewed && assessment?.visibilityResult !== 'not_found' && assessment?.googleIdentityDecision?.decision !== 'verified',
   )
   const conflicting = observation.overallResult === 'found_conflicting_information'
-  const verified = Boolean(assessment?.automaticObservation && !automatedReview && !organicWebsiteResult)
+  const verified = googleAutomaticVerified || Boolean(assessment?.automaticObservation && !automatedReview && !organicWebsiteResult)
   const evidenceConflict = Boolean(operatorVerification && verified && (
     operatorVerification.outcome === 'found_correct' ? conflicting : true
   ))
@@ -97,6 +128,7 @@ export function projectSalesVisibility(
   else if (operatorVerification?.outcome === 'found_correction_needed') state = 'operator_correction_needed'
   else if (operatorVerification?.outcome === 'not_found') state = 'operator_not_found'
   else if (operatorVerification?.outcome === 'unable_to_determine') state = 'operator_unable_to_determine'
+  else if (googleAutomaticVerified) state = 'verified_correct'
   else if (staleOperatorVerification) state = 'reconfirmation_needed'
   else if (googleConflict) state = 'conflicting_evidence'
   else if (profileDiscovered) state = 'profile_discovered'

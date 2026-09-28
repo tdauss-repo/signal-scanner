@@ -48,6 +48,7 @@
     "test:brand-presence-assisted-verification": "node --import tsx scripts/test-brand-presence-assisted-verification.tsx",
     "test:brand-presence-evidence-detail": "node --import tsx scripts/test-brand-presence-evidence-detail.tsx",
     "test:google-search-auto-verification": "node --import tsx scripts/test-google-search-auto-verification.tsx",
+    "test:google-auto-verification-projection": "node --import tsx scripts/test-google-auto-verification-projection.tsx",
     "test:google-acquisition-runtime": "node --import tsx scripts/test-google-acquisition-runtime.ts"
   },
   "dependencies": {

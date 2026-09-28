@@ -4,6 +4,7 @@ import { emptyDirectoryRow } from './directorySuggestions'
 import { buildSearchVisibilityQueries, primarySearchDestinations } from './searchVisibility'
 import { operatorAssistedEvidenceIsCurrent } from './operatorAssistedSearch'
 import { currentBrandPresenceVerification } from './brandPresenceVerification'
+import { effectiveGoogleAutomaticIdentityState } from './salesVisibilityProjection'
 
 const profileNameForDestination: Partial<Record<SearchDestination, string>> = {
   'Google Maps': 'Google Business Profile',
@@ -97,7 +98,8 @@ export function summarizePublicPresence(state: import('../types/audit').AuditSta
     const evidence = Boolean(automated?.evidence || verification || observation.operatorAssisted?.rawText || observation.evidenceNotes.trim())
     const sourceRun = state.visibilityRuns?.find((run) => run.id === automated?.runId)
     const currentProfileEvidence = matchesEvidenceFingerprint(sourceRun?.profileKey, state.profile) && (!sourceRun?.profileReviewKey || matchesEvidenceFingerprint(sourceRun.profileReviewKey, state.businessProfile))
-    const automatic = Boolean(automated?.automaticObservation && observation.provenance === 'automated_acquisition' && currentProfileEvidence)
+    const explicitGoogleVerification = effectiveGoogleAutomaticIdentityState(observation) === 'verified'
+    const automatic = Boolean((explicitGoogleVerification || automated?.automaticObservation && observation.provenance === 'automated_acquisition') && currentProfileEvidence)
     const normalizedReview = automated?.assessment?.operatorReviewRequired
     const needsReview = verification ? verification.outcome === 'unable_to_determine'
       : assisted && observation.operatorAssisted?.assessment.operatorReviewRequired === false ? false : observation.provenance === 'automated_acquisition' && typeof normalizedReview === 'boolean'

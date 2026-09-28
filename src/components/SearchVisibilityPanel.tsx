@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { BrandPresenceMismatch, BrandPresenceVerificationOutcome, BusinessProfile, BusinessProfileState, SearchDestination, SearchDestinationObservation, SearchVisibilityQuery, SearchVisibilityResult, SearchVisibilityTestState } from '../types/audit'
 import { buildSearchVisibilityQueries, publicPresenceUrl, defaultSearchDestinationObservation, normalizeSearchDestinationObservation, normalizeSearchResultTypes, resultTypesForDestination, searchDestinations, searchResultTypeLabel, searchVisibilityResultLabel } from '../utils/searchVisibility'
 import { acceptOperatorAssistedBrandObservation, operatorAssistedEvidenceIsCurrent, operatorAssistedParsedFields, parseOperatorAssistedBrandObservation, type ParsedOperatorAssistedObservation } from '../utils/operatorAssistedSearch'
-import { projectSalesVisibility } from '../utils/salesVisibilityProjection'
+import { effectiveGoogleAutomaticIdentityState, projectSalesVisibility } from '../utils/salesVisibilityProjection'
 import { evidenceTimestampToLocalInput, formatEvidenceTimestamp, localInputToEvidenceTimestamp } from '../utils/evidenceTime'
 import { brandPresenceMismatchLabels, brandPresenceOutcomeLabels, brandPresenceVerificationIsStale, buildBrandPresenceVerification, currentBrandPresenceVerification, expectedBrandPresenceIdentity } from '../utils/brandPresenceVerification'
 import { brandPresenceEvidenceSummary, serializeBrandPresenceTechnicalEvidence, shortEvidenceUrl } from '../utils/brandPresenceEvidenceDetail'
@@ -96,7 +96,7 @@ function BrandPresenceReviewWorkflow({ profile, profileState, query, value, sale
   onChange: (query: SearchVisibilityQuery, observation: SearchDestinationObservation) => void
 }) {
   const [manualReview, setManualReview] = useState(false)
-  const automaticallyVerifiedGoogle = value.destination === 'Google Search' && sales.state === 'verified_correct' && value.automation?.assessment?.googleIdentityDecision?.decision === 'verified'
+  const automaticallyVerifiedGoogle = sales.state === 'verified_correct' && effectiveGoogleAutomaticIdentityState(value) === 'verified'
   if (automaticallyVerifiedGoogle && !manualReview) return <section className="brand-presence-verification brand-presence-verification-complete">
     <p><strong>No operator action required.</strong> The acquired identity evidence passed automatic verification.</p>
     <button type="button" className="secondary" onClick={() => setManualReview(true)}>Review manually</button>
