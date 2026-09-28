@@ -214,6 +214,14 @@ result, category, city, rating, or review count cannot verify identity. Any
 material conflicting identifier or multiple plausible entity blocks automatic
 verification and produces an explainable review-needed state.
 
+Full-address identity comparison treats punctuation, whitespace, common US
+street-suffix abbreviations, state names/abbreviations in the address tail,
+optional `United States`/`USA`/`US` suffixes, and ZIP+4 versus its five-digit
+base as formatting equivalents. This normalization is token-bounded and exact
+after equivalence mapping: house number, street name and type, city, state, and
+five-digit ZIP remain material. Formatting equivalence must not create a false
+conflict, while a materially different location identity remains conflicting.
+
 Organic document titles are not automatically business-name assertions. A
 nonmatching title on the reviewed official domain (for example, an About page)
 does not conflict with an otherwise matched knowledge-panel entity, and an

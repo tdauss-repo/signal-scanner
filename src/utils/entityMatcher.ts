@@ -7,21 +7,37 @@ export interface BusinessCandidateAssessmentOptions {
 
 export const normalizedWords = (value: string) => value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ')
 const regions = 'AL:Alabama|AK:Alaska|AZ:Arizona|AR:Arkansas|CA:California|CO:Colorado|CT:Connecticut|DE:Delaware|FL:Florida|GA:Georgia|HI:Hawaii|ID:Idaho|IL:Illinois|IN:Indiana|IA:Iowa|KS:Kansas|KY:Kentucky|LA:Louisiana|ME:Maine|MD:Maryland|MA:Massachusetts|MI:Michigan|MN:Minnesota|MS:Mississippi|MO:Missouri|MT:Montana|NE:Nebraska|NV:Nevada|NH:New Hampshire|NJ:New Jersey|NM:New Mexico|NY:New York|NC:North Carolina|ND:North Dakota|OH:Ohio|OK:Oklahoma|OR:Oregon|PA:Pennsylvania|RI:Rhode Island|SC:South Carolina|SD:South Dakota|TN:Tennessee|TX:Texas|UT:Utah|VT:Vermont|VA:Virginia|WA:Washington|WV:West Virginia|WI:Wisconsin|WY:Wyoming|DC:District of Columbia'.split('|').map((entry) => entry.split(':'))
+const addressTokens: Record<string, string> = {
+  street: 'st', st: 'st', road: 'rd', rd: 'rd', avenue: 'ave', ave: 'ave', boulevard: 'blvd', blvd: 'blvd',
+  drive: 'dr', dr: 'dr', lane: 'ln', ln: 'ln', court: 'ct', ct: 'ct', circle: 'cir', cir: 'cir',
+  parkway: 'pkwy', pkwy: 'pkwy', highway: 'hwy', hwy: 'hwy', trail: 'trl', trl: 'trl',
+  terrace: 'ter', ter: 'ter', place: 'pl', pl: 'pl', suite: 'ste', ste: 'ste',
+}
+const addressTokenPattern = new RegExp(`\\b(${Object.keys(addressTokens).join('|')})\\b`, 'g')
+const countrySuffixPattern = /\s+(?:united states(?: of america)?|u s a|u s|usa|us)$/
+const normalizeAddress = (value: string) => {
+  let words = normalizedWords(value).replace(/^(?:street )?address\s+/, '')
+  words = words.replace(countrySuffixPattern, '').trim()
+  // ZIP+4 is the same delivery area as its five-digit base for business identity.
+  words = words.replace(/\b(\d{5})\s+\d{4}$/, '$1')
+  // State names are reduced only in the address tail (immediately before ZIP
+  // or at the end), so a street such as Washington Avenue is not rewritten.
+  for (const [abbr, name] of regions) {
+    const normalizedName = normalizedWords(name)
+    const beforePostal = new RegExp(`\\b${normalizedName}(?=\\s+\\d{5}$)`)
+    const atEnd = new RegExp(`\\b${normalizedName}$`)
+    words = words.replace(beforePostal, abbr.toLowerCase()).replace(atEnd, abbr.toLowerCase())
+  }
+  return words.replace(addressTokenPattern, (token) => addressTokens[token])
+}
 export const normalizedEntityField = (field: EntityField, value: string) => {
   if (field === 'phone') return value.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '')
   if (field === 'website') { try { return new URL(/^https?:/i.test(value) ? value : `https://${value}`).hostname.toLowerCase().replace(/^www\./, '') } catch { return '' } }
   if (field === 'publicProfileUrl') { try { const url = new URL(value); return `${url.hostname.replace(/^www\./, '')}${url.pathname.replace(/\/$/, '')}${url.search}`.toLowerCase() } catch { return '' } }
-  let words = normalizedWords(value)
+  const words = normalizedWords(value)
   if (field === 'region') return regions.find(([abbr, name]) => [abbr.toLowerCase(), name.toLowerCase()].includes(words))?.[0].toLowerCase() || words
-  if (field === 'streetAddress' || field === 'address') {
-    words = words.replace(/^(?:street )?address\s+/, '')
-    const addressTokens: Record<string, string> = {
-      street: 'st', st: 'st', road: 'rd', rd: 'rd', avenue: 'ave', ave: 'ave', boulevard: 'blvd', blvd: 'blvd',
-      drive: 'dr', dr: 'dr', lane: 'ln', ln: 'ln', court: 'ct', ct: 'ct', parkway: 'pkwy', pkwy: 'pkwy',
-      highway: 'hwy', hwy: 'hwy', suite: 'ste', ste: 'ste',
-    }
-    return words.replace(/\b(street|st|road|rd|avenue|ave|boulevard|blvd|drive|dr|lane|ln|court|ct|parkway|pkwy|highway|hwy|suite|ste)\b/g, (token) => addressTokens[token])
-  }
+  if (field === 'postalCode') return value.replace(/\D/g, '').slice(0, 5)
+  if (field === 'streetAddress' || field === 'address') return normalizeAddress(value)
   return words
 }
 const fieldMap: Partial<Record<EntityField, BusinessProfileField>> = { name: 'businessName', streetAddress: 'streetAddress', locality: 'city', region: 'state', postalCode: 'zip', phone: 'phone', website: 'website', category: 'primaryCategory', publicProfileUrl: 'knownListingUrl' }
