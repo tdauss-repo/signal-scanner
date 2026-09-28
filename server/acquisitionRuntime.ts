@@ -46,6 +46,11 @@ const runtimeFailureBlocker = (error: unknown) => /timeout|aborted/i.test(`${err
   ? 'provider_timeout'
   : 'runtime_exception'
 
+/** Two SERP attempts plus the optional Browser fallback remain below the 180s scan boundary. */
+export const googleBrandSerpAttemptTimeoutMs = 52_000
+export const googleBrandBrowserNavigationTimeoutMs = 35_000
+export const googleBrandBrowserSettleTimeoutMs = 5_000
+
 /**
  * Google-only production provider. An entirely unconfigured runtime explicitly
  * yields to the retained direct acquisition ladder; partial or failed provider
@@ -75,6 +80,9 @@ export async function acquireGoogleSearchRuntime(value: string) {
         playwrightModule: process.env.FOUND_LOCAL_PLAYWRIGHT_MODULE,
         rawProviderMetadataReference: 'runtime:brightdata_serp_api',
         browserMetadataReference: 'runtime:brightdata_browser_api',
+        requestTimeoutMs: googleBrandSerpAttemptTimeoutMs,
+        navigationTimeoutMs: googleBrandBrowserNavigationTimeoutMs,
+        networkIdleTimeoutMs: googleBrandBrowserSettleTimeoutMs,
       })
       return { capture: brightDataProductionCapture(run, value) }
     } catch (error) {

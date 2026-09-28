@@ -481,10 +481,31 @@ export interface BrandPresenceOperatorVerification {
   note: string
 }
 
+/**
+ * A bounded prior Google automatic verification retained when the current
+ * refresh is unavailable. The current failed automation remains on the parent
+ * observation; this record preserves the distinct successful evidence fact.
+ */
+export interface RetainedGoogleAutomaticVerification {
+  version: 1
+  provenance: 'retained_automatic_verification'
+  businessIdentityKey: string
+  verifiedAt: string
+  sourceRunId: string
+  observedResultUrl?: string
+  canonicalProfileUrl?: string
+  observedResultTypes: SearchVisibilityObservedResultType[]
+  evidenceNotes: string
+  confidence: EvidenceConfidence
+  evidenceKind: EvidenceKind
+  automation: PresenceAutomation
+}
+
 export interface SearchDestinationObservation extends DestinationEvidence {
   automation?: PresenceAutomation
   operatorAssisted?: OperatorAssistedBrowserEvidence
   operatorVerification?: BrandPresenceOperatorVerification
+  retainedGoogleVerification?: RetainedGoogleAutomaticVerification
   destination: SearchDestination
   query: string
   /** Clean operator destination generated for the verification task. */

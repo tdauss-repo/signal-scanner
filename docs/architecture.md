@@ -248,12 +248,13 @@ Vite proxies `/api` to Express. The API health response and startup log expose
 only whether Google Search acquisition configuration is configured, partial, or
 unconfigured. They never expose credential values.
 
-Google Brand acquisition has an 85-second scan-operation boundary, aligned
-between the Bright Data SERP request boundary (60 seconds) and the frontend API
-request boundary (90 seconds). The ordinary 30-second operation boundary still
-applies elsewhere. This prevents a valid, slower structured Google response
-from being discarded before normalization while retaining overall scan and
-late-response safeguards.
+Google Brand acquisition has a 155-second scan-operation boundary and a
+165-second frontend API boundary. Production SERP attempts are individually
+bounded to 52 seconds; the optional remote-browser navigation and settle stages
+are bounded to 35 and 5 seconds. The ordinary 30-second operation boundary
+still applies elsewhere, and the existing 180-second overall scan boundary is
+unchanged. This keeps the complete retry/fallback ladder finite while retaining
+scan finalization and late-response safeguards.
 
 Provider authentication, zone configuration, timeout, network, HTTP, response
 shape, missing-result-region, and access failures remain distinct bounded
@@ -261,8 +262,47 @@ diagnostic classes. Operator presentation stays neutral, but may show the
 sanitized failure category. Raw response bodies, headers, tokens, and zones are
 not part of the operator summary or customer export. The safe
 `diagnose:google-acquisition` command uses the configured structured SERP path,
-does not invoke Chromium, and prints counts and field availability rather than
-raw provider data.
+does not launch local Chromium, and prints bounded attempt, count, and field
+availability summaries rather than raw provider data.
+
+### Google Brand acquisition resilience
+
+Google Brand acquisition uses the existing provider path in this order:
+
+1. Bright Data SERP attempt;
+2. one retry after a deterministic 250-millisecond delay when the first failure
+   is transient (`embedded_5xx`, HTTP 5xx, network failure, provider timeout,
+   provider failure, provider captcha, or a SERP-route Google challenge); and
+3. the existing Browser API fallback once, only when the final SERP result is
+   fallback-eligible.
+
+Authentication, zone/configuration, ordinary HTTP 4xx, malformed response, and
+structural parsing failures are not retried. Browser fallback may still serve
+its existing bounded compatibility role for a failed response shape, but a
+Browser `google_sorry` or other challenge is never repeated in the same scan.
+Attempt stages and elapsed times are retained as sanitized diagnostics. The
+same clean verification query is used for both SERP attempts.
+
+When the current refresh remains unavailable, the workspace may retain a prior
+Google Search automatic verification for seven days. Retention requires a
+successful prior acquisition, an explicit verified identity decision, the same
+material reviewed identity (normalized business name, primary domain, address,
+and phone), and no intervening conflicting Google assessment. Operator-only,
+ambiguous, expired, or conflicting evidence cannot become retained automatic
+evidence. New scans stamp the material identity key directly; compatible older
+runs may use their reviewed-profile fingerprint conservatively.
+
+The current failed automation and the retained successful verification remain
+separate records. Operator UI labels the effective result “Verified from recent
+evidence,” shows the local last-verified time and the current refresh failure,
+and never calls it fresh. While current, retained evidence remains a positive
+Google-only destination and may support the existing strength
+include/hide/refine flow; it is excluded from neutral and “Still being
+verified” counts. Expiry or material identity change removes that eligibility.
+Provider and retention metadata remain outside customer JSON and package scope.
+
+A transient acquisition failure does not erase recent trustworthy verified
+evidence, but retained evidence must never be represented as fresh.
 
 ## Deployment Considerations
 The internal scanner and bounded API may be operated separately from Found

@@ -96,9 +96,12 @@ function BrandPresenceReviewWorkflow({ profile, profileState, query, value, sale
   onChange: (query: SearchVisibilityQuery, observation: SearchDestinationObservation) => void
 }) {
   const [manualReview, setManualReview] = useState(false)
-  const automaticallyVerifiedGoogle = sales.state === 'verified_correct' && effectiveGoogleAutomaticIdentityState(value) === 'verified'
+  const googleAutomaticState = effectiveGoogleAutomaticIdentityState(value, { profile, profileState })
+  const automaticallyVerifiedGoogle = ['verified_correct', 'verified_recent'].includes(sales.state) && ['verified', 'verified_recent'].includes(googleAutomaticState || '')
   if (automaticallyVerifiedGoogle && !manualReview) return <section className="brand-presence-verification brand-presence-verification-complete">
-    <p><strong>No operator action required.</strong> The acquired identity evidence passed automatic verification.</p>
+    <p><strong>No operator action required.</strong> {googleAutomaticState === 'verified_recent'
+      ? 'Recent acquired identity evidence remains within the freshness window; the current refresh was unavailable.'
+      : 'The acquired identity evidence passed automatic verification.'}</p>
     <button type="button" className="secondary" onClick={() => setManualReview(true)}>Review manually</button>
   </section>
   return <>
@@ -124,8 +127,9 @@ function BrandPresenceEvidenceDetail({ value, sales }: { value: SearchDestinatio
       {summary.observedResultUrl ? <div><dt>Observed result</dt><dd><a href={summary.observedResultUrl} target="_blank" rel="noreferrer">{shortEvidenceUrl(summary.observedResultUrl)}</a></dd></div> : null}
       {summary.knownProfileUrl ? <div><dt>Known profile</dt><dd><a href={summary.knownProfileUrl} target="_blank" rel="noreferrer">{shortEvidenceUrl(summary.knownProfileUrl)}</a></dd></div> : null}
       {summary.observedAt ? <div><dt>Observed</dt><dd>{formatEvidenceTimestamp(summary.observedAt)} (local time)</dd></div> : null}
+      {summary.lastVerifiedAt ? <div><dt>Last verified</dt><dd>{formatEvidenceTimestamp(summary.lastVerifiedAt)} (local time)</dd></div> : null}
       <div><dt>Source</dt><dd>{summary.source}</dd></div>
-      {summary.automationState ? <div><dt>Automation state</dt><dd>{summary.automationState}</dd></div> : null}
+      {summary.automationState ? <div><dt>{sales.state === 'verified_recent' ? 'Current refresh' : 'Automation state'}</dt><dd>{summary.automationState}</dd></div> : null}
       {summary.identityEvidence?.map((item) => <div key={`${item.label}-${item.result}`}><dt>{item.label}</dt><dd>{item.result}</dd></div>)}
       {summary.decision ? <div><dt>Decision</dt><dd>{summary.decision}</dd></div> : null}
       {summary.interpretation ? <div><dt>Interpretation</dt><dd>{summary.interpretation}</dd></div> : null}

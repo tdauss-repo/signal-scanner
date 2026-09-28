@@ -98,10 +98,14 @@ export function summarizePublicPresence(state: import('../types/audit').AuditSta
     const evidence = Boolean(automated?.evidence || verification || observation.operatorAssisted?.rawText || observation.evidenceNotes.trim())
     const sourceRun = state.visibilityRuns?.find((run) => run.id === automated?.runId)
     const currentProfileEvidence = matchesEvidenceFingerprint(sourceRun?.profileKey, state.profile) && (!sourceRun?.profileReviewKey || matchesEvidenceFingerprint(sourceRun.profileReviewKey, state.businessProfile))
-    const explicitGoogleVerification = effectiveGoogleAutomaticIdentityState(observation) === 'verified'
+    const explicitGoogleVerification = ['verified', 'verified_recent'].includes(effectiveGoogleAutomaticIdentityState(observation, {
+      profile: state.profile,
+      profileState: state.businessProfile,
+    }) || '')
     const automatic = Boolean((explicitGoogleVerification || automated?.automaticObservation && observation.provenance === 'automated_acquisition') && currentProfileEvidence)
     const normalizedReview = automated?.assessment?.operatorReviewRequired
     const needsReview = verification ? verification.outcome === 'unable_to_determine'
+      : explicitGoogleVerification ? false
       : assisted && observation.operatorAssisted?.assessment.operatorReviewRequired === false ? false : observation.provenance === 'automated_acquisition' && typeof normalizedReview === 'boolean'
         ? normalizedReview : attempted && !observation.reviewed && !automatic
     records.set(`${query.id}:${destination}`, { attempted, evidence, automatic, reviewed: Boolean(verification || observation.reviewed), needsReview })

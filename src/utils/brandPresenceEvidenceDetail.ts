@@ -7,6 +7,7 @@ export interface BrandPresenceEvidenceSummary {
   observedResultUrl?: string
   knownProfileUrl?: string
   observedAt?: string
+  lastVerifiedAt?: string
   source: string
   automationState?: string
   interpretation?: string
@@ -35,7 +36,7 @@ const acquisitionFailureReason = (observation: SearchDestinationObservation) => 
   if (blocker === 'http_error') return capture?.statusCode ? `Provider request returned HTTP ${capture.statusCode}.` : 'Provider request returned an error.'
   if (['malformed_response', 'structurally_insufficient'].includes(blocker)) return 'Provider response could not be parsed into usable evidence.'
   if (blocker === 'missing_result_region' || blocker === 'provider_failure') return 'Provider returned no usable response.'
-  if (['provider_captcha', 'access_failure', 'access_blocked'].includes(blocker)) return 'Provider access was restricted.'
+  if (['provider_captcha', 'google_sorry', 'captcha_or_challenge', 'access_failure', 'access_blocked'].includes(blocker)) return 'Provider access was restricted.'
   if (blocker === 'acquisition_failure') return 'Acquisition server unavailable.'
   return 'Provider could not complete this check.'
 }
@@ -51,10 +52,11 @@ const automationStateLabel = (observation: SearchDestinationObservation) => {
 }
 
 const resultLabel = (observation: SearchDestinationObservation, sales: SalesVisibilityProjection) => {
+  if (sales.state === 'verified_recent') return 'Business identity verified from recent evidence'
   if (unavailable(observation)) return 'No verified result'
   if (sales.state === 'website_result_discovered') return 'Website result discovered'
   if (sales.state === 'profile_discovered') return 'Profile candidate discovered'
-  if (['verified_correct', 'verified_by_operator'].includes(sales.state)) return 'Business identity verified'
+  if (['verified_correct', 'verified_recent', 'verified_by_operator'].includes(sales.state)) return 'Business identity verified'
   if (['verified_correction_needed', 'operator_correction_needed'].includes(sales.state)) return 'Business information needs correction'
   if (sales.state === 'operator_not_found') return 'Not found during operator review'
   if (sales.state === 'operator_unable_to_determine') return 'Unable to determine'
@@ -74,6 +76,7 @@ const identityLabel = (field: string) => ({
 
 const automaticIdentityEvidence = (observation: SearchDestinationObservation) => {
   const decision = observation.automation?.assessment?.googleIdentityDecision
+    || observation.retainedGoogleVerification?.automation.assessment?.googleIdentityDecision
   if (!decision) return undefined
   return [
     ...decision.matchedSignals.map((signal) => ({ label: identityLabel(signal.field), result: signal.field === 'name' ? 'Matches' : `Matches ${signal.observed}` })),
@@ -87,7 +90,9 @@ export function brandPresenceEvidenceSummary(
   sales: SalesVisibilityProjection,
 ): BrandPresenceEvidenceSummary {
   const failed = unavailable(observation)
-  const acquisition = failed ? 'Automated check unavailable'
+  const retained = sales.state === 'verified_recent' ? observation.retainedGoogleVerification : undefined
+  const acquisition = retained ? 'Recent automated evidence retained'
+    : failed ? 'Automated check unavailable'
     : observation.operatorAssisted ? 'Operator-assisted evidence'
       : observation.automation ? 'Automated evidence'
         : observation.operatorVerification ? 'Operator verification'
@@ -96,21 +101,26 @@ export function brandPresenceEvidenceSummary(
   return {
     acquisition,
     result: resultLabel(observation, sales),
-    ...(observation.observedResultUrl ? { observedResultUrl: observation.observedResultUrl } : {}),
+    ...(observation.observedResultUrl || retained?.observedResultUrl ? { observedResultUrl: observation.observedResultUrl || retained?.observedResultUrl } : {}),
     ...(sales.knownProfileUrl ? { knownProfileUrl: sales.knownProfileUrl } : {}),
     ...(observation.observedAt ? { observedAt: observation.observedAt } : {}),
+    ...(retained?.verifiedAt ? { lastVerifiedAt: retained.verifiedAt } : {}),
     source: observation.destination,
     ...(automationStateLabel(observation) ? { automationState: automationStateLabel(observation) } : {}),
-    ...(!failed ? { interpretation: sales.explanation } : {
+    ...(!failed || retained ? { interpretation: sales.explanation } : {
       reason: acquisitionFailureReason(observation),
       nextStep: 'Use assisted verification.',
     }),
+    ...(failed && retained ? {
+      reason: acquisitionFailureReason(observation),
+    } : {}),
     verificationUrl: observation.verificationUrl,
     verificationLabel: `${observation.destination} verification query`,
     ...(identityEvidence?.length ? { identityEvidence } : {}),
-    ...(observation.automation?.assessment?.googleIdentityDecision ? {
-      decision: observation.automation.assessment.googleIdentityDecision.decision === 'verified' ? 'Verified automatically' : 'Assisted verification required',
-    } : {}),
+    ...(retained ? { decision: 'Verified from recent evidence' }
+      : observation.automation?.assessment?.googleIdentityDecision ? {
+        decision: observation.automation.assessment.googleIdentityDecision.decision === 'verified' ? 'Verified automatically' : 'Assisted verification required',
+      } : {}),
   }
 }
 
@@ -131,6 +141,7 @@ export function brandPresenceTechnicalEvidence(observation: SearchDestinationObs
     observedResultUrl: observation.observedResultUrl,
     canonicalProfileUrl: observation.canonicalProfileUrl,
     automation: observation.automation,
+    retainedGoogleVerification: observation.retainedGoogleVerification,
     operatorAssisted: observation.operatorAssisted,
     operatorVerification: observation.operatorVerification,
   }

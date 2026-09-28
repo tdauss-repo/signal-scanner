@@ -32,7 +32,7 @@ const googleCapture = (url: string): AcquisitionResult => ({
   }, evidence: [] }],
 })
 
-assert(defaultGoogleBrandOperationTimeoutMs > 60_000 && defaultGoogleBrandOperationTimeoutMs < 90_000, 'Google Brand timeout fits between the provider and client API bounds')
+assert(defaultGoogleBrandOperationTimeoutMs > 145_000 && defaultGoogleBrandOperationTimeoutMs < 180_000, 'Google Brand retry/fallback budget remains below the overall scan boundary')
 let googleCalls = 0
 let finalState = structuredClone(state)
 const run = await runVisibilityScan(state, {

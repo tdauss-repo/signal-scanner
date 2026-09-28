@@ -3,6 +3,7 @@ import type { EntityMatch } from '../types/entityMatch'
 import { reviewedBusinessProfile } from './businessProfileState'
 import { customerBusinessNoun, localBusinessModel } from './businessContext'
 import { evidenceFingerprint } from './evidenceFingerprint'
+import { effectiveGoogleAutomaticIdentityState } from './googleAcquisitionResilience'
 import { salesCockpitVisibility } from './salesVisibilityProjection'
 
 export interface CustomerStrengthCandidate {
@@ -54,7 +55,9 @@ const materialEntityMatch = (match: EntityMatch) => ({
 })
 
 const materialSearchEvidence = (state: AuditState, queryId: string, observation: SearchDestinationObservation) => {
-  const assessment = observation.automation?.assessment
+  const retained = effectiveGoogleAutomaticIdentityState(observation, { profile: state.profile, profileState: state.businessProfile }) === 'verified_recent'
+    ? observation.retainedGoogleVerification : undefined
+  const assessment = retained?.automation.assessment || observation.automation?.assessment
   const profile = reviewedBusinessProfile(state.profile, state.businessProfile)
   return {
     version: 'found-local-material-strength-v1',
@@ -64,13 +67,13 @@ const materialSearchEvidence = (state: AuditState, queryId: string, observation:
     queryId,
     destination: observation.destination,
     query: observation.query,
-    overallResult: observation.overallResult,
-    observedResultTypes: observation.observedResultTypes,
-    evidenceNotes: observation.evidenceNotes,
-    evidenceKind: observation.evidenceKind,
-    confidence: observation.confidence,
-    reviewed: observation.reviewed,
-    operatorVerification: observation.operatorVerification ? {
+    overallResult: retained ? 'found_match' : observation.overallResult,
+    observedResultTypes: retained?.observedResultTypes || observation.observedResultTypes,
+    evidenceNotes: retained?.evidenceNotes || observation.evidenceNotes,
+    evidenceKind: retained?.evidenceKind || observation.evidenceKind,
+    confidence: retained?.confidence || observation.confidence,
+    reviewed: retained ? false : observation.reviewed,
+    operatorVerification: !retained && observation.operatorVerification ? {
       evidenceKey: observation.operatorVerification.evidenceKey,
       outcome: observation.operatorVerification.outcome,
       mismatches: observation.operatorVerification.mismatches,
@@ -78,7 +81,7 @@ const materialSearchEvidence = (state: AuditState, queryId: string, observation:
       classifiedCanonicalProfileUrl: observation.operatorVerification.classifiedCanonicalProfileUrl,
       provenance: observation.operatorVerification.provenance,
     } : undefined,
-    queryMode: observation.automation?.queryMode,
+    queryMode: retained?.automation.queryMode || observation.automation?.queryMode,
     assessment: assessment ? {
       visibilityResult: assessment.visibilityResult,
       automaticObservation: assessment.automaticObservation,

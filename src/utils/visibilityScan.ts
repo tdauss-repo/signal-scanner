@@ -13,6 +13,11 @@ import { buildSearchVisibilityQueries, defaultSearchDestinationObservation, prim
 import { mapAutoAuditToWebsiteChecks, runWebsiteAutoAudit } from './websiteAutoAudit'
 import { workspaceFindings } from './workspaceFindings'
 import { compareIdentity, host, interpretPresence, isChallenge, pageText } from './presenceExtraction'
+import {
+  buildRetainedGoogleAutomaticVerification,
+  googleBrandBusinessIdentityKey,
+  retainedGoogleAutomaticVerificationIsCurrent,
+} from './googleAcquisitionResilience'
 
 export { scanProfileKey, scanStateLabel, scanAreaState, restoreVisibilityRuns } from './visibilityScanState'
 import { scanProfileKey } from './visibilityScanState'
@@ -34,8 +39,8 @@ export interface ScanDependencies {
   overallTimeoutMs?: number
 }
 const defaultOperationTimeoutMs = 30_000
-/** Bright Data SERP permits 60 seconds and the browser-to-API request permits 90 seconds. */
-export const defaultGoogleBrandOperationTimeoutMs = 85_000
+/** Two bounded SERP attempts plus one optional remote-browser fallback fit below the 180-second scan boundary. */
+export const defaultGoogleBrandOperationTimeoutMs = 155_000
 const defaultOverallTimeoutMs = 180_000
 class VisibilityScanTimeoutError extends Error {
   constructor(message: string) { super(message); this.name = 'VisibilityScanTimeoutError' }
@@ -50,7 +55,7 @@ export const applicationScanDependencies: ScanDependencies = {
     return body.capture
   },
   async acquireGoogle(url) {
-    const response = await fetch('/api/acquire-google-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(90_000) })
+    const response = await fetch('/api/acquire-google-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(165_000) })
     const body = await response.json()
     if (!response.ok) throw new Error(body.error || 'Google acquisition request failed.')
     return body.capture
@@ -72,22 +77,39 @@ const compactCapture = (capture: AcquisitionResult): AcquisitionResult => {
     ...candidate,
     evidence: candidate.evidence.slice(0, 4).map((reference) => ({ ...reference, excerpt: reference.excerpt.slice(0, 2500) })),
   }))
-  if (compact.providerAttempts) compact.providerAttempts = compact.providerAttempts.slice(0, 2)
+  if (compact.providerAttempts) compact.providerAttempts = compact.providerAttempts.slice(0, 3)
   delete compact.html
   delete compact.browserEvidence
   return compact
 }
 
 /** Merge into the existing form without erasing operator corrections or supplemental notes. */
-export function mergeAutomatedObservation(previous: SearchDestinationObservation | undefined, incoming: SearchDestinationObservation): SearchDestinationObservation {
+export function mergeAutomatedObservation(
+  previous: SearchDestinationObservation | undefined,
+  incoming: SearchDestinationObservation,
+  context?: { profile: BusinessProfile; profileState: AuditState['businessProfile']; sourceProfileReviewKey?: string; now?: number },
+): SearchDestinationObservation {
   if (previous && previous.query !== incoming.query) return incoming
+  const currentGoogleUnavailable = incoming.destination === 'Google Search' && incoming.automation?.queryMode === 'brand' &&
+    incoming.automation.assessment?.visibilityResult === 'unavailable'
+  const newlyRetained = currentGoogleUnavailable && previous && context
+    ? buildRetainedGoogleAutomaticVerification(previous, context.profile, context.profileState, context.sourceProfileReviewKey)
+    : undefined
+  const retainedGoogleVerification = currentGoogleUnavailable && previous && context
+    ? newlyRetained && retainedGoogleAutomaticVerificationIsCurrent(newlyRetained, context.profile, context.profileState, context.now)
+      ? newlyRetained
+      : previous.automation?.assessment?.visibilityResult === 'unavailable' &&
+          retainedGoogleAutomaticVerificationIsCurrent(previous.retainedGoogleVerification, context.profile, context.profileState, context.now)
+        ? previous.retainedGoogleVerification : undefined
+    : undefined
   const manual = previous && (previous.reviewed || (previous.provenance !== 'automated_acquisition' && Boolean(previous.evidenceNotes.trim() || previous.competitorsObserved.trim() || previous.recommendedAction.trim() || !['not_checked', 'manual_review_needed'].includes(previous.overallResult))))
-  return manual ? { ...previous, verificationUrl: incoming.verificationUrl, observedResultUrl: incoming.observedResultUrl || previous.observedResultUrl, canonicalProfileUrl: incoming.canonicalProfileUrl || previous.canonicalProfileUrl, automation: incoming.automation, reviewed: false } : {
+  const merged = manual ? { ...previous, verificationUrl: incoming.verificationUrl, observedResultUrl: incoming.observedResultUrl || previous.observedResultUrl, canonicalProfileUrl: incoming.canonicalProfileUrl || previous.canonicalProfileUrl, automation: incoming.automation, reviewed: false } : {
     ...incoming, observedResultUrl: incoming.observedResultUrl || previous?.observedResultUrl,
     canonicalProfileUrl: incoming.canonicalProfileUrl || previous?.canonicalProfileUrl,
     competitorsObserved: previous?.competitorsObserved || '', recommendedAction: previous?.recommendedAction || '',
     operatorVerification: previous?.operatorVerification,
   }
+  return { ...merged, retainedGoogleVerification }
 }
 
 /** One runner shared by customer, Workbench and proving CLI. Every progress transition follows real work. */
@@ -294,10 +316,17 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
         observedAt: selected?.evidence[0]?.acquiredAt || captures.at(-1)?.acquiredAt || '', provenance: 'automated_acquisition', overallResult: assessment.automaticObservation ? 'found_match' : assessment.visibilityResult === 'not_found' ? 'not_found' : 'manual_review_needed',
         observedResultTypes: [...new Set(types)].filter((type) => resultTypesForDestination(item.destination!).includes(type)), evidenceNotes: normalizedEvidence,
         confidence: item.evidenceCaptured ? 'scanner_detected_public_page' : 'manual_needs_confirmation', evidenceKind: item.evidenceCaptured ? 'external_observation' : captures.some((capture) => ['success', 'partial'].includes(capture.outcome)) ? 'unable_to_verify' : 'acquisition_failure',
-        automation: { runId: run.id, queryMode: item.queryMode, state: item.state, inspectedUrl: item.url!, captures: item.captures, evidence: normalizedEvidence, interpreted: item.interpreted, automaticObservation: assessment.automaticObservation, assessment },
+        automation: { runId: run.id, queryMode: item.queryMode, state: item.state, inspectedUrl: item.url!, captures: item.captures, evidence: normalizedEvidence, interpreted: item.interpreted, automaticObservation: assessment.automaticObservation,
+          ...(item.destination === 'Google Search' && item.queryMode === 'brand' ? { businessIdentityKey: googleBrandBusinessIdentityKey(profile, initial.businessProfile) } : {}), assessment },
       }
-      update((current) => ({ ...current, searchDestinationObservations: { ...current.searchDestinationObservations,
-        [item.queryId!]: { ...current.searchDestinationObservations[item.queryId!], [item.destination!]: mergeAutomatedObservation(current.searchDestinationObservations[item.queryId!]?.[item.destination!], observation) } } }))
+      update((current) => {
+        const previous = current.searchDestinationObservations[item.queryId!]?.[item.destination!]
+        const sourceRun = current.visibilityRuns?.find((candidate) => candidate.id === previous?.automation?.runId)
+        return { ...current, searchDestinationObservations: { ...current.searchDestinationObservations,
+          [item.queryId!]: { ...current.searchDestinationObservations[item.queryId!], [item.destination!]: mergeAutomatedObservation(previous, observation, {
+            profile, profileState: initial.businessProfile, sourceProfileReviewKey: sourceRun?.profileReviewKey,
+          }) } } }
+      })
     } else if (item.destination) {
       const interpretations = captures.map((capture) => ({ capture, ...interpretPresence(capture, profile, item.destination!) }))
       const best = interpretations.find((result) => result.interpreted) || interpretations.find((result) => result.evidence)
@@ -311,8 +340,14 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
         evidenceNotes: best?.evidence || '', confidence: best ? 'scanner_detected_public_page' as const : 'manual_needs_confirmation' as const,
         evidenceKind: best ? 'external_observation' as const : 'acquisition_failure' as const,
         automation: { runId: run.id, state: item.state, inspectedUrl: item.url!, captures: item.captures, evidence: best?.evidence || '', interpreted: item.interpreted } }
-      update((current) => ({ ...current, searchDestinationObservations: { ...current.searchDestinationObservations,
-        [item.queryId!]: { ...current.searchDestinationObservations[item.queryId!], [item.destination!]: mergeAutomatedObservation(current.searchDestinationObservations[item.queryId!]?.[item.destination!], observation) } } }))
+      update((current) => {
+        const previous = current.searchDestinationObservations[item.queryId!]?.[item.destination!]
+        const sourceRun = current.visibilityRuns?.find((candidate) => candidate.id === previous?.automation?.runId)
+        return { ...current, searchDestinationObservations: { ...current.searchDestinationObservations,
+          [item.queryId!]: { ...current.searchDestinationObservations[item.queryId!], [item.destination!]: mergeAutomatedObservation(previous, observation, {
+            profile, profileState: initial.businessProfile, sourceProfileReviewKey: sourceRun?.profileReviewKey,
+          }) } } }
+      })
     } else {
       item.evidenceCaptured = captures.some((capture) => compareIdentity(capture, profile).length > 0)
       item.interpreted = item.evidenceCaptured

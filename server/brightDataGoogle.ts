@@ -88,6 +88,7 @@ export interface SerpAcquisitionConfig {
   language?: string
   location?: string
   rawProviderMetadataReference: string
+  requestTimeoutMs?: number
 }
 
 export interface BrowserAcquisitionConfig {
@@ -98,6 +99,8 @@ export interface BrowserAcquisitionConfig {
   language?: string
   location?: string
   rawProviderMetadataReference: string
+  navigationTimeoutMs?: number
+  networkIdleTimeoutMs?: number
 }
 
 export interface BrowserObservedPage {
@@ -116,6 +119,10 @@ export interface GoogleBrightDataRun {
   fallbackTriggered: boolean
   fallbackReason: GoogleAcquisitionBlocker | null
   serp: NormalizedGoogleAcquisition
+  serpRetry?: NormalizedGoogleAcquisition
+  retryTriggered?: boolean
+  retryReason?: GoogleAcquisitionBlocker | null
+  retryDelayMs?: number
   browser?: NormalizedGoogleAcquisition
   selected: NormalizedGoogleAcquisition | null
   outcome: GoogleAcquisitionOutcome
@@ -309,7 +316,7 @@ export function classifySerpResponse(input: { status: number; headers?: Record<s
 const defaultSerpRequest = async (config: SerpAcquisitionConfig, requestedUrl: string): Promise<SerpHttpResponse> => {
   const response = await fetch('https://api.brightdata.com/request', {
     method: 'POST', headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ zone: config.zone, url: requestedUrl, format: 'json' }), signal: AbortSignal.timeout(60_000),
+    body: JSON.stringify({ zone: config.zone, url: requestedUrl, format: 'json' }), signal: AbortSignal.timeout(config.requestTimeoutMs ?? 60_000),
   })
   return { status: response.status, statusText: response.statusText, headers: Object.fromEntries(response.headers.entries()), bodyText: await response.text() }
 }
@@ -473,8 +480,8 @@ const defaultBrowserObserve = async (config: BrowserAcquisitionConfig, requested
     const page = await browser.newPage()
     let response: { status(): number } | null = null
     try {
-      response = await page.goto(requestedUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-      await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined)
+      response = await page.goto(requestedUrl, { waitUntil: 'domcontentloaded', timeout: config.navigationTimeoutMs ?? 60_000 })
+      await page.waitForLoadState('networkidle', { timeout: config.networkIdleTimeoutMs ?? 10_000 }).catch(() => undefined)
     } catch (error) {
       return { observed: emptyObserved(), finalUrl: page.url() || requestedUrl, navigationFailed: true, error: redactConnection(error instanceof Error ? error.message : String(error)) }
     }
@@ -608,6 +615,7 @@ export async function acquireBrightDataMapsBrowser(config: BrowserAcquisitionCon
 export interface OrchestratorDependencies {
   acquireSerp?: typeof acquireBrightDataSerp
   acquireBrowser?: typeof acquireBrightDataBrowser
+  wait?: (delayMs: number) => Promise<void>
 }
 
 export interface MapsOrchestratorDependencies {
@@ -619,14 +627,30 @@ const browserFallbackEligible = (blocker: GoogleAcquisitionBlocker) => [
   'http_5xx', 'http_error', 'embedded_5xx', 'provider_captcha', 'provider_failure', 'provider_timeout', 'network_failure', 'malformed_response', 'missing_result_region', 'structurally_insufficient',
 ].includes(blocker)
 
-export async function acquireGoogleWithBrightData(config: SerpAcquisitionConfig & { browserCdpUrl: string; playwrightModule?: string; browserMetadataReference: string }, dependencies: OrchestratorDependencies = {}): Promise<GoogleBrightDataRun> {
+export const GOOGLE_SERP_RETRY_DELAY_MS = 250
+export const GOOGLE_SERP_RETRYABLE_BLOCKERS: readonly GoogleAcquisitionBlocker[] = [
+  'embedded_5xx', 'http_5xx', 'network_failure', 'provider_timeout', 'provider_failure', 'provider_captcha', 'google_sorry',
+]
+export const googleSerpFailureIsRetryable = (blocker: GoogleAcquisitionBlocker) => GOOGLE_SERP_RETRYABLE_BLOCKERS.includes(blocker)
+
+export async function acquireGoogleWithBrightData(config: SerpAcquisitionConfig & { browserCdpUrl: string; playwrightModule?: string; browserMetadataReference: string; navigationTimeoutMs?: number; networkIdleTimeoutMs?: number }, dependencies: OrchestratorDependencies = {}): Promise<GoogleBrightDataRun> {
   const started = performance.now()
-  const serp = await (dependencies.acquireSerp || acquireBrightDataSerp)(config)
-  if (serp.usable) return { primaryProvider: 'brightdata_serp_api', selectedProvider: 'brightdata_serp_api', fallbackTriggered: false, fallbackReason: null, serp, selected: serp, outcome: 'success', blocker: 'none', resultRegionInspected: serp.resultRegionInspected, candidates: serp.candidates, elapsedMs: Math.round(performance.now() - started) }
-  if (!browserFallbackEligible(serp.blocker)) return { primaryProvider: 'brightdata_serp_api', selectedProvider: null, fallbackTriggered: false, fallbackReason: null, serp, selected: null, outcome: 'unavailable', blocker: serp.blocker, resultRegionInspected: false, candidates: [], elapsedMs: Math.round(performance.now() - started) }
-  const browser = await (dependencies.acquireBrowser || acquireBrightDataBrowser)({ query: config.query, cdpUrl: config.browserCdpUrl, playwrightModule: config.playwrightModule, country: config.country, language: config.language, location: config.location, rawProviderMetadataReference: config.browserMetadataReference })
+  const acquireSerp = dependencies.acquireSerp || acquireBrightDataSerp
+  const serp = await acquireSerp(config)
+  let effectiveSerp: NormalizedGoogleAcquisition = serp
+  let serpRetry: Awaited<ReturnType<typeof acquireBrightDataSerp>> | undefined
+  const retryTriggered = !serp.usable && googleSerpFailureIsRetryable(serp.blocker)
+  if (retryTriggered) {
+    await (dependencies.wait || ((delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs))))(GOOGLE_SERP_RETRY_DELAY_MS)
+    serpRetry = await acquireSerp(config)
+    effectiveSerp = serpRetry
+  }
+  const retry = { retryTriggered, retryReason: retryTriggered ? serp.blocker : null, retryDelayMs: retryTriggered ? GOOGLE_SERP_RETRY_DELAY_MS : 0, ...(serpRetry ? { serpRetry } : {}) }
+  if (effectiveSerp.usable) return { primaryProvider: 'brightdata_serp_api', selectedProvider: 'brightdata_serp_api', fallbackTriggered: false, fallbackReason: null, serp, ...retry, selected: effectiveSerp, outcome: 'success', blocker: 'none', resultRegionInspected: effectiveSerp.resultRegionInspected, candidates: effectiveSerp.candidates, elapsedMs: Math.round(performance.now() - started) }
+  if (!browserFallbackEligible(effectiveSerp.blocker)) return { primaryProvider: 'brightdata_serp_api', selectedProvider: null, fallbackTriggered: false, fallbackReason: null, serp, ...retry, selected: null, outcome: 'unavailable', blocker: effectiveSerp.blocker, resultRegionInspected: false, candidates: [], elapsedMs: Math.round(performance.now() - started) }
+  const browser = await (dependencies.acquireBrowser || acquireBrightDataBrowser)({ query: config.query, cdpUrl: config.browserCdpUrl, playwrightModule: config.playwrightModule, country: config.country, language: config.language, location: config.location, rawProviderMetadataReference: config.browserMetadataReference, navigationTimeoutMs: config.navigationTimeoutMs, networkIdleTimeoutMs: config.networkIdleTimeoutMs })
   const selected = browser.usable ? browser : null
-  return { primaryProvider: 'brightdata_serp_api', selectedProvider: selected?.provider || null, fallbackTriggered: true, fallbackReason: serp.blocker, serp, browser, selected, outcome: selected ? 'success' : 'unavailable', blocker: selected ? 'none' : browser.blocker, resultRegionInspected: selected?.resultRegionInspected || false, candidates: selected?.candidates || [], elapsedMs: Math.round(performance.now() - started) }
+  return { primaryProvider: 'brightdata_serp_api', selectedProvider: selected?.provider || null, fallbackTriggered: true, fallbackReason: effectiveSerp.blocker, serp, ...retry, browser, selected, outcome: selected ? 'success' : 'unavailable', blocker: selected ? 'none' : browser.blocker, resultRegionInspected: selected?.resultRegionInspected || false, candidates: selected?.candidates || [], elapsedMs: Math.round(performance.now() - started) }
 }
 
 export async function acquireGoogleMapsWithBrightData(config: SerpAcquisitionConfig & { browserCdpUrl: string; playwrightModule?: string; browserMetadataReference: string }, dependencies: MapsOrchestratorDependencies = {}): Promise<GoogleBrightDataRun> {
@@ -691,9 +715,10 @@ export function brightDataMatcherCandidates(acquisition: NormalizedGoogleAcquisi
 /** Production-safe capture: normalized evidence and bounded diagnostics only; credentials/raw provider payloads are omitted. */
 export function brightDataProductionCapture(run: GoogleBrightDataRun, requestedUrl: string, checkedDestination: 'Google Search' | 'Google Maps' = 'Google Search'): AcquisitionResult {
   const acquiredAt = new Date().toISOString()
-  const attempts = [run.serp, ...(run.browser ? [run.browser] : [])].map((attempt) => {
+  const attempts = [run.serp, ...(run.serpRetry ? [run.serpRetry] : []), ...(run.browser ? [run.browser] : [])].map((attempt, index) => {
     const statusCode = attempt.diagnostic.httpStatus
-    return { provider: attempt.provider, outcome: attempt.outcome, blocker: attempt.blocker, elapsedMs: attempt.elapsedMs,
+    const stage = attempt.provider === 'brightdata_browser_api' ? 'browser_fallback' as const : index === 0 ? 'serp_initial' as const : 'serp_retry' as const
+    return { provider: attempt.provider, stage, outcome: attempt.outcome, blocker: attempt.blocker, elapsedMs: attempt.elapsedMs,
       ...(typeof statusCode === 'number' ? { statusCode } : {}) }
   })
   if (run.selected) {
@@ -708,7 +733,9 @@ export function brightDataProductionCapture(run: GoogleBrightDataRun, requestedU
       method: run.selected.provider === 'brightdata_serp_api' ? 'server_fetch' : 'rendered_browser',
       outcome: 'success',
       confidence: 'captured',
-      notes: [run.fallbackTriggered ? `Bright Data Browser API fallback selected after ${run.fallbackReason}.` : 'Bright Data SERP API returned a usable structured result region.'],
+      notes: [run.fallbackTriggered ? `Bright Data Browser API fallback selected after ${run.fallbackReason}.`
+        : run.retryTriggered ? 'Bright Data SERP API retry returned a usable structured result region.'
+          : 'Bright Data SERP API returned a usable structured result region.'],
       normalizedSearchCandidates: brightDataMatcherCandidates(run.selected, acquiredAt),
       resultRegionInspected: run.selected.resultRegionInspected,
       blocker: run.selected.blocker,
