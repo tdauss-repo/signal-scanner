@@ -68,7 +68,7 @@ assert.equal(conflict.blocker, 'identifier_conflict')
 assert(conflict.bingIdentityDecision?.conflictingSignals.some((signal) => signal.field === 'phone'))
 
 const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent('Montessori Center of Downriver Southgate MI')}`
-const bingHtml = `<html><body><main><ol id="b_results"><li class="b_algo"><h2><a href="https://montessoridownriver.com/">${profile.businessName}</a></h2><cite>montessoridownriver.com</cite><p>Preschool in Southgate, MI</p></li></ol></main></body></html>`
+const bingHtml = readFileSync(new URL('./fixtures/bing-local-business-montessori.html', import.meta.url), 'utf8')
 const capture = await acquireBingSearch(bingUrl, {
   verifyDns: async () => undefined,
   transport: async (url) => ({ status: 200, finalUrl: url.href, body: bingHtml }),
@@ -79,7 +79,8 @@ assert.equal(capture.method, 'server_fetch')
 assert.equal(capture.resultRegionInspected, true)
 const extracted = assessSearchCapture(capture, profile, profileState, 'Bing Search', 'brand')
 assert.equal(extracted.bingIdentityDecision?.decision, 'verified', 'native HTML candidates reach the explicit Bing matcher')
-assert.equal(extracted.selected?.candidate.sourceType, 'organic')
+assert(extracted.matches.some((item) => item.candidate.sourceType === 'local_place'), 'native HTML normalizes the Bing local entity')
+assert.equal(extracted.selected?.candidate.sourceType, 'local_place')
 
 const blockedCapture = await acquireBingSearch(bingUrl, {
   verifyDns: async () => undefined,
@@ -102,7 +103,7 @@ const observation = (assessment: SearchEntityAssessment): SearchDestinationObser
   },
 }, { profile, brandPresence: true })
 
-const bing = observation(official)
+const bing = observation(extracted)
 const projected = projectSalesVisibility(bing, { profile, profileState })
 assert.equal(projected.headline, 'Verified automatically')
 assert.equal(projected.operatorReviewRequired, false, '7: verified Bing does not require assisted controls')

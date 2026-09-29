@@ -283,6 +283,21 @@ access, and missing-result-region failures retain distinct internal blockers
 and remain neutral. Assisted verification is the fallback when this bounded
 acquisition is unavailable or insufficient.
 
+The native request preserves the clean reviewed-identity query while adding a
+stable US-English public-result context (`cc=us`, `setlang=en-us`, and
+`mkt=en-US`), an ordinary desktop user agent, and standard HTML/English accept
+headers. It sends no authenticated state, copied browser cookies, transient
+headers, or exact-location personalization. Provider normalization recognizes
+bounded Bing local/entity scopes in addition to JSON-LD and organic result
+rows, retaining asserted name, website, phone, address, category, Maps URL, and
+entity identity fields without fabricating absent values. Organic extraction
+remains independent and additive.
+
+A successfully inspected Bing Brand result region with no matching business
+candidate is `review_required` with blocker `no_match`; it is neutral and is
+never automatic absence evidence. Only the existing explicit operator Not
+found outcome may establish Bing Brand absence for customer-review purposes.
+
 The Bing identity decision reuses the reviewed Business Profile comparison and
 normalization contract. Automatic verification requires at least two distinct
 strong matched groups from business name, official domain, phone, or address;

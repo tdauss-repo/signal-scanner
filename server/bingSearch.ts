@@ -19,12 +19,22 @@ const resultRegion = (html: string) => /<(?:main)\b|\bid=["']b_results["']|\bcla
 const blockedPage = (status: number, html: string) => [401, 403, 429].includes(status) ||
   /<title[^>]*>[^<]*(?:access denied|verify you are human|unusual traffic|captcha)/i.test(html)
 
+export const bingSearchMarketContext = { country: 'us', language: 'en-us', market: 'en-US' } as const
+export const bingSearchRequestHeaders = {
+  'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'accept-language': 'en-US,en;q=0.9',
+} as const
+const marketUrl = (value: URL) => {
+  const url = new URL(value.href)
+  url.searchParams.set('cc', bingSearchMarketContext.country)
+  url.searchParams.set('setlang', bingSearchMarketContext.language)
+  url.searchParams.set('mkt', bingSearchMarketContext.market)
+  return url
+}
+
 const defaultTransport = async (url: URL, signal: AbortSignal): Promise<BingSearchTransportResult> => {
-  const { response, body } = await fetchPage(url, 'GET', {
-    'user-agent': 'Mozilla/5.0 (compatible; FoundLocalEvidence/1.0)',
-    accept: 'text/html,application/xhtml+xml',
-    'accept-language': 'en-US,en;q=0.9',
-  }, signal, 1_000_000, 'manual')
+  const { response, body } = await fetchPage(url, 'GET', bingSearchRequestHeaders, signal, 1_000_000, 'manual')
   return { status: response.status, finalUrl: response.url || url.href, body }
 }
 
@@ -54,10 +64,11 @@ export async function acquireBingSearch(value: string, options: BingSearchAcquis
     notes: [],
   }
   try {
-    const url = publicUrl(value)
-    if (!bingHost(url.hostname) || url.pathname !== '/search' || !url.searchParams.get('q')?.trim()) {
+    const cleanUrl = publicUrl(value)
+    if (!bingHost(cleanUrl.hostname) || cleanUrl.pathname !== '/search' || !cleanUrl.searchParams.get('q')?.trim()) {
       throw new Error('Bing acquisition requires a clean Bing Search query URL.')
     }
+    const url = marketUrl(cleanUrl)
     await (options.verifyDns || checkPublicDns)(url)
     const result = await (options.transport || defaultTransport)(url, AbortSignal.timeout(options.timeoutMs ?? 12_000))
     const final = publicUrl(result.finalUrl)
@@ -106,7 +117,7 @@ export async function acquireBingSearch(value: string, options: BingSearchAcquis
       html: result.body,
       resultRegionInspected: inspected,
       blocker: inspected ? 'none' : 'missing_result_region',
-      notes: inspected ? ['Bounded Bing public result region captured.'] : ['HTML was captured, but a standard Bing result region was not established. Assisted verification remains available.'],
+      notes: inspected ? ['Bounded Bing public result region captured in a US-English market context.'] : ['HTML was captured, but a standard Bing result region was not established. Assisted verification remains available.'],
     }
   } catch (error) {
     const blocker = failureBlocker(error)

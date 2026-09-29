@@ -103,6 +103,70 @@ const content = (element: Element): string => hidden(element) ? '' : decode(`${e
 const value = (element: Element) => element.attrs.content || element.attrs.href || element.attrs.src || content(element)
 const semanticFields: Record<string, EntityField> = { name: 'name', telephone: 'phone', streetAddress: 'streetAddress', addressLocality: 'locality', addressRegion: 'region', postalCode: 'postalCode', category: 'category' }
 
+const className = (element: Element) => element.attrs.class || ''
+const isBingLocalEntityScope = (element: Element) =>
+  /(?:^|\s)(?:b_entityTP|b_localEntity|b_localBusiness)(?:\s|$)/i.test(className(element)) ||
+  Boolean(element.attrs['data-entityid'] || element.attrs['data-entity-id'])
+const labeledValue = (label: string, prefix: RegExp) => decode(label.replace(prefix, ''))
+const firstText = (nodes: Element[], predicate: (node: Element) => boolean) => nodes.find(predicate)
+const bingLocalAddress = (nodes: Element[], text: string) => {
+  const node = firstText(nodes, (candidate) => candidate.tag === 'address' || candidate.attrs.itemprop === 'address' ||
+    /(?:^|[_\s-])address(?:$|[_\s-])/i.test(`${candidate.attrs.id || ''} ${className(candidate)}`) || /^address\s*:/i.test(candidate.attrs['aria-label'] || ''))
+  if (node) return labeledValue(node.attrs['aria-label'] || content(node), /^address\s*:\s*/i)
+  const match = text.match(/\b\d{1,8}\s+(?:[A-Za-z0-9.'-]+\s+){0,8}(?:Road|Rd|Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Circle|Cir|Parkway|Pkwy|Highway|Hwy|Trail|Trl|Terrace|Ter|Place|Pl)\b(?:,?\s+[A-Za-z .'-]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?)?/i)
+  return decode(match?.[0] || '')
+}
+
+/**
+ * Bing's right-rail/local card is not consistently JSON-LD. Normalize only a
+ * bounded, explicitly marked Bing entity scope and fields asserted inside it.
+ */
+export const bingLocalEntityExtractor: SearchResultExtractor = {
+  id: 'bing-local-entity-v1',
+  extract(capture) {
+    if (host(capture.finalUrl || capture.requestedUrl) !== 'bing.com') return []
+    if (capture.normalizedSearchCandidates?.some((candidate) => candidate.sourceType === 'local_place')) return []
+    const elements = descendants(semanticTree(capture.html || ''))
+    const specific = elements.filter(isBingLocalEntityScope)
+    const scopes = (specific.length ? specific : elements.filter((element) => element.attrs.id === 'b_context'))
+      .filter((scope, index, all) => all.findIndex((candidate) => content(candidate) === content(scope)) === index)
+      .slice(0, 10)
+    return scopes.flatMap((scope, index) => {
+      const nodes = descendants(scope)
+      const scopeText = content(scope)
+      const fields: BusinessResultCandidate['fields'] = {}
+      const nameNode = firstText(nodes, (node) => node.attrs.itemprop === 'name' || /(?:^|[_\s-])entityTitle(?:$|[_\s-])/i.test(className(node))) ||
+        firstText(nodes, (node) => ['h1', 'h2'].includes(node.tag))
+      if (nameNode) fields.name = content(nameNode)
+      const categoryNode = firstText(nodes, (node) => node.attrs.itemprop === 'category' || /(?:entitySubTitle|category)/i.test(className(node)))
+      if (categoryNode) fields.category = content(categoryNode)
+      const phoneNode = firstText(nodes, (node) => node.attrs.itemprop === 'telephone' || node.attrs.href?.startsWith('tel:') || /^phone\s*:/i.test(node.attrs['aria-label'] || ''))
+      if (phoneNode) fields.phone = phoneNode.attrs.href?.startsWith('tel:')
+        ? decode(phoneNode.attrs.href.slice(4))
+        : labeledValue(phoneNode.attrs['aria-label'] || content(phoneNode), /^phone\s*:\s*/i)
+      if (!fields.phone) fields.phone = scopeText.match(/(?:\+?1[\s.-]*)?\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4}/)?.[0]
+      fields.address = bingLocalAddress(nodes, scopeText)
+      const links = nodes.filter((node) => node.tag === 'a' && node.attrs.href).map((node) => ({ node, url: resultUrl(node.attrs.href, capture) })).filter((item) => item.url)
+      const mapLink = links.find(({ url }) => host(url) === 'bing.com' && /\/maps(?:[/?#]|$)/i.test(new URL(url).pathname))
+      const websiteLink = links.find(({ node, url }) => host(url) !== 'bing.com' && /^(?:website|official (?:site|website))$/i.test(content(node) || node.attrs['aria-label'] || '')) ||
+        links.find(({ node, url }) => host(url) !== 'bing.com' && node.attrs.itemprop === 'url')
+      if (websiteLink) fields.website = websiteLink.url
+      if (mapLink) fields.publicProfileUrl = mapLink.url
+      const entityIdentity = scope.attrs['data-entityid'] || scope.attrs['data-entity-id']
+      if (entityIdentity || mapLink) fields.placeIdentity = entityIdentity || mapLink!.url
+      if (!fields.name || !(fields.phone || fields.address || fields.website || fields.publicProfileUrl || fields.placeIdentity)) return []
+      return [{
+        id: `${capture.requestedUrl}#bing-local-${index}`,
+        kind: 'semantic_card' as const,
+        sourceType: 'local_place' as const,
+        ...(websiteLink ? { resultUrl: websiteLink.url } : {}),
+        fields,
+        evidence: [reference(capture, `bing-local-entity[${index}]`, scopeText)],
+      }]
+    })
+  },
+}
+
 export const semanticResultExtractor: SearchResultExtractor = {
   id: 'semantic-public-card-v1',
   extract(capture) {
@@ -210,7 +274,7 @@ export const renderedResultExtractor: SearchResultExtractor = {
     })
   },
 }
-export const searchResultExtractors: SearchResultExtractor[] = [normalizedProviderResultExtractor, jsonLdResultExtractor, semanticResultExtractor, publicPlaceCardExtractor, renderedResultExtractor]
+export const searchResultExtractors: SearchResultExtractor[] = [normalizedProviderResultExtractor, jsonLdResultExtractor, bingLocalEntityExtractor, semanticResultExtractor, publicPlaceCardExtractor, renderedResultExtractor]
 
 export function assessSearchCapture(capture: AcquisitionResult, profile: BusinessProfile, profileState: BusinessProfileState, destination: SearchDestination, queryMode: SearchQueryMode = 'discovery'): SearchEntityAssessment {
   const loginGate = /\/(?:accounts\/)?(?:login|signin)(?:[/?#]|$)/i.test(capture.finalUrl || capture.requestedUrl) || (/<title[^>]*>[^<]*(?:log in|sign in)/i.test(capture.html || '') && /<form[^>]*action=["'][^"']*(?:login|signin)/i.test(capture.html || ''))
@@ -225,11 +289,14 @@ export function assessSearchCapture(capture: AcquisitionResult, profile: Busines
   const resultRegionInspected = Boolean(capture.resultRegionInspected || capture.renderedResultEvidence?.resultRegionInspected || (candidates.length && /<(?:main|article)\b|role=["'](?:main|listitem)["']/i.test(capture.html || '')))
   assessment.resultRegionInspected = resultRegionInspected
   if (!assessment.matches.length && resultRegionInspected && reviewedProfileValue(profile, profileState, 'businessName')) {
-    assessment.visibilityResult = 'not_found'
-    assessment.operatorReviewRequired = false
+    const neutralBingBrandNoMatch = destination === 'Bing Search' && queryMode === 'brand'
+    assessment.visibilityResult = neutralBingBrandNoMatch ? 'review_required' : 'not_found'
+    assessment.operatorReviewRequired = neutralBingBrandNoMatch
     assessment.blocker = 'no_match'
     assessment.confidence = 'low'
-    assessment.ambiguityReasons = ['A normal usable result region was inspected, but no candidate sufficiently matched the reviewed business identity.']
+    assessment.ambiguityReasons = [neutralBingBrandNoMatch
+      ? 'A normal Bing result region was inspected, but no candidate sufficiently matched the reviewed business identity. Assisted verification remains available; this is not absence evidence.'
+      : 'A normal usable result region was inspected, but no candidate sufficiently matched the reviewed business identity.']
   }
   const interactive = /<button\b|role=["'](?:button|dialog)["']|\/maps\/place\//i.test(capture.html || '') && pageText(capture).length > 20
   if (!assessment.automaticObservation && assessment.visibilityResult !== 'not_found' && interactive && ['Google Maps', 'Apple Maps', 'Bing Search', 'Yelp', 'Facebook', 'Instagram'].includes(destination) && !['identifier_conflict', 'unreviewed_profile'].includes(assessment.blocker)) {

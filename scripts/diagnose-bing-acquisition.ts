@@ -1,6 +1,8 @@
 import { performance } from 'node:perf_hooks'
 import { acquireBingSearchRuntime } from '../server/acquisitionRuntime.ts'
+import { bingSearchMarketContext } from '../server/bingSearch.ts'
 import type { BusinessProfileField, BusinessProfileState } from '../src/types/audit.ts'
+import type { SearchEntityAssessment } from '../src/types/entityMatch.ts'
 import { assessSearchCapture, searchResultExtractors } from '../src/utils/searchResultExtraction.ts'
 import { bingSearch } from '../src/utils/links.ts'
 import { normalizeWorkspaceProfile } from '../src/utils/workspaceProfile.ts'
@@ -25,6 +27,7 @@ if (!query) {
   }
   const profileProvided = Boolean(input.businessName)
   let decision: string = 'not_evaluated_reviewed_profile_required'
+  let assessment: SearchEntityAssessment | undefined
   if (capture && profileProvided) {
     const profile = normalizeWorkspaceProfile(input)
     const fieldMap: Array<[BusinessProfileField, string]> = [
@@ -34,10 +37,13 @@ if (!query) {
     const profileState: BusinessProfileState = { schemaVersion: 1, values: Object.fromEntries(fieldMap.filter(([, value]) => value).map(([field, value]) => [field, {
       value, source: 'diagnostic argument', confidence: 'high', status: 'operator_reviewed', recordedAt: new Date().toISOString(),
     }])) as BusinessProfileState['values'] }
-    const assessment = assessSearchCapture(capture, profile, profileState, 'Bing Search', 'brand')
+    assessment = assessSearchCapture(capture, profile, profileState, 'Bing Search', 'brand')
     decision = assessment.bingIdentityDecision?.decision || assessment.visibilityResult
   }
   const usefulFields = [...new Set(candidates.flatMap((candidate) => Object.keys(candidate.fields)))]
+  const localCandidates = candidates.filter((candidate) => candidate.sourceType === 'local_place')
+  const organicCandidates = candidates.filter((candidate) => candidate.sourceType === 'organic')
+  const matchedFields = [...new Set(assessment?.selected?.matchedFields.map((field) => field.field) || [])]
   console.log(JSON.stringify({
     endpointPath: '/api/acquire-bing-search',
     runtimePath: 'acquireBingSearchRuntime',
@@ -49,8 +55,13 @@ if (!query) {
     elapsedMs: Math.round(performance.now() - started),
     status: capture?.statusCode || 0,
     blocker: capture?.blocker || 'runtime_unavailable',
+    requestMarket: bingSearchMarketContext,
+    localBusinessEntityDetected: localCandidates.length > 0,
+    localEntityCandidateCount: localCandidates.length,
+    organicCandidateCount: organicCandidates.length,
     normalizedCandidateCount: candidates.length,
     usefulIdentityFields: usefulFields,
+    matchedIdentityFields: matchedFields,
     effectiveVerificationDecision: decision,
   }, null, 2))
 }
