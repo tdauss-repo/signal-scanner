@@ -115,7 +115,7 @@ const observation = (assessment: SearchEntityAssessment, source = capture): Sear
   },
 }, { profile, brandPresence: true })
 
-const apple = observation(extracted)
+const apple = observation(extracted, { ...capture, redirectUrl: 'https://maps.apple.com/place?place-id=internal-place-id&coordinate=42.1%2C-83.2', initialStatusCode: 301, redirectAccepted: true })
 const projected = projectSalesVisibility(apple, { profile, profileState })
 assert.equal(projected.headline, 'Verified automatically')
 assert.equal(projected.operatorReviewRequired, false, '6: verified Apple hides required assisted controls')
@@ -159,7 +159,7 @@ const customer = buildCustomerVisibilityReviewExport(state, [], [])
 assert.equal(customer.needsReview.includes('Apple Maps'), false, '9: Customer Review excludes verified Apple from Still being verified')
 assert(customer.verifiedStrengths.some((item) => item.title === 'Apple Maps'))
 const customerJson = serializeCustomerVisibilityReview(customer)
-for (const internal of ['apple-maps-native-fetch', 'placeIdentity', 'matchedFields', 'missing_result_region', 'apple-brand-run']) {
+for (const internal of ['apple-maps-native-fetch', 'placeIdentity', 'matchedFields', 'missing_result_region', 'apple-brand-run', 'internal-place-id', 'coordinate=', 'redirectUrl']) {
   assert.equal(customerJson.includes(internal), false, `10: ${internal} stays outside customer JSON`)
 }
 

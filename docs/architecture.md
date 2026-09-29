@@ -328,11 +328,27 @@ Apple Maps Brand Presence uses one bounded public HTTP request to the clean
 `maps.apple.com/?q=...` reviewed-identity query. It runs in a dedicated native
 runtime lane, does not execute scripts, launch a browser, use authenticated or
 private endpoints, retain session state, or bypass an access restriction. The
-public response is useful only when it exposes an explicit structured place or
-share record through JSON-LD, embedded public JSON, or a canonical public
-`/place` URL. The normalizer retains only asserted name, address components,
-phone, website, category, public Apple Maps profile URL, and place identifier;
-it does not infer missing identity data.
+production acquisition URL and operator verification URL use the same
+`brandVerificationQuery()` contract: reviewed business name plus reviewed city
+and state.
+
+Apple Maps public place resolution permits exactly one 301, 302, 303, 307, or
+308 redirect when its `Location` is HTTPS, remains on `maps.apple.com`, and is
+a public `/place` route rather than an authentication route. A bounded Apple
+Maps search redirect to a public place URL is itself acquired structured place
+evidence. Public `place-id`, `name`, and `address` parameters are normalized as
+a local-place candidate; `coordinate` is retained only in raw technical
+redirect evidence and is excluded from the canonical profile and material
+fingerprint. Place identity alone is provenance, not business-identity proof.
+A missing, external, insecure, or second redirect stops neutral.
+
+The final public place response is optional enrichment. JSON-LD, embedded
+public JSON, canonical metadata, and explicit place metadata may add asserted
+phone, website, category, address, name, or canonical URL only when they refer
+to the same place identity. Final HTML enrichment is additive, not mandatory:
+the redirect may establish identity when its public name/address fields satisfy
+the normal matcher. A sparse application shell does not erase sufficient
+redirect evidence. The normalizer never fabricates absent identity data.
 
 The existing reviewed-identity matcher is authoritative. Automatic Apple Maps
 verification requires at least two strong identifier groups from name,

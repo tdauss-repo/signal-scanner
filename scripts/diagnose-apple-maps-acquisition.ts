@@ -35,11 +35,21 @@ if (!query) {
     decision = assessment.automaticObservation ? 'verified' : assessment.visibilityResult
     matchedFields = [...new Set(assessment.selected?.matchedFields.map((field) => field.field) || [])]
   }
+  const finalRequest = decision === 'verified' && capture?.finalRequestState === 'unavailable'
+    ? 'not_needed_for_verification'
+    : capture?.finalRequestState || 'not_requested'
   console.log(JSON.stringify({
+    query,
     endpointPath: '/api/acquire-apple-maps', runtimePath: 'acquireAppleMapsRuntime', requestAttempted: true,
     provider: capture?.provider || 'apple-maps-native-request', method: capture?.method || 'server_fetch',
-    resultState: capture?.outcome || 'unavailable', elapsedMs: Math.round(performance.now() - started),
-    status: capture?.statusCode || 0, blocker: capture?.blocker || 'runtime_unavailable',
+    resultState: capture?.outcome || 'unavailable', elapsedMs: Math.round(performance.now() - started), initialStatus: capture?.initialStatusCode ?? capture?.statusCode ?? 0,
+    redirectAccepted: capture?.redirectAccepted || false,
+    redirectHost: capture?.redirectUrl ? new URL(capture.redirectUrl).hostname : '',
+    placeIdPresent: candidates.some((candidate) => Boolean(candidate.fields.placeIdentity)),
+    namePresent: candidates.some((candidate) => Boolean(candidate.fields.name)),
+    addressPresent: candidates.some((candidate) => Boolean(candidate.fields.address || candidate.fields.streetAddress)),
+    finalRequest,
+    status: capture?.statusCode ?? 0, blocker: capture?.blocker || 'runtime_unavailable',
     structuredPlaceDetected: candidates.some((candidate) => candidate.sourceType === 'local_place'),
     candidateCount: candidates.length, matchedIdentityFields: matchedFields, effectiveVerificationDecision: decision,
   }, null, 2))

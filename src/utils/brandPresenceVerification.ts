@@ -10,7 +10,7 @@ import type {
 } from '../types/audit'
 import type { EntityMatch } from '../types/entityMatch'
 import { evidenceFingerprint } from './evidenceFingerprint'
-import { reviewedProfileValue } from './entityMatcher'
+import { normalizedEntityField, reviewedProfileValue } from './entityMatcher'
 import { canonicalProfileUrlForDestination } from './searchVisibility'
 
 export interface ExpectedBrandPresenceIdentity {
@@ -59,16 +59,39 @@ export function expectedBrandPresenceIdentity(
   }
 }
 
-const materialMatch = (match: EntityMatch) => ({
+const materialAppleProfileUrl = (value?: string) => {
+  if (!value) return value
+  try {
+    const url = new URL(value)
+    if (url.hostname.replace(/^www\./, '').toLowerCase() !== 'maps.apple.com' || !/\/place(?:[/?#]|$)/i.test(url.pathname)) return value
+    const placeIdentity = url.searchParams.get('place-id') || url.searchParams.get('mapitemguid') || url.searchParams.get('id') || ''
+    if (!placeIdentity) { url.searchParams.delete('coordinate'); return url.href }
+    const stable = new URL(`${url.origin}${url.pathname}`)
+    stable.searchParams.set('place-id', placeIdentity)
+    const name = url.searchParams.get('name')
+    const address = url.searchParams.get('address')
+    if (name) stable.searchParams.set('name', normalizedEntityField('name', name))
+    if (address) stable.searchParams.set('address', normalizedEntityField('address', address))
+    return stable.href
+  } catch { return value }
+}
+const materialComparison = (comparison: EntityMatch['matchedFields'][number]) => ({
+  ...comparison,
+  expected: normalizedEntityField(comparison.field, comparison.expected),
+  observed: normalizedEntityField(comparison.field, comparison.observed),
+})
+const materialMatch = (match: EntityMatch, apple = false) => ({
   candidate: {
     kind: match.candidate.kind,
     sourceType: match.candidate.sourceType,
-    resultUrl: match.candidate.resultUrl,
-    fields: match.candidate.fields,
+    resultUrl: apple ? materialAppleProfileUrl(match.candidate.resultUrl) : match.candidate.resultUrl,
+    fields: apple ? Object.fromEntries(Object.entries(match.candidate.fields).map(([field, value]) => [field,
+      field === 'publicProfileUrl' ? materialAppleProfileUrl(value) : value ? normalizedEntityField(field as Parameters<typeof normalizedEntityField>[0], value) : value,
+    ])) : match.candidate.fields,
     schemaTypes: match.candidate.schemaTypes,
   },
-  matchedFields: match.matchedFields,
-  conflictingFields: match.conflictingFields,
+  matchedFields: apple ? match.matchedFields.map(materialComparison) : match.matchedFields,
+  conflictingFields: apple ? match.conflictingFields.map(materialComparison) : match.conflictingFields,
   missingFields: match.missingFields,
   unreviewedProfileFields: match.unreviewedProfileFields,
   confidence: match.confidence,
@@ -87,12 +110,13 @@ export function brandPresenceVerificationEvidenceKey(
   profileState: BusinessProfileState,
 ) {
   const assessment = observation.automation?.assessment
+  const apple = observation.destination === 'Apple Maps'
   return evidenceFingerprint({
     version: 'found-local-brand-presence-review-v1',
     destination: observation.destination,
     query: observation.query,
-    observedResultUrl: observation.observedResultUrl,
-    canonicalProfileUrl: observation.canonicalProfileUrl,
+    observedResultUrl: apple ? materialAppleProfileUrl(observation.observedResultUrl) : observation.observedResultUrl,
+    canonicalProfileUrl: apple ? materialAppleProfileUrl(observation.canonicalProfileUrl) : observation.canonicalProfileUrl,
     observedResultTypes: observation.observedResultTypes,
     evidenceKind: observation.evidenceKind,
     identity: expectedBrandPresenceIdentity(profile, profileState),
@@ -107,8 +131,8 @@ export function brandPresenceVerificationEvidenceKey(
       ambiguityReasons: assessment.ambiguityReasons,
       googleIdentityDecision: assessment.googleIdentityDecision,
       bingIdentityDecision: assessment.bingIdentityDecision,
-      selected: assessment.selected ? materialMatch(assessment.selected) : undefined,
-      matches: assessment.matches.map(materialMatch),
+      selected: assessment.selected ? materialMatch(assessment.selected, apple) : undefined,
+      matches: assessment.matches.map((match) => materialMatch(match, apple)),
     } : !assessment ? {
       overallResult: observation.overallResult,
       confidence: observation.confidence,

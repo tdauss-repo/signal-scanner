@@ -21,12 +21,20 @@ export interface RenderedResultEvidence {
 export interface AcquisitionResult {
   version: 1
   requestedUrl: string
+  /** Approved public redirect target, retained separately from the requested and final URLs. */
+  redirectUrl?: string
   finalUrl?: string
   provider: string
   method: AcquisitionMethod
   acquiredAt: string
   outcome: 'success' | 'partial' | 'blocked' | 'failed' | 'unavailable'
   statusCode?: number
+  /** Initial response status when a bounded redirect was considered. */
+  initialStatusCode?: number
+  /** True only when the redirect passed the destination-specific public URL policy. */
+  redirectAccepted?: boolean
+  /** Sanitized state of the optional request made to the approved redirect target. */
+  finalRequestState?: 'success' | 'shell' | 'restricted' | 'unavailable' | 'not_requested'
   html?: string
   visibleText?: string
   screenshotReference?: string

@@ -119,6 +119,9 @@ export function brandPresenceEvidenceSummary(
         : observation.operatorVerification ? 'Operator verification'
           : 'Manual evidence'
   const identityEvidence = automaticIdentityEvidence(observation, sales)
+  const applePlaceResolution = observation.destination === 'Apple Maps' && Boolean(
+    observation.automation?.assessment?.selected?.evidence.some((item) => item.locator === 'redirect-place-url'),
+  )
   return {
     acquisition,
     result: resultLabel(observation, sales),
@@ -128,7 +131,7 @@ export function brandPresenceEvidenceSummary(
       : observation.observedAt ? { observedAt: observation.observedAt } : {}),
     ...(derived?.freshness === 'recent' ? { lastVerifiedAt: derived.verifiedAt }
       : retained?.verifiedAt ? { lastVerifiedAt: retained.verifiedAt } : {}),
-    source: derived ? 'Google Search knowledge panel' : observation.destination,
+    source: derived ? 'Google Search knowledge panel' : applePlaceResolution ? 'Public Apple Maps place resolution' : observation.destination,
     ...(derived?.freshness === 'fresh' ? { automationState: 'Completed' }
       : automationStateLabel(observation) ? { automationState: automationStateLabel(observation) } : {}),
     ...(!failed || retained || derived ? { interpretation: sales.explanation } : {

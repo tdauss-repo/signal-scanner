@@ -214,7 +214,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       (destination !== 'Google Search' || new URL(url).pathname === '/search') &&
       (destination !== 'Google Maps' || new URL(url).pathname.startsWith('/maps')))
     run.checks.push({ ...check(`${query.id}:${destination}`, 'SearchMaps'), destination, queryId: query.id, query: query.query, queryMode: query.isDiagnostic ? 'location' : query.role === 'Brand Presence' ? 'brand' : 'discovery',
-      url: destination === 'Google Search' || destination === 'Bing Search' && query.id === 'search-brand-canonical'
+      url: destination === 'Google Search' || ['Bing Search', 'Apple Maps'].includes(destination) && query.id === 'search-brand-canonical'
         ? verificationUrl
         : enhanced && query.isDiagnostic ? publicPresenceUrl(destination, query.query) : query.role === 'Brand Presence' ? configured || recorded || publicPresenceUrl(destination, query.query) : publicPresenceUrl(destination, query.query) })
   }
