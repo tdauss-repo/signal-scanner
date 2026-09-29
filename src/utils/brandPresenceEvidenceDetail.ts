@@ -10,6 +10,8 @@ export interface BrandPresenceEvidenceSummary {
   lastVerifiedAt?: string
   source: string
   automationState?: string
+  appleMapsSearch?: string
+  structuredPlace?: string
   interpretation?: string
   reason?: string
   nextStep?: string
@@ -102,6 +104,17 @@ const automaticIdentityEvidence = (observation: SearchDestinationObservation, sa
   ]
 }
 
+const acceptedAppleSearchCapture = (observation: SearchDestinationObservation) => {
+  if (observation.destination !== 'Apple Maps') return undefined
+  return observation.automation?.captures.find((capture) => {
+    if (!capture.redirectAccepted || !capture.redirectUrl) return false
+    try {
+      const url = new URL(capture.redirectUrl)
+      return url.protocol === 'https:' && url.hostname.replace(/^www\./i, '').toLowerCase() === 'maps.apple.com' && url.pathname === '/search'
+    } catch { return false }
+  })
+}
+
 /** Decision-relevant operator summary projected from the retained evidence. */
 export function brandPresenceEvidenceSummary(
   observation: SearchDestinationObservation,
@@ -110,9 +123,13 @@ export function brandPresenceEvidenceSummary(
   const failed = unavailable(observation)
   const retained = sales.state === 'verified_recent' ? observation.retainedGoogleVerification : undefined
   const derived = sales.derivedGoogleMapsVerification
+  const appleSearchCapture = acceptedAppleSearchCapture(observation)
+  const appleSearchCompleted = Boolean(appleSearchCapture?.outcome === 'success' && appleSearchCapture.resultRegionInspected)
+  const appleStructuredPlace = Boolean(appleSearchCapture?.normalizedSearchCandidates?.length)
   const acquisition = derived?.freshness === 'recent' ? 'Recent derived evidence retained'
     : derived ? 'Derived automated evidence'
     : retained ? 'Recent automated evidence retained'
+    : appleSearchCompleted ? 'Completed'
     : failed ? 'Automated check unavailable'
     : observation.operatorAssisted ? 'Operator-assisted evidence'
       : observation.automation ? 'Automated evidence'
@@ -131,10 +148,22 @@ export function brandPresenceEvidenceSummary(
       : observation.observedAt ? { observedAt: observation.observedAt } : {}),
     ...(derived?.freshness === 'recent' ? { lastVerifiedAt: derived.verifiedAt }
       : retained?.verifiedAt ? { lastVerifiedAt: retained.verifiedAt } : {}),
-    source: derived ? 'Google Search knowledge panel' : applePlaceResolution ? 'Public Apple Maps place resolution' : observation.destination,
+    source: derived ? 'Google Search knowledge panel'
+      : applePlaceResolution ? 'Public Apple Maps place resolution'
+        : appleSearchCompleted ? 'Public Apple Maps search'
+          : observation.destination,
     ...(derived?.freshness === 'fresh' ? { automationState: 'Completed' }
+      : appleSearchCompleted ? { automationState: 'Completed' }
       : automationStateLabel(observation) ? { automationState: automationStateLabel(observation) } : {}),
-    ...(!failed || retained || derived ? { interpretation: sales.explanation } : {
+    ...(appleSearchCompleted ? {
+      appleMapsSearch: 'Resolved',
+      structuredPlace: appleStructuredPlace ? 'Available' : 'Not available',
+    } : {}),
+    ...(!failed || retained || derived ? {
+      interpretation: appleSearchCompleted && !appleStructuredPlace
+        ? 'Apple Maps responded to the public business search, but the automated check could not verify a matching place listing.'
+        : sales.explanation,
+    } : {
       reason: acquisitionFailureReason(observation),
       nextStep: 'Use assisted verification.',
     }),

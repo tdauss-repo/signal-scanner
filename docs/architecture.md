@@ -334,13 +334,29 @@ and state.
 
 Apple Maps public place resolution permits exactly one 301, 302, 303, 307, or
 308 redirect when its `Location` is HTTPS, remains on `maps.apple.com`, and is
-a public `/place` route rather than an authentication route. A bounded Apple
-Maps search redirect to a public place URL is itself acquired structured place
-evidence. Public `place-id`, `name`, and `address` parameters are normalized as
-a local-place candidate; `coordinate` is retained only in raw technical
-redirect evidence and is excluded from the canonical profile and material
-fingerprint. Place identity alone is provenance, not business-identity proof.
-A missing, external, insecure, or second redirect stops neutral.
+exactly a supported public `/search` or `/place` route rather than an
+authentication or arbitrary Apple route. A `/search` redirect is accepted only
+when its decoded `query` is materially the same as the requested reviewed-
+identity query after bounded case and whitespace normalization. A missing,
+external, insecure, unrelated-query, arbitrary-route, or second redirect stops
+neutral.
+
+The permitted public sequence is search query → one approved `/search`
+redirect → structured public place evidence or an explicit canonical `/place`
+URL in the returned page. The `/search` redirect itself is not evidence that a
+listing exists. The search response is inspected only for bounded JSON-LD,
+public `application/json`, canonical/Open Graph metadata, and explicit public
+place links. A `/place` URL found in that response is parsed as evidence without
+a second network request, preserving the one-redirect boundary. If the search
+page is only an application shell, acquisition is completed but insufficient:
+the destination remains neutral and requires review rather than being labeled
+unavailable.
+
+A server-provided public `/place` target is acquired structured place evidence.
+Public `place-id`, `name`, and `address` parameters are normalized as a local-
+place candidate; `coordinate` is retained only in raw technical redirect
+evidence and is excluded from the canonical profile and material fingerprint.
+Place identity alone is provenance, not business-identity proof.
 
 The final public place response is optional enrichment. JSON-LD, embedded
 public JSON, canonical metadata, and explicit place metadata may add asserted

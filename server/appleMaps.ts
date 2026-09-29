@@ -19,6 +19,7 @@ export interface AppleMapsAcquisitionOptions {
 const appleMapsHost = (value: string) => value.replace(/^www\./, '').toLowerCase() === 'maps.apple.com'
 const appleRedirectStatuses = new Set([301, 302, 303, 307, 308])
 const clean = (value: unknown, max = 1000) => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : ''
+const normalizedRedirectQuery = (value: string) => value.normalize('NFKC').toLowerCase().trim().replace(/\s+/g, ' ')
 const normalizedWords = (value: string) => value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ')
 const comparable = (field: EntityField, value: string) => {
   if (field === 'phone') return value.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '')
@@ -41,9 +42,24 @@ const approvedApplePlaceTarget = (value: unknown, base: string) => {
   const resolved = safeUrl(value, base)
   if (!resolved) return undefined
   const url = new URL(resolved)
-  if (url.protocol !== 'https:' || !appleMapsHost(url.hostname) || !/\/place(?:[/?#]|$)/i.test(url.pathname)) return undefined
-  if (/\/(?:login|signin|auth|account)(?:[/?#]|$)/i.test(url.pathname)) return undefined
+  if (url.protocol !== 'https:' || url.hostname.toLowerCase() !== 'maps.apple.com' || url.pathname !== '/place') return undefined
   return url
+}
+const approvedAppleSearchTarget = (value: unknown, base: string, requestedQuery: string) => {
+  const resolved = safeUrl(value, base)
+  if (!resolved) return undefined
+  const url = new URL(resolved)
+  const redirectedQueries = url.searchParams.getAll('query')
+  const redirectedQuery = redirectedQueries.length === 1 ? redirectedQueries[0].trim() : ''
+  if (url.protocol !== 'https:' || url.hostname.toLowerCase() !== 'maps.apple.com' || url.pathname !== '/search') return undefined
+  if (!redirectedQuery || redirectedQuery.length > 500 || normalizedRedirectQuery(redirectedQuery) !== normalizedRedirectQuery(requestedQuery)) return undefined
+  return url
+}
+const approvedAppleRedirectTarget = (value: unknown, base: string, requestedQuery: string) => {
+  const place = approvedApplePlaceTarget(value, base)
+  if (place) return { url: place, route: 'place' as const }
+  const search = approvedAppleSearchTarget(value, base, requestedQuery)
+  return search ? { url: search, route: 'search' as const } : undefined
 }
 /** Stable public profile URL: place routing and public identity, without presentation-only coordinates. */
 export const canonicalApplePlaceUrl = (value: unknown, base: string) => {
@@ -73,7 +89,7 @@ const reference = (sourceUrl: string, acquiredAt: string, locator: string, excer
 })
 
 /** A server-issued public /place target is structured acquisition evidence even when its SPA body is sparse. */
-export function normalizeAppleMapsRedirectCandidate(value: string, acquiredAt: string): BusinessResultCandidate | undefined {
+export function normalizeAppleMapsRedirectCandidate(value: string, acquiredAt: string, locator = 'redirect-place-url'): BusinessResultCandidate | undefined {
   const target = approvedApplePlaceTarget(value, value)
   if (!target) return undefined
   const canonicalProfileUrl = canonicalApplePlaceUrl(target.href, target.href)
@@ -87,7 +103,7 @@ export function normalizeAppleMapsRedirectCandidate(value: string, acquiredAt: s
   if (placeIdentity) fields.placeIdentity = placeIdentity
   return {
     id: 'apple-maps-redirect-place', kind: 'structured_entity', sourceType: 'local_place', resultUrl: canonicalProfileUrl, fields,
-    evidence: [reference(target.href, acquiredAt, 'redirect-place-url', JSON.stringify({ name, address, placeIdentityPresent: Boolean(placeIdentity), coordinatePresent: target.searchParams.has('coordinate') }))],
+    evidence: [reference(target.href, acquiredAt, locator, JSON.stringify({ name, address, placeIdentityPresent: Boolean(placeIdentity), coordinatePresent: target.searchParams.has('coordinate') }))],
   }
 }
 
@@ -180,6 +196,19 @@ export function normalizeAppleMapsCandidates(html: string, finalUrl: string, acq
     const placeIdentity = url.searchParams.get('place-id') || url.searchParams.get('mapitemguid') || url.searchParams.get('id') || ''
     append({ name, address, placeId: placeIdentity, placeUrl: canonical }, 'canonical-place-url')
   }
+  const explicitPlaceUrls = [...html.matchAll(/<(?:a|link)\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>/gi)]
+    .slice(0, 200)
+    .map((match) => decodedAttribute(match[1] || match[2] || ''))
+    .map((value) => applePlaceUrl(value, finalUrl))
+    .filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index)
+  for (const [index, placeUrl] of explicitPlaceUrls.entries()) {
+    const candidate = normalizeAppleMapsRedirectCandidate(placeUrl, acquiredAt, `public-place-link[${index}]`)
+    if (!candidate) continue
+    const key = JSON.stringify([candidate.fields.name, candidate.fields.address, candidate.fields.publicProfileUrl, candidate.fields.placeIdentity])
+    if (seen.has(key)) continue
+    seen.add(key)
+    candidates.push({ ...candidate, id: `apple-maps-place-link-${index + 1}` })
+  }
   return candidates.slice(0, 50)
 }
 
@@ -240,7 +269,17 @@ export async function acquireAppleMaps(value: string, options: AppleMapsAcquisit
   }
   try {
     const url = publicUrl(value)
-    if (!appleMapsHost(url.hostname) || (!url.searchParams.get('q')?.trim() && !/\/place(?:[/?#]|$)/i.test(url.pathname))) {
+    const rootQueries = url.searchParams.getAll('q')
+    const searchQueries = url.searchParams.getAll('query')
+    const requestedQuery = clean(
+      url.pathname === '/search' && searchQueries.length === 1 ? searchQueries[0]
+        : url.pathname === '/' && rootQueries.length === 1 ? rootQueries[0]
+          : '',
+      500,
+    )
+    const supportedSearchRequest = Boolean(requestedQuery && (url.pathname === '/' || url.pathname === '/search'))
+    const supportedPlaceRequest = Boolean(approvedApplePlaceTarget(url.href, url.href))
+    if (url.protocol !== 'https:' || !appleMapsHost(url.hostname) || (!supportedSearchRequest && !supportedPlaceRequest)) {
       throw new Error('Apple Maps acquisition requires a public Apple Maps search or place URL.')
     }
     await (options.verifyDns || checkPublicDns)(url)
@@ -252,16 +291,19 @@ export async function acquireAppleMaps(value: string, options: AppleMapsAcquisit
     let final = publicUrl(initial.finalUrl)
     let redirectUrl = ''
     let redirectAccepted = false
+    let redirectRoute: 'place' | 'search' | undefined
     let redirectCandidate: BusinessResultCandidate | undefined
     let finalRequestState: NonNullable<AcquisitionResult['finalRequestState']> = 'not_requested'
 
     if (appleRedirectStatuses.has(initial.status)) {
       if (!initial.location) return { ...base, initialStatusCode, statusCode: initial.status, redirectAccepted: false, finalRequestState, outcome: 'unavailable', blocker: 'redirect_missing_location', error: 'Apple Maps returned a redirect without a public Location target.', notes: ['No redirect was followed. This is not evidence that the business is absent.'] }
-      const target = approvedApplePlaceTarget(initial.location, url.href)
-      if (!target) return { ...base, initialStatusCode, statusCode: initial.status, redirectUrl: safeUrl(initial.location, url.href) || undefined, redirectAccepted: false, finalRequestState, outcome: 'unavailable', blocker: 'redirect_not_allowed', error: 'Apple Maps returned an unsupported or unsafe redirect target.', notes: ['No redirect was followed. This is not evidence that the business is absent.'] }
+      const approved = approvedAppleRedirectTarget(initial.location, url.href, requestedQuery)
+      if (!approved) return { ...base, initialStatusCode, statusCode: initial.status, redirectUrl: safeUrl(initial.location, url.href) || undefined, redirectAccepted: false, finalRequestState, outcome: 'unavailable', blocker: 'redirect_not_allowed', error: 'Apple Maps returned an unsupported or unsafe redirect target.', notes: ['No redirect was followed. This is not evidence that the business is absent.'] }
+      const target = approved.url
+      redirectRoute = approved.route
       redirectUrl = target.href
       redirectAccepted = true
-      redirectCandidate = normalizeAppleMapsRedirectCandidate(target.href, acquiredAt)
+      redirectCandidate = redirectRoute === 'place' ? normalizeAppleMapsRedirectCandidate(target.href, acquiredAt) : undefined
       final = target
       try {
         result = await transport(target, signal)
@@ -271,7 +313,10 @@ export async function acquireAppleMaps(value: string, options: AppleMapsAcquisit
       }
       if (appleRedirectStatuses.has(result.status)) return { ...base, redirectUrl, finalUrl: target.href, initialStatusCode, statusCode: result.status, redirectAccepted, finalRequestState: 'unavailable', outcome: 'unavailable', blocker: 'redirect_limit', normalizedSearchCandidates: redirectCandidate ? [redirectCandidate] : undefined, error: 'Apple Maps returned a second redirect; the one-hop acquisition limit stopped the request.', notes: ['The second redirect was not followed. This is not evidence that the business is absent.'] }
       const returnedFinal = publicUrl(result.finalUrl || target.href)
-      if (!appleMapsHost(returnedFinal.hostname) || returnedFinal.protocol !== 'https:') return { ...base, redirectUrl, finalUrl: result.finalUrl, initialStatusCode, statusCode: result.status, redirectAccepted, finalRequestState: 'unavailable', outcome: 'unavailable', blocker: 'redirect_not_allowed', error: 'Apple Maps place enrichment resolved outside the approved public host.', notes: ['The external target was not acquired. This is not evidence that the business is absent.'] }
+      const returnedRouteAccepted = redirectRoute === 'place'
+        ? Boolean(approvedApplePlaceTarget(returnedFinal.href, target.href))
+        : Boolean(approvedAppleSearchTarget(returnedFinal.href, target.href, requestedQuery))
+      if (!returnedRouteAccepted) return { ...base, redirectUrl, finalUrl: result.finalUrl, initialStatusCode, statusCode: result.status, redirectAccepted, finalRequestState: 'unavailable', outcome: 'unavailable', blocker: 'redirect_not_allowed', error: 'Apple Maps public resolution returned an unsupported or unsafe route.', notes: ['The unsupported target was not used as evidence. This is not evidence that the business is absent.'] }
       final = returnedFinal
     }
 
@@ -285,6 +330,7 @@ export async function acquireAppleMaps(value: string, options: AppleMapsAcquisit
     const enrichment = normalizeAppleMapsCandidates(result.body, final.href, acquiredAt)
     const candidates = redirectCandidate ? mergeApplePlaceEvidence(redirectCandidate, enrichment) : enrichment
     finalRequestState = enrichment.length ? 'success' : 'shell'
+    if (!candidates.length && redirectRoute === 'search') return { ...base, ...common, acquiredAt: new Date().toISOString(), finalRequestState, outcome: 'success', confidence: 'captured', resultRegionInspected: true, blocker: 'none', notes: ['Apple Maps completed the public business search, but the response exposed no supported structured place record. Assisted verification remains available.'] }
     if (!candidates.length) return { ...base, ...common, finalRequestState, outcome: 'unavailable', blocker: 'missing_result_region', error: 'Apple Maps returned no supported public place structure.', notes: ['The public response did not expose a structured place record. Assisted verification remains available.'] }
     return { ...base, ...common, acquiredAt: new Date().toISOString(), finalRequestState, outcome: 'success', confidence: 'captured', html: result.body, normalizedSearchCandidates: candidates, resultRegionInspected: true, blocker: 'none', notes: [redirectCandidate ? 'Public Apple Maps place resolution captured; final public metadata was evaluated as optional enrichment.' : 'Bounded public Apple Maps place evidence captured.'] }
   } catch (error) {

@@ -16,7 +16,8 @@ if (!query) {
   process.exitCode = 1
 } else {
   const started = performance.now()
-  const result = await acquireAppleMapsRuntime(publicPresenceUrl('Apple Maps', query))
+  const initialRequest = publicPresenceUrl('Apple Maps', query)
+  const result = await acquireAppleMapsRuntime(initialRequest)
   const capture = 'capture' in result ? result.capture : undefined
   const candidates = capture?.normalizedSearchCandidates || []
   const input = {
@@ -38,19 +39,29 @@ if (!query) {
   const finalRequest = decision === 'verified' && capture?.finalRequestState === 'unavailable'
     ? 'not_needed_for_verification'
     : capture?.finalRequestState || 'not_requested'
+  const redirectRoute = (() => {
+    try { return capture?.redirectUrl ? new URL(capture.redirectUrl).pathname : '' } catch { return '' }
+  })()
+  const canonicalPlaceDetected = candidates.some((candidate) => {
+    const value = candidate.fields.publicProfileUrl || candidate.resultUrl || ''
+    try { return new URL(value).hostname === 'maps.apple.com' && new URL(value).pathname === '/place' } catch { return false }
+  })
   console.log(JSON.stringify({
     query,
+    initialRequest,
     endpointPath: '/api/acquire-apple-maps', runtimePath: 'acquireAppleMapsRuntime', requestAttempted: true,
     provider: capture?.provider || 'apple-maps-native-request', method: capture?.method || 'server_fetch',
     resultState: capture?.outcome || 'unavailable', elapsedMs: Math.round(performance.now() - started), initialStatus: capture?.initialStatusCode ?? capture?.statusCode ?? 0,
+    redirectRoute,
     redirectAccepted: capture?.redirectAccepted || false,
     redirectHost: capture?.redirectUrl ? new URL(capture.redirectUrl).hostname : '',
-    placeIdPresent: candidates.some((candidate) => Boolean(candidate.fields.placeIdentity)),
-    namePresent: candidates.some((candidate) => Boolean(candidate.fields.name)),
-    addressPresent: candidates.some((candidate) => Boolean(candidate.fields.address || candidate.fields.streetAddress)),
+    placeId: candidates.some((candidate) => Boolean(candidate.fields.placeIdentity)) ? 'present' : 'absent',
+    name: candidates.some((candidate) => Boolean(candidate.fields.name)) ? 'present' : 'absent',
+    address: candidates.some((candidate) => Boolean(candidate.fields.address || candidate.fields.streetAddress)) ? 'present' : 'absent',
     finalRequest,
-    status: capture?.statusCode ?? 0, blocker: capture?.blocker || 'runtime_unavailable',
+    finalStatus: capture?.statusCode ?? 0, blocker: capture?.blocker || 'runtime_unavailable',
     structuredPlaceDetected: candidates.some((candidate) => candidate.sourceType === 'local_place'),
+    canonicalPlaceDetected,
     candidateCount: candidates.length, matchedIdentityFields: matchedFields, effectiveVerificationDecision: decision,
   }, null, 2))
 }
