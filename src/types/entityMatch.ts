@@ -44,6 +44,8 @@ export interface GoogleIdentityDecision {
 }
 /** Explainable Bing Brand decision. Kept separate from Google provenance even though the bounded rule is shared. */
 export type BingIdentityDecision = GoogleIdentityDecision
+/** Explainable DuckDuckGo Brand decision with destination-specific provenance. */
+export type DuckDuckGoIdentityDecision = GoogleIdentityDecision
 export interface SearchEntityAssessment {
   matches: EntityMatch[]
   selected?: EntityMatch
@@ -59,4 +61,6 @@ export interface SearchEntityAssessment {
   googleIdentityDecision?: GoogleIdentityDecision
   /** Explainable Bing Brand identity decision. Raw acquired candidates remain unchanged. */
   bingIdentityDecision?: BingIdentityDecision
+  /** Explainable DuckDuckGo Brand identity decision. Raw acquired candidates remain unchanged. */
+  duckDuckGoIdentityDecision?: DuckDuckGoIdentityDecision
 }

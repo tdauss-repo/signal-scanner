@@ -52,9 +52,9 @@ export const destinationAcquisitionCapabilities: DestinationAcquisitionCapabilit
     blockerTypes: ['login wall', 'public result not inspectable', 'Browser API path not yet live-validated'],
   },
   {
-    destination: 'DuckDuckGo', preferredProvider: 'Operator public observation', fallbackProvider: 'Open DuckDuckGo search', provingProvider: 'Bright Data SERP API',
-    productionStatus: 'manual_fallback', shape: 'manual', automaticFound: false, automaticNotFound: false,
-    blockerTypes: ['provider upstream 5xx', 'structured SERP path not yet repeatable', 'malformed or missing result region'],
+    destination: 'DuckDuckGo', preferredProvider: 'Found Local bounded DuckDuckGo HTML fetch', fallbackProvider: 'Assisted verification',
+    productionStatus: 'production', shape: 'native_fetch_then_assisted', automaticFound: true, automaticNotFound: false,
+    blockerTypes: ['transport or HTTP failure', 'challenge or access restriction', 'missing public result region'],
   },
   {
     destination: 'Instagram', preferredProvider: 'Operator public observation', fallbackProvider: 'Open Instagram search', provingProvider: 'Bright Data Browser API',

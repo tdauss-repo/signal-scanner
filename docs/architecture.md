@@ -257,7 +257,8 @@ Brand Presence destination dispatch is explicit:
 | Google Maps | Dedicated Google Maps acquisition |
 | Bing Search | Dedicated bounded native Bing acquisition |
 | Apple Maps | Dedicated bounded native Apple Maps acquisition |
-| DuckDuckGo, Yelp, Facebook, Instagram | Existing destination/generic path |
+| DuckDuckGo | Dedicated bounded native DuckDuckGo HTML acquisition |
+| Yelp, Facebook, Instagram | Existing destination/generic path |
 
 Bing Search Brand Presence must not fall through to generic public acquisition
 or its rendered-browser fallback. Missing dedicated wiring and native Bing
@@ -271,12 +272,14 @@ Production visibility-scan dependencies are constructed by the single
 `createApplicationVisibilityScanDependencies()` composition used by `App` and
 the production-composition regression test. Its production contract requires
 the dedicated Bing and Apple Maps adapters, which post to
-`/api/acquire-bing-search` and `/api/acquire-apple-maps`. The
+`/api/acquire-bing-search`, `/api/acquire-apple-maps`, and
+`/api/acquire-duckduckgo-search`. The
 general scan contract remains injectable for fixtures and CLI tools, but a
 missing Bing adapter fails closed as `bing_acquisition_not_configured`; it can
 never select generic public acquisition or rendered-browser acquisition. The
-Apple Maps adapter follows the same fail-closed composition rule with
-`apple_maps_acquisition_not_configured`.
+Apple Maps and DuckDuckGo adapters follow the same fail-closed composition rule
+with `apple_maps_acquisition_not_configured` and
+`duckduckgo_acquisition_not_configured`.
 
 Bing Brand Presence uses one bounded native server request to the clean
 `bing.com/search?q=...` verification query. The request does not execute
@@ -365,6 +368,11 @@ to the same place identity. Final HTML enrichment is additive, not mandatory:
 the redirect may establish identity when its public name/address fields satisfy
 the normal matcher. A sparse application shell does not erase sufficient
 redirect evidence. The normalizer never fabricates absent identity data.
+Apple Maps application/page-owner metadata—such as an Apple or Apple Inc.
+`parentOrganization` that identifies `apple.com` rather than the searched
+place—is excluded from place candidates. This exclusion is scoped to Apple
+Maps host metadata and does not globally suppress businesses with “Apple” in
+their names.
 
 The existing reviewed-identity matcher is authoritative. Automatic Apple Maps
 verification requires at least two strong identifier groups from name,
@@ -381,11 +389,49 @@ completeness, or optimization quality. Provider, place-identity, matcher, and
 raw acquisition details remain outside customer JSON.
 
 HTTP/network failure, access restriction, and a response without supported
-public place structure remain distinct neutral failures. A usable Apple Maps
+public place structure remain distinct neutral outcomes. When the bounded
+public search resolves and returns HTTP 200 but exposes only the Apple Maps
+application shell, acquisition is complete but identity evidence is
+insufficient: the effective state is “Verification needed,” not unavailable or
+absent. A usable Apple Maps
 result with no sufficient match is `review_required` with blocker `no_match`;
 it is not absence evidence. Only an explicit operator Not found result may
 establish absence. Assisted verification remains the fallback for incomplete,
 ambiguous, conflicting, restricted, or unavailable public evidence.
+
+Apple Maps is a candidate for a future operator browser-assisted evidence
+helper when the operator-opened rendered public page exposes place information
+that is absent from bounded native HTML. That helper is outside the native
+acquisition boundary and is not implemented here.
+
+### DuckDuckGo Brand Presence verification
+
+DuckDuckGo Brand Presence uses one bounded native request to DuckDuckGo's
+public server-rendered HTML search surface. The operator verification URL stays
+the clean `duckduckgo.com/?q=...` reviewed-identity query; the server uses the
+same decoded business-and-locality query on `html.duckduckgo.com/html/` with a
+stable US-English context. The response is bounded to one megabyte and twelve
+seconds. It does not execute scripts, launch a browser, retain cookies, use
+authenticated state, bypass a challenge, or fall through to rendered-browser
+acquisition.
+
+Only explicit public result-title/link rows and bounded structured business
+data are normalized. Organic snippets remain evidence excerpts and are not
+promoted into asserted phone, address, or identity fields. Result destinations
+remain `observedResultUrl` evidence; DuckDuckGo has no canonical business
+profile URL contract. Automatic verification reuses the established reviewed-
+identity rule: at least two strong groups from name, official domain, phone, or
+address; one must be name or official domain; and no material conflict or
+second plausible entity may exist.
+
+A normal inspected DuckDuckGo result region with no sufficient identity match
+is `review_required` with blocker `no_match`. It is neutral and never automatic
+absence. Transport, timeout, HTTP, challenge, and missing-result-region failures
+remain separately classified and neutral. Only an explicit operator Not found
+outcome can establish absence. A verified result may support the independent
+DuckDuckGo strength through the existing include/hide/refine workflow, while
+provider, matcher, candidate, and diagnostic metadata remain outside customer
+JSON.
 
 ### Configured Google acquisition runtime
 

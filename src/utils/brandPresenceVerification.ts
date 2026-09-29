@@ -131,6 +131,7 @@ export function brandPresenceVerificationEvidenceKey(
       ambiguityReasons: assessment.ambiguityReasons,
       googleIdentityDecision: assessment.googleIdentityDecision,
       bingIdentityDecision: assessment.bingIdentityDecision,
+      duckDuckGoIdentityDecision: assessment.duckDuckGoIdentityDecision,
       selected: assessment.selected ? materialMatch(assessment.selected, apple) : undefined,
       matches: assessment.matches.map((match) => materialMatch(match, apple)),
     } : !assessment ? {

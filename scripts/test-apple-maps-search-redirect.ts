@@ -44,7 +44,10 @@ const acquireSequence = async (location: string, body = '<html><main>Apple Maps<
 }
 
 const equivalentSearch = appleSearchUrl('  montessori center OF downriver   SOUTHGATE mi  ')
-const acceptedShell = await acquireSequence(equivalentSearch)
+const appleOwnerShell = `<html><main>Apple Maps</main><script type="application/json">${JSON.stringify({
+  application: { parentOrganization: { '@type': 'Organization', name: 'Apple', url: 'https://www.apple.com/' } },
+})}</script></html>`
+const acceptedShell = await acquireSequence(equivalentSearch, appleOwnerShell)
 assert.equal(acceptedShell.calls, 2, 'an approved search redirect is the single followed network hop')
 assert.equal(acceptedShell.capture.redirectAccepted, true)
 assert.equal(acceptedShell.capture.redirectUrl, equivalentSearch)
@@ -54,6 +57,7 @@ assert.equal(acceptedShell.capture.finalRequestState, 'shell')
 assert.equal(acceptedShell.capture.outcome, 'success', 'a resolved public search shell is completed acquisition, not provider unavailability')
 assert.equal(acceptedShell.capture.resultRegionInspected, true)
 assert.equal(acceptedShell.capture.normalizedSearchCandidates?.length || 0, 0)
+assert.equal(Boolean(acceptedShell.capture.normalizedSearchCandidates?.some((candidate) => candidate.fields.name === 'Apple')), false, 'Apple shell parentOrganization metadata never becomes a searched place candidate')
 
 const shellAssessment = assessSearchCapture(acceptedShell.capture, profile, profileState, 'Apple Maps', 'brand')
 assert.equal(shellAssessment.visibilityResult, 'review_required')
@@ -71,11 +75,12 @@ const shellObservation = normalizeSearchDestinationObservation({
 const shellSales = projectSalesVisibility(shellObservation, { profile, profileState })
 const shellSummary = brandPresenceEvidenceSummary(shellObservation, shellSales)
 assert.equal(shellSales.headline, 'Verification needed')
+assert.equal(shellSales.explanation, 'Apple Maps responded to the public business search, but the automated check could not access enough structured place information to verify the listing.')
 assert.equal(shellSummary.acquisition, 'Completed')
 assert.equal(shellSummary.appleMapsSearch, 'Resolved')
 assert.equal(shellSummary.structuredPlace, 'Not available')
 assert.equal(shellSummary.automationState, 'Completed')
-assert.match(shellSummary.interpretation || '', /responded to the public business search.*could not verify a matching place listing/i)
+assert.match(shellSummary.interpretation || '', /responded to the public business search.*could not access enough structured place information to verify the listing/i)
 
 const unrelatedQuery = await acquireSequence(appleSearchUrl('Unrelated School Taylor MI'))
 assert.equal(unrelatedQuery.calls, 1)

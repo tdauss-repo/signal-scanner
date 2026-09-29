@@ -36,6 +36,7 @@ const acquisitionFailureReason = (observation: SearchDestinationObservation) => 
   if (blocker === 'capacity_busy') return 'A dedicated acquisition for this destination is already in progress.'
   if (blocker === 'bing_acquisition_not_configured') return 'Dedicated Bing acquisition is not configured.'
   if (blocker === 'apple_maps_acquisition_not_configured') return 'Dedicated Apple Maps acquisition is not configured.'
+  if (blocker === 'duckduckgo_acquisition_not_configured') return 'Dedicated DuckDuckGo acquisition is not configured.'
   if (blocker === 'runtime_exception') return 'Acquisition server could not complete the request.'
   if (blocker === 'http_5xx' || blocker === 'embedded_5xx') return 'Provider service returned an error.'
   if (blocker === 'http_error') return capture?.statusCode ? `Provider request returned HTTP ${capture.statusCode}.` : 'Provider request returned an error.'
@@ -89,6 +90,7 @@ const automaticIdentityEvidence = (observation: SearchDestinationObservation, sa
   }))
   const decision = observation.automation?.assessment?.googleIdentityDecision
     || observation.automation?.assessment?.bingIdentityDecision
+    || observation.automation?.assessment?.duckDuckGoIdentityDecision
     || observation.retainedGoogleVerification?.automation.assessment?.googleIdentityDecision
   if (!decision && observation.destination === 'Apple Maps' && sales.state === 'verified_correct') {
     const match = observation.automation?.assessment?.selected || observation.automation?.assessment?.matches[0]
@@ -161,7 +163,7 @@ export function brandPresenceEvidenceSummary(
     } : {}),
     ...(!failed || retained || derived ? {
       interpretation: appleSearchCompleted && !appleStructuredPlace
-        ? 'Apple Maps responded to the public business search, but the automated check could not verify a matching place listing.'
+        ? 'Apple Maps responded to the public business search, but the automated check could not access enough structured place information to verify the listing.'
         : sales.explanation,
     } : {
       reason: acquisitionFailureReason(observation),
@@ -176,8 +178,8 @@ export function brandPresenceEvidenceSummary(
     ...(derived ? { decision: derived.freshness === 'recent' ? 'Verified from recent evidence' : 'Verified automatically' }
       : retained ? { decision: 'Verified from recent evidence' }
       : observation.destination === 'Apple Maps' && sales.state === 'verified_correct' ? { decision: 'Verified automatically' }
-      : observation.automation?.assessment?.googleIdentityDecision || observation.automation?.assessment?.bingIdentityDecision ? {
-        decision: (observation.automation.assessment.googleIdentityDecision || observation.automation.assessment.bingIdentityDecision)?.decision === 'verified' ? 'Verified automatically' : 'Assisted verification required',
+      : observation.automation?.assessment?.googleIdentityDecision || observation.automation?.assessment?.bingIdentityDecision || observation.automation?.assessment?.duckDuckGoIdentityDecision ? {
+        decision: (observation.automation.assessment.googleIdentityDecision || observation.automation.assessment.bingIdentityDecision || observation.automation.assessment.duckDuckGoIdentityDecision)?.decision === 'verified' ? 'Verified automatically' : 'Assisted verification required',
       } : {}),
   }
 }

@@ -148,6 +148,19 @@ export function normalizeAppleMapsCandidates(html: string, finalUrl: string, acq
     const categoryValue = node.category || node.categoryName || node.type
     const category = Array.isArray(categoryValue) ? clean(categoryValue.join(', '), 200) : clean(categoryValue, 200)
     const address = addressFields(node.address || node.locationAddress || node.formattedAddress)
+    const assertedOwnerUrls = [node.url, node['@id'], node.website]
+      .map((value) => safeUrl(value, finalUrl))
+      .filter(Boolean)
+    const appleApplicationOwner = assertedTypes.some((value) => /^Organization$/i.test(value)) &&
+      /^(?:apple|apple inc)$/i.test(normalizedWords(name)) &&
+      !phone && !Object.keys(address).length &&
+      (/(?:^|\.)parentOrganization(?:\.|$)/i.test(locator) || assertedOwnerUrls.some((value) => {
+        const hostname = new URL(value).hostname.replace(/^www\./i, '').toLowerCase()
+        return hostname === 'apple.com' || hostname === 'maps.apple.com'
+      }))
+    // Apple Maps' application shell describes Apple as its parent/page-owner
+    // organization. That host metadata is not a searched place candidate.
+    if (appleApplicationOwner) return
     Object.assign(fields, address)
     if (name) fields.name = name
     if (phone) fields.phone = phone
