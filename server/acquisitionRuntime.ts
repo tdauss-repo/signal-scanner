@@ -2,6 +2,7 @@ import { pathToFileURL } from 'node:url'
 import { chromiumSandboxEnabled, publicUrl, renderedBrowserProvider, serverFetchProvider, type BrowserLauncher } from './acquisition.ts'
 import { acquireGoogleMapsWithBrightData, acquireGoogleWithBrightData, brightDataProductionCapture } from './brightDataGoogle.ts'
 import { acquireBingSearch } from './bingSearch.ts'
+import { acquireAppleMaps } from './appleMaps.ts'
 import type { AcquisitionProvider, AcquisitionResult } from '../src/types/acquisition.ts'
 
 const destinationHosts = ['www.google.com', 'www.bing.com', 'maps.apple.com', 'duckduckgo.com', 'www.yelp.com', 'www.facebook.com', 'www.instagram.com']
@@ -27,12 +28,12 @@ export async function runtimeRenderedProvider(): Promise<AcquisitionProvider | u
   }
 }
 
-type AcquisitionLane = 'shared' | 'bing_native'
+type AcquisitionLane = 'shared' | 'bing_native' | 'apple_maps_native'
 const activeLanes = new Set<AcquisitionLane>()
 
 /** Dedicated native Bing work does not contend with unrelated Google or generic/browser work. */
 export async function runInAcquisitionLane<T>(lane: AcquisitionLane, work: () => Promise<T>): Promise<T> {
-  if (activeLanes.has(lane)) throw new Error(`${lane === 'bing_native' ? 'Bing native' : 'Public'} acquisition busy. Retry this check later.`)
+  if (activeLanes.has(lane)) throw new Error(`${lane === 'bing_native' ? 'Bing native' : lane === 'apple_maps_native' ? 'Apple Maps native' : 'Public'} acquisition busy. Retry this check later.`)
   activeLanes.add(lane)
   try { return await work() } finally { activeLanes.delete(lane) }
 }
@@ -163,6 +164,14 @@ export async function acquireBingSearchRuntime(value: string) {
     throw new Error('Bing acquisition requires a Bing Search query URL.')
   }
   return runInAcquisitionLane('bing_native', async () => ({ capture: await acquireBingSearch(url.href) }))
+}
+
+export async function acquireAppleMapsRuntime(value: string) {
+  const url = runtimeAllowedUrl(value)
+  if (url.hostname.replace(/^www\./, '') !== 'maps.apple.com' || (!url.searchParams.get('q')?.trim() && !/\/place(?:[/?#]|$)/i.test(url.pathname))) {
+    throw new Error('Apple Maps acquisition requires a public Apple Maps search or place URL.')
+  }
+  return runInAcquisitionLane('apple_maps_native', async () => ({ capture: await acquireAppleMaps(url.href) }))
 }
 
 export async function acquireRuntime(value: string, method: string) {

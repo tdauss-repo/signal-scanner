@@ -123,9 +123,16 @@ export function projectSalesVisibility(
     observation.destination === 'Bing Search' && assessment?.bingIdentityDecision?.decision === 'review_required' &&
     (assessment.bingIdentityDecision.conflictingSignals.length || ['identifier_conflict', 'multiple_entities'].includes(assessment.blocker)),
   )
-  const automatedReview = assessment?.operatorReviewRequired === true && !googleAutomaticVerified && !googleRecentVerified && !bingAutomaticVerified
+  const appleAutomaticVerified = Boolean(
+    observation.destination === 'Apple Maps' && assessment?.automaticObservation &&
+    assessment.visibilityResult === 'found' && !assessment.operatorReviewRequired && assessment.blocker === 'none',
+  )
+  const appleConflict = Boolean(
+    observation.destination === 'Apple Maps' && ['identifier_conflict', 'multiple_entities'].includes(assessment?.blocker || ''),
+  )
+  const automatedReview = assessment?.operatorReviewRequired === true && !googleAutomaticVerified && !googleRecentVerified && !bingAutomaticVerified && !appleAutomaticVerified
   const googleConflict = googleAutomaticState === 'conflict'
-  const unavailable = !googleAutomaticVerified && !googleRecentVerified && !bingAutomaticVerified && (assessment?.visibilityResult === 'unavailable' || automatedReview || observation.overallResult === 'manual_review_needed' || observation.overallResult === 'unable_to_verify' || observation.overallResult === 'not_checked')
+  const unavailable = !googleAutomaticVerified && !googleRecentVerified && !bingAutomaticVerified && !appleAutomaticVerified && (assessment?.visibilityResult === 'unavailable' || automatedReview || observation.overallResult === 'manual_review_needed' || observation.overallResult === 'unable_to_verify' || observation.overallResult === 'not_checked')
   const profileDiscovered = Boolean(acquiredProfileUrl && !googleConflict && !assessment?.automaticObservation && !['not_found', 'unavailable'].includes(assessment?.visibilityResult || ''))
   const organicWebsiteResult = Boolean(
     observation.destination === 'Google Search' && observedResultUrl && !acquiredProfileUrl &&
@@ -133,7 +140,7 @@ export function projectSalesVisibility(
     !observation.reviewed && assessment?.visibilityResult !== 'not_found' && assessment?.googleIdentityDecision?.decision !== 'verified',
   )
   const conflicting = observation.overallResult === 'found_conflicting_information'
-  const verified = googleAutomaticVerified || googleRecentVerified || bingAutomaticVerified || directMapsVerified || Boolean(derivedGoogleMapsVerification) || Boolean(assessment?.automaticObservation && !automatedReview && !organicWebsiteResult)
+  const verified = googleAutomaticVerified || googleRecentVerified || bingAutomaticVerified || appleAutomaticVerified || directMapsVerified || Boolean(derivedGoogleMapsVerification) || Boolean(assessment?.automaticObservation && !automatedReview && !organicWebsiteResult)
   const evidenceConflict = Boolean(operatorVerification && verified && (
     operatorVerification.outcome === 'found_correct' ? conflicting : true
   ))
@@ -146,6 +153,7 @@ export function projectSalesVisibility(
   else if (googleAutomaticVerified) state = 'verified_correct'
   else if (googleRecentVerified) state = 'verified_recent'
   else if (bingAutomaticVerified) state = 'verified_correct'
+  else if (appleAutomaticVerified) state = 'verified_correct'
   else if (directMapsVerified) state = 'verified_correct'
   else if (directMapsConflict) state = 'conflicting_evidence'
   else if (derivedGoogleMapsVerification?.freshness === 'fresh') state = 'verified_correct'
@@ -153,6 +161,7 @@ export function projectSalesVisibility(
   else if (staleOperatorVerification) state = 'reconfirmation_needed'
   else if (googleConflict) state = 'conflicting_evidence'
   else if (bingConflict) state = 'conflicting_evidence'
+  else if (appleConflict) state = 'conflicting_evidence'
   else if (profileDiscovered) state = 'profile_discovered'
   else if (organicWebsiteResult) state = 'website_result_discovered'
   else if (unavailable || assessment?.visibilityResult === 'not_found') state = 'manual_verification_needed'
@@ -171,6 +180,8 @@ export function projectSalesVisibility(
     ? `Google Search shows business information that matches the reviewed details${reviewedName ? ` for ${reviewedName}` : ''}.`
     : state === 'verified_correct' && observation.destination === 'Bing Search'
       ? `Bing Search shows business information that matches the reviewed business details${reviewedName ? ` for ${reviewedName}` : ''}.`
+    : state === 'verified_correct' && observation.destination === 'Apple Maps'
+      ? `Apple Maps shows a business listing that matches the reviewed business details${reviewedName ? ` for ${reviewedName}` : ''}.`
     : state === 'verified_recent' ? `A recent Google Search check verified the business identity${reviewedName ? ` for ${reviewedName}` : ''}. The current automated refresh was unavailable.`
     : state === 'verified_correct' ? 'Automated evidence matched the reviewed business identity.'
     : state === 'verified_by_operator' ? 'The operator verified that the business identity shown at this destination matches the reviewed information.'
@@ -202,7 +213,7 @@ export function projectSalesVisibility(
       ? 'Automated check unavailable — verification needed'
       : labels[state],
     explanation,
-    identitySummary: ['verified_correct', 'verified_recent'].includes(state) && ['Google Search', 'Google Maps', 'Bing Search'].includes(observation.destination) ? 'Matches reviewed business details'
+    identitySummary: ['verified_correct', 'verified_recent'].includes(state) && ['Google Search', 'Google Maps', 'Bing Search', 'Apple Maps'].includes(observation.destination) ? 'Matches reviewed business details'
       : ['verified_correct', 'verified_recent', 'verified_by_operator'].includes(state) ? 'Business identity aligns with reviewed details'
       : ['verified_correction_needed', 'operator_correction_needed'].includes(state) ? 'A reviewed identity difference was observed'
         : state === 'operator_not_found' ? 'No matching presence was found during operator review'
@@ -220,6 +231,7 @@ export function projectSalesVisibility(
     operatorReviewRequired,
     ...(state === 'verified_correct' && observation.destination === 'Google Search' ? { automationSummary: 'Verified from acquired Google evidence' } : {}),
     ...(state === 'verified_correct' && observation.destination === 'Bing Search' && bingAutomaticVerified ? { automationSummary: 'Verified from acquired Bing evidence' } : {}),
+    ...(state === 'verified_correct' && observation.destination === 'Apple Maps' && appleAutomaticVerified ? { automationSummary: 'Verified from acquired Apple Maps evidence' } : {}),
     ...(state === 'verified_correct' && observation.destination !== 'Google Search' && !derivedGoogleMapsVerification && directMapsVerified
       ? { automationSummary: `Verified from acquired ${observation.destination} evidence` } : {}),
     ...(derivedGoogleMapsVerification?.freshness === 'fresh' ? {

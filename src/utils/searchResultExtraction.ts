@@ -284,18 +284,19 @@ export function assessSearchCapture(capture: AcquisitionResult, profile: Busines
   const assessment = assessBusinessCandidates(candidates, profile, profileState, queryMode, {
     automaticIdentityPolicy: queryMode !== 'brand' ? undefined
       : destination === 'Google Search' ? 'google_search'
-        : destination === 'Bing Search' ? 'bing_search' : undefined,
+        : destination === 'Bing Search' ? 'bing_search'
+          : destination === 'Apple Maps' ? 'apple_maps' : undefined,
   })
   const resultRegionInspected = Boolean(capture.resultRegionInspected || capture.renderedResultEvidence?.resultRegionInspected || (candidates.length && /<(?:main|article)\b|role=["'](?:main|listitem)["']/i.test(capture.html || '')))
   assessment.resultRegionInspected = resultRegionInspected
   if (!assessment.matches.length && resultRegionInspected && reviewedProfileValue(profile, profileState, 'businessName')) {
-    const neutralBingBrandNoMatch = destination === 'Bing Search' && queryMode === 'brand'
-    assessment.visibilityResult = neutralBingBrandNoMatch ? 'review_required' : 'not_found'
-    assessment.operatorReviewRequired = neutralBingBrandNoMatch
+    const neutralBrandNoMatch = queryMode === 'brand' && ['Bing Search', 'Apple Maps'].includes(destination)
+    assessment.visibilityResult = neutralBrandNoMatch ? 'review_required' : 'not_found'
+    assessment.operatorReviewRequired = neutralBrandNoMatch
     assessment.blocker = 'no_match'
     assessment.confidence = 'low'
-    assessment.ambiguityReasons = [neutralBingBrandNoMatch
-      ? 'A normal Bing result region was inspected, but no candidate sufficiently matched the reviewed business identity. Assisted verification remains available; this is not absence evidence.'
+    assessment.ambiguityReasons = [neutralBrandNoMatch
+      ? `A normal ${destination} result region was inspected, but no candidate sufficiently matched the reviewed business identity. Assisted verification remains available; this is not absence evidence.`
       : 'A normal usable result region was inspected, but no candidate sufficiently matched the reviewed business identity.']
   }
   const interactive = /<button\b|role=["'](?:button|dialog)["']|\/maps\/place\//i.test(capture.html || '') && pageText(capture).length > 20

@@ -33,6 +33,7 @@ const acquisitionFailureReason = (observation: SearchDestinationObservation) => 
   if (blocker === 'network_failure') return 'Provider network request failed.'
   if (blocker === 'capacity_busy') return 'A dedicated acquisition for this destination is already in progress.'
   if (blocker === 'bing_acquisition_not_configured') return 'Dedicated Bing acquisition is not configured.'
+  if (blocker === 'apple_maps_acquisition_not_configured') return 'Dedicated Apple Maps acquisition is not configured.'
   if (blocker === 'runtime_exception') return 'Acquisition server could not complete the request.'
   if (blocker === 'http_5xx' || blocker === 'embedded_5xx') return 'Provider service returned an error.'
   if (blocker === 'http_error') return capture?.statusCode ? `Provider request returned HTTP ${capture.statusCode}.` : 'Provider request returned an error.'
@@ -87,6 +88,13 @@ const automaticIdentityEvidence = (observation: SearchDestinationObservation, sa
   const decision = observation.automation?.assessment?.googleIdentityDecision
     || observation.automation?.assessment?.bingIdentityDecision
     || observation.retainedGoogleVerification?.automation.assessment?.googleIdentityDecision
+  if (!decision && observation.destination === 'Apple Maps' && sales.state === 'verified_correct') {
+    const match = observation.automation?.assessment?.selected || observation.automation?.assessment?.matches[0]
+    return match ? [
+      ...match.matchedFields.map((signal) => ({ label: identityLabel(signal.field), result: signal.field === 'name' ? 'Matches' : `Matches ${signal.observed}` })),
+      ...match.conflictingFields.map((signal) => ({ label: identityLabel(signal.field), result: `Conflicts: observed ${signal.observed}; reviewed ${signal.expected}` })),
+    ] : undefined
+  }
   if (!decision) return undefined
   return [
     ...decision.matchedSignals.map((signal) => ({ label: identityLabel(signal.field), result: signal.field === 'name' ? 'Matches' : `Matches ${signal.observed}` })),
@@ -135,6 +143,7 @@ export function brandPresenceEvidenceSummary(
     ...(identityEvidence?.length ? { identityEvidence } : {}),
     ...(derived ? { decision: derived.freshness === 'recent' ? 'Verified from recent evidence' : 'Verified automatically' }
       : retained ? { decision: 'Verified from recent evidence' }
+      : observation.destination === 'Apple Maps' && sales.state === 'verified_correct' ? { decision: 'Verified automatically' }
       : observation.automation?.assessment?.googleIdentityDecision || observation.automation?.assessment?.bingIdentityDecision ? {
         decision: (observation.automation.assessment.googleIdentityDecision || observation.automation.assessment.bingIdentityDecision)?.decision === 'verified' ? 'Verified automatically' : 'Assisted verification required',
       } : {}),

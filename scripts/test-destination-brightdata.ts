@@ -38,7 +38,10 @@ assert.equal(applePermissionAssessment.operatorReviewRequired, true)
 assert.equal(applePermissionAssessment.resultRegionInspected, false)
 
 const appleNoResults = await acquireBrightDataDestinationBrowser({ destination: 'Apple Maps', query: profile.businessName, cdpUrl: 'fixture-cdp' }, async (_config, requestedUrl) => ({ observed: observed({ visibleText: 'No places found', html: '<main>No places found</main>', resultRegionInspected: true, noResults: true, candidates: [] }), finalUrl: requestedUrl, statusCode: 200, navigationFailed: false }))
-assert.equal(assessSearchCapture(appleNoResults, profile, state, 'Apple Maps', 'brand').visibilityResult, 'not_found', 'only an explicitly inspected normal no-result region can become not_found')
+const appleNoResultsAssessment = assessSearchCapture(appleNoResults, profile, state, 'Apple Maps', 'brand')
+assert.equal(appleNoResultsAssessment.visibilityResult, 'review_required', 'an automated Apple no-match stays neutral')
+assert.equal(appleNoResultsAssessment.operatorReviewRequired, true, 'only an explicit operator Not found may establish Apple absence')
+assert.equal(appleNoResultsAssessment.blocker, 'no_match')
 
 const yelpObserved = observed({ candidates: [{ name: profile.businessName, resultUrl: 'https://www.yelp.com/biz/example-studio-example', phone: profile.phone, address: '1 Main St, Example, MI 48111', category: 'Photographers', excerpt: 'Example Studio 1 Main St Example MI 48111', locator: 'biz[0]' }] })
 const yelp = await acquireBrightDataDestinationBrowser({ destination: 'Yelp', query: profile.businessName, cdpUrl: 'fixture-cdp' }, async (_config, requestedUrl) => ({ observed: yelpObserved, finalUrl: requestedUrl, statusCode: 200, navigationFailed: false }))

@@ -47,6 +47,14 @@ const success = (url: string): AcquisitionResult => ({
     fields: { name: profile.businessName, website: 'https://montessoridownriver.com/', locality: 'Southgate', region: 'MI' }, evidence: [],
   }],
 })
+const appleSuccess = (url: string): AcquisitionResult => ({
+  version: 1, requestedUrl: url, finalUrl: 'https://maps.apple.com/place?place-id=fixture-apple-place', provider: 'apple-maps-native-fetch', checkedDestination: 'Apple Maps',
+  method: 'server_fetch', acquiredAt, outcome: 'success', confidence: 'captured', resultRegionInspected: true, blocker: 'none', notes: [],
+  normalizedSearchCandidates: [{
+    id: 'apple-mary-place', kind: 'structured_entity', sourceType: 'local_place', resultUrl: 'https://maps.apple.com/place?place-id=fixture-apple-place',
+    fields: { name: profile.businessName, phone: profile.phone, publicProfileUrl: 'https://maps.apple.com/place?place-id=fixture-apple-place', placeIdentity: 'fixture-apple-place' }, evidence: [],
+  }],
+})
 const unavailable = (url: string, method: AcquisitionResult['method'] = 'server_fetch'): AcquisitionResult => ({
   version: 1, requestedUrl: url, provider: 'fixture-unavailable', method, acquiredAt, outcome: 'failed', confidence: 'unavailable',
   blocker: 'network_failure', notes: [], error: 'Fixture network unavailable.',
@@ -63,6 +71,8 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
     ? websiteAudit
     : endpoint === '/api/acquire-bing-search'
       ? { capture: success(String(body.url || '')) }
+      : endpoint === '/api/acquire-apple-maps'
+        ? { capture: appleSuccess(String(body.url || '')) }
       : { capture: unavailable(String(body.url || ''), body.method === 'rendered_browser' ? 'rendered_browser' : 'server_fetch') }
   return new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } })
 }) as typeof fetch
@@ -70,19 +80,25 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
 try {
   const productionDependencies = createApplicationVisibilityScanDependencies()
   assert.equal(typeof productionDependencies.acquireBingSearch, 'function', '1: the production App dependency factory requires Bing acquisition')
+  assert.equal(typeof productionDependencies.acquireAppleMaps, 'function', 'the production App dependency factory requires Apple Maps acquisition')
 
   let current = state()
   const run = await runVisibilityScan(current, productionDependencies, (update) => { current = update(current) })
   const bingBrand = run.checks.find((check) => check.destination === 'Bing Search' && check.queryMode === 'brand')!
   const bingApiRequests = requests.filter((request) => request.endpoint === '/api/acquire-bing-search')
+  const appleApiRequests = requests.filter((request) => request.endpoint === '/api/acquire-apple-maps')
   const genericRequests = requests.filter((request) => request.endpoint === '/api/acquire-public-presence')
 
   assert.equal(bingApiRequests.length, 1, '2: the real production factory invokes the dedicated Bing API once')
+  assert.equal(appleApiRequests.length, 1, 'the real production factory invokes the dedicated Apple Maps API once')
   assert.equal(bingApiRequests[0].body.url, bingBrand.url)
   assert.equal(new URL(String(bingApiRequests[0].body.url)).searchParams.get('q'), 'Montessori Center of Downriver Southgate MI', '5: production uses the reviewed identity plus locality')
   assert.equal(genericRequests.some((request) => request.body.url === bingBrand.url), false, '3: the Bing Brand URL never reaches generic acquisition')
   assert.equal(genericRequests.some((request) => request.body.url === bingBrand.url && request.body.method === 'rendered_browser'), false, '4: Bing Brand never invokes rendered-browser acquisition')
   assert.deepEqual(bingBrand.captures.map((capture) => [capture.provider, capture.method]), [['bing-native-fetch', 'server_fetch']])
+  const appleBrand = run.checks.find((check) => check.destination === 'Apple Maps' && check.queryMode === 'brand')!
+  assert.deepEqual(appleBrand.captures.map((capture) => [capture.provider, capture.method]), [['apple-maps-native-fetch', 'server_fetch']])
+  assert.equal(genericRequests.some((request) => request.body.url === appleBrand.url), false, 'Apple Maps Brand never reaches generic acquisition')
   assert.equal(bingBrand.assessment?.bingIdentityDecision?.decision, 'verified', 'the production response reaches the existing Bing matcher')
   assert(requests.some((request) => request.endpoint === '/api/acquire-google-search'), '7: Google Search production wiring remains present')
   assert(requests.some((request) => request.endpoint === '/api/acquire-google-maps'), '7: Google Maps production wiring remains present')
@@ -101,4 +117,4 @@ try {
   globalThis.fetch = originalFetch
 }
 
-console.log('Application scan acquisition wiring PASS: App factory provides the dedicated Bing endpoint, locality query, fail-closed semantics, and unchanged Google wiring.')
+console.log('Application scan acquisition wiring PASS: App factory provides dedicated Bing and Apple Maps endpoints, locality queries, fail-closed semantics, and unchanged Google wiring.')

@@ -172,6 +172,8 @@ export function customerStrengthCandidates(state: AuditState, items: AuditItem[]
       defaultTitle: entry.destination,
       defaultSummary: entry.destination === 'Google Maps'
         ? `We verified that ${profile.businessName || 'the business'} has a Google Maps business profile matching the reviewed business information.`
+        : entry.destination === 'Apple Maps'
+          ? `We verified that ${profile.businessName || 'the business'} has an Apple Maps listing matching the reviewed business information.`
         : `We verified that the business identity shown in ${entry.destination} matches the reviewed information${profile.businessName ? ` for ${profile.businessName}` : ''}.`,
       evidenceKey: evidenceFingerprint(material),
     }

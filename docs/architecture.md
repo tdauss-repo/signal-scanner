@@ -256,7 +256,8 @@ Brand Presence destination dispatch is explicit:
 | Google Search | Dedicated Google Search acquisition |
 | Google Maps | Dedicated Google Maps acquisition |
 | Bing Search | Dedicated bounded native Bing acquisition |
-| Apple Maps, DuckDuckGo, Yelp, Facebook, Instagram | Existing destination/generic path |
+| Apple Maps | Dedicated bounded native Apple Maps acquisition |
+| DuckDuckGo, Yelp, Facebook, Instagram | Existing destination/generic path |
 
 Bing Search Brand Presence must not fall through to generic public acquisition
 or its rendered-browser fallback. Missing dedicated wiring and native Bing
@@ -269,10 +270,13 @@ unchanged.
 Production visibility-scan dependencies are constructed by the single
 `createApplicationVisibilityScanDependencies()` composition used by `App` and
 the production-composition regression test. Its production contract requires
-the dedicated Bing adapter, which posts to `/api/acquire-bing-search`. The
+the dedicated Bing and Apple Maps adapters, which post to
+`/api/acquire-bing-search` and `/api/acquire-apple-maps`. The
 general scan contract remains injectable for fixtures and CLI tools, but a
 missing Bing adapter fails closed as `bing_acquisition_not_configured`; it can
-never select generic public acquisition or rendered-browser acquisition.
+never select generic public acquisition or rendered-browser acquisition. The
+Apple Maps adapter follows the same fail-closed composition rule with
+`apple_maps_acquisition_not_configured`.
 
 Bing Brand Presence uses one bounded native server request to the clean
 `bing.com/search?q=...` verification query. The request does not execute
@@ -317,6 +321,39 @@ queries remain separate and cannot override the Brand identity result.
 Successful Brand Presence identity verification is separate from local-intent
 discovery performance. Candidate details, matcher decisions, provider names,
 blockers, and acquisition metadata remain outside customer JSON.
+
+### Apple Maps Brand Presence verification
+
+Apple Maps Brand Presence uses one bounded public HTTP request to the clean
+`maps.apple.com/?q=...` reviewed-identity query. It runs in a dedicated native
+runtime lane, does not execute scripts, launch a browser, use authenticated or
+private endpoints, retain session state, or bypass an access restriction. The
+public response is useful only when it exposes an explicit structured place or
+share record through JSON-LD, embedded public JSON, or a canonical public
+`/place` URL. The normalizer retains only asserted name, address components,
+phone, website, category, public Apple Maps profile URL, and place identifier;
+it does not infer missing identity data.
+
+The existing reviewed-identity matcher is authoritative. Automatic Apple Maps
+verification requires at least two strong identifier groups from name,
+official domain, phone, or address; one must be name or official domain, and
+no material conflict or second plausible Apple entity may exist. Matching name
+plus phone or name plus address is sufficient. Name-only evidence, a map pin,
+an Apple URL without matching identity, or an application shell is not.
+
+A verified result is presented as “Verified automatically,” removes the
+required assisted-verification control, and may support the Apple Maps
+destination strength through the existing include/hide/refine workflow. This
+proves listing presence and identity consistency only—not ownership, ranking,
+completeness, or optimization quality. Provider, place-identity, matcher, and
+raw acquisition details remain outside customer JSON.
+
+HTTP/network failure, access restriction, and a response without supported
+public place structure remain distinct neutral failures. A usable Apple Maps
+result with no sufficient match is `review_required` with blocker `no_match`;
+it is not absence evidence. Only an explicit operator Not found result may
+establish absence. Assisted verification remains the fallback for incomplete,
+ambiguous, conflicting, restricted, or unavailable public evidence.
 
 ### Configured Google acquisition runtime
 

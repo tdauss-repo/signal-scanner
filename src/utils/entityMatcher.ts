@@ -2,7 +2,7 @@ import type { BusinessProfile, BusinessProfileField, BusinessProfileState } from
 import type { BingIdentityDecision, BusinessResultCandidate, EntityField, EntityMatch, FieldComparison, GoogleIdentityDecision, SearchEntityAssessment, SearchQueryMode } from '../types/entityMatch'
 
 export interface BusinessCandidateAssessmentOptions {
-  automaticIdentityPolicy?: 'google_search' | 'bing_search'
+  automaticIdentityPolicy?: 'google_search' | 'bing_search' | 'apple_maps'
 }
 
 export const normalizedWords = (value: string) => value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ')
@@ -176,8 +176,11 @@ export function assessBusinessCandidates(candidates: BusinessResultCandidate[], 
   const bingIdentityDecision = options.automaticIdentityPolicy === 'bing_search' && selected
     ? bingAutomaticIdentityDecision(selected, matches, sameIdentity, multiple, conflictingEvidence)
     : undefined
-  const explicitIdentityDecision = googleIdentityDecision || bingIdentityDecision
-  const reasons = [...(selected?.ambiguityReasons || ['No identifiable business result was extracted.']), ...(multiple ? ['Multiple plausible business records require disambiguation; fields were not combined across candidates.'] : []), ...(conflictingEvidence && !selected?.conflictingFields.length ? ['Another plausible result representation conflicts with reviewed profile fields.'] : []), ...(googleIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Google evidence did not contain the required independent identity signals for automatic verification.'] : []), ...(bingIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Bing evidence did not contain the required independent identity signals for automatic verification.'] : [])]
+  const appleIdentityDecision = options.automaticIdentityPolicy === 'apple_maps' && selected
+    ? bingAutomaticIdentityDecision(selected, matches, sameIdentity, multiple, conflictingEvidence)
+    : undefined
+  const explicitIdentityDecision = googleIdentityDecision || bingIdentityDecision || appleIdentityDecision
+  const reasons = [...(selected?.ambiguityReasons || ['No identifiable business result was extracted.']), ...(multiple ? ['Multiple plausible business records require disambiguation; fields were not combined across candidates.'] : []), ...(conflictingEvidence && !selected?.conflictingFields.length ? ['Another plausible result representation conflicts with reviewed profile fields.'] : []), ...(googleIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Google evidence did not contain the required independent identity signals for automatic verification.'] : []), ...(bingIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Bing evidence did not contain the required independent identity signals for automatic verification.'] : []), ...(appleIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Apple Maps evidence did not contain the required independent identity signals for automatic verification.'] : [])]
   const automaticObservation = explicitIdentityDecision
     ? explicitIdentityDecision.decision === 'verified'
     : Boolean(selected?.automaticObservation && !multiple && !conflictingEvidence)

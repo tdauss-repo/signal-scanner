@@ -1,4 +1,4 @@
-import { acquireBingSearchRuntime, acquireGoogleMapsRuntime, acquireGoogleSearchRuntime, acquireRuntime, googleSearchRuntimeConfigurationStatus } from './acquisitionRuntime.ts'
+import { acquireAppleMapsRuntime, acquireBingSearchRuntime, acquireGoogleMapsRuntime, acquireGoogleSearchRuntime, acquireRuntime, googleSearchRuntimeConfigurationStatus } from './acquisitionRuntime.ts'
 import express from 'express'
 import type { ErrorRequestHandler } from 'express'
 import { discoverDirectoryCandidates } from './directoryCandidates.ts'
@@ -19,6 +19,7 @@ app.get('/api/health', (_request, response) => {
     service: 'business-scanner-tool-api',
     googleSearchAcquisition: googleSearchRuntimeConfigurationStatus(),
     bingSearchAcquisition: 'configured',
+    appleMapsAcquisition: 'configured',
   })
 })
 
@@ -51,6 +52,14 @@ app.post('/api/acquire-bing-search', async (request, response) => {
     response.json(await acquireBingSearchRuntime(String(request.body.url || '')))
   } catch (error) {
     response.status(400).json({ error: error instanceof Error ? error.message : 'Bing acquisition unavailable.' })
+  }
+})
+
+app.post('/api/acquire-apple-maps', async (request, response) => {
+  try {
+    response.json(await acquireAppleMapsRuntime(String(request.body.url || '')))
+  } catch (error) {
+    response.status(400).json({ error: error instanceof Error ? error.message : 'Apple Maps acquisition unavailable.' })
   }
 })
 

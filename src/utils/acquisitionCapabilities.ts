@@ -37,9 +37,9 @@ export const destinationAcquisitionCapabilities: DestinationAcquisitionCapabilit
     blockerTypes: ['transport failure', 'challenge or access restriction', 'result region not inspected'],
   },
   {
-    destination: 'Apple Maps', preferredProvider: 'Operator public observation', fallbackProvider: 'Open Apple Maps search', provingProvider: 'Bright Data Browser API',
-    productionStatus: 'manual_fallback', shape: 'manual', automaticFound: false, automaticNotFound: false,
-    blockerTypes: ['Bright Data target permission restriction', 'application shell without place evidence', 'provider access expansion required'],
+    destination: 'Apple Maps', preferredProvider: 'Found Local bounded Apple Maps fetch', fallbackProvider: 'Assisted verification',
+    productionStatus: 'production', shape: 'native_fetch_then_assisted', automaticFound: true, automaticNotFound: false,
+    blockerTypes: ['transport or HTTP failure', 'access restriction', 'public application shell without structured place evidence'],
   },
   {
     destination: 'Yelp', preferredProvider: 'Operator public observation', fallbackProvider: 'Open Yelp search', provingProvider: 'Bright Data Browser API',

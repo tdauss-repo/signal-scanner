@@ -33,6 +33,8 @@ export interface ScanDependencies {
   acquireGoogleMaps?(url: string): Promise<AcquisitionResult | undefined>
   /** Dedicated native Bing Brand Search provider. Other Bing query modes retain their existing path. */
   acquireBingSearch?(url: string): Promise<AcquisitionResult | undefined>
+  /** Dedicated bounded public Apple Maps Brand provider. */
+  acquireAppleMaps?(url: string): Promise<AcquisitionResult | undefined>
   cancelled?: () => boolean
   /** Test/runtime override. Application defaults keep each operation and the entire run bounded. */
   operationTimeoutMs?: number
@@ -46,6 +48,7 @@ export interface ApplicationVisibilityScanDependencies extends ScanDependencies 
   acquireGoogle(url: string): Promise<AcquisitionResult | undefined>
   acquireGoogleMaps(url: string): Promise<AcquisitionResult | undefined>
   acquireBingSearch(url: string): Promise<AcquisitionResult | undefined>
+  acquireAppleMaps(url: string): Promise<AcquisitionResult | undefined>
 }
 const defaultOperationTimeoutMs = 30_000
 /** Two bounded SERP attempts plus one optional remote-browser fallback fit below the 180-second scan boundary. */
@@ -78,6 +81,12 @@ const acquireBingSearchFromApi: NonNullable<ScanDependencies['acquireBingSearch'
   if (!response.ok) throw new Error(body.error || 'Bing acquisition request failed.')
   return body.capture
 }
+const acquireAppleMapsFromApi: NonNullable<ScanDependencies['acquireAppleMaps']> = async (url) => {
+  const response = await fetch('/api/acquire-apple-maps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(20_000) })
+  const body = await response.json()
+  if (!response.ok) throw new Error(body.error || 'Apple Maps acquisition request failed.')
+  return body.capture
+}
 
 /** The sole production composition path used by App and production-wiring tests. */
 export function createApplicationVisibilityScanDependencies(
@@ -90,6 +99,7 @@ export function createApplicationVisibilityScanDependencies(
     acquireGoogle: acquireGoogleSearchFromApi,
     acquireGoogleMaps: acquireGoogleMapsFromApi,
     acquireBingSearch: acquireBingSearchFromApi,
+    acquireAppleMaps: acquireAppleMapsFromApi,
     ...options,
   }
 }
@@ -97,7 +107,7 @@ export function createApplicationVisibilityScanDependencies(
 /** Compatibility export for existing CLI/proving callers; App constructs a fresh dependency object. */
 export const applicationScanDependencies = createApplicationVisibilityScanDependencies()
 
-export type DestinationAcquisitionRoute = 'google_search' | 'google_maps' | 'bing_native_search' | 'generic'
+export type DestinationAcquisitionRoute = 'google_search' | 'google_maps' | 'bing_native_search' | 'apple_maps_native' | 'generic'
 
 /** Brand destination dispatch is explicit so dedicated routes cannot silently enter the generic ladder. */
 export function destinationAcquisitionRoute(
@@ -107,6 +117,7 @@ export function destinationAcquisitionRoute(
   if (destination === 'Google Search') return 'google_search'
   if (destination === 'Google Maps') return 'google_maps'
   if (destination === 'Bing Search' && queryMode === 'brand') return 'bing_native_search'
+  if (destination === 'Apple Maps' && queryMode === 'brand') return 'apple_maps_native'
   return 'generic'
 }
 
@@ -261,9 +272,12 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireGoogle
     const googleMapsProvider = dependencies.acquireGoogleMaps === applicationScanDependencies.acquireGoogleMaps
       && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireGoogleMaps
+    const appleMapsProvider = dependencies.acquireAppleMaps === applicationScanDependencies.acquireAppleMaps
+      && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireAppleMaps
     const dedicatedProvider = acquisitionRoute === 'google_search' ? googleProvider
       : acquisitionRoute === 'google_maps' ? googleMapsProvider
-        : acquisitionRoute === 'bing_native_search' ? dependencies.acquireBingSearch : undefined
+        : acquisitionRoute === 'bing_native_search' ? dependencies.acquireBingSearch
+          : acquisitionRoute === 'apple_maps_native' ? appleMapsProvider : undefined
     if (dedicatedProvider) {
       try {
         const timeoutMs = item.destination === 'Google Search' && item.queryMode === 'brand' ? googleBrandOperationTimeoutMs : operationTimeoutMs
@@ -293,10 +307,11 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       } catch (error) {
         const errorText = `${error instanceof Error ? error.name : ''} ${error instanceof Error ? error.message : String(error)}`
         const blocker = error instanceof VisibilityScanTimeoutError ? 'provider_timeout'
-          : /Bing native acquisition busy/i.test(errorText) ? 'capacity_busy'
+          : /(?:Bing native|Apple Maps native) acquisition busy/i.test(errorText) ? 'capacity_busy'
             : /Failed to fetch|network/i.test(errorText) ? 'network_failure' : 'acquisition_failure'
         const provider = item.destination === 'Google Maps' ? 'brightdata-google-maps-request'
-          : item.destination === 'Google Search' ? 'brightdata-google-request' : 'bing-native-request'
+          : item.destination === 'Google Search' ? 'brightdata-google-request'
+            : item.destination === 'Apple Maps' ? 'apple-maps-native-request' : 'bing-native-request'
         captures.push({ version: 1, requestedUrl: item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch', provider, outcome: 'failed', confidence: 'unavailable', notes: [`${item.destination || 'Destination'} provider request failed. This is not evidence that the business is absent.`], blocker, error: String(error) })
         dedicatedProviderHandled = true
       }
@@ -308,6 +323,16 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
         resultRegionInspected: false, blocker: 'bing_acquisition_not_configured',
         notes: ['The dedicated Bing Brand acquisition route was unavailable. This is not evidence that the business is absent.'],
         error: 'Dedicated Bing acquisition is not configured.',
+      })
+      dedicatedProviderHandled = true
+    }
+    if (acquisitionRoute === 'apple_maps_native' && !dedicatedProvider) {
+      captures.push({
+        version: 1, requestedUrl: item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch',
+        provider: 'apple-maps-native-request', checkedDestination: 'Apple Maps', outcome: 'unavailable', confidence: 'unavailable',
+        resultRegionInspected: false, blocker: 'apple_maps_acquisition_not_configured',
+        notes: ['The dedicated Apple Maps Brand acquisition route was unavailable. This is not evidence that the business is absent.'],
+        error: 'Dedicated Apple Maps acquisition is not configured.',
       })
       dedicatedProviderHandled = true
     }
@@ -339,7 +364,8 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       const assessment = candidates.length ? assessBusinessCandidates(candidates, profile, initial.businessProfile, item.queryMode, {
         automaticIdentityPolicy: item.queryMode !== 'brand' ? undefined
           : item.destination === 'Google Search' ? 'google_search'
-            : item.destination === 'Bing Search' ? 'bing_search' : undefined,
+            : item.destination === 'Bing Search' ? 'bing_search'
+              : item.destination === 'Apple Maps' ? 'apple_maps' : undefined,
       })
         : assessments.find((value) => value.visibilityResult === 'not_found') || assessments.at(-1) || { matches: [], confidence: 'unavailable' as const, automaticObservation: false, visibilityResult: 'unavailable' as const, operatorReviewRequired: true, resultRegionInspected: false, ambiguityReasons: [item.error || 'No usable public evidence was captured.'], blocker: 'runtime_unavailable' as const, tier3Candidate: false }
       assessment.resultRegionInspected ||= assessments.some((value) => value.resultRegionInspected)

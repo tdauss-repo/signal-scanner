@@ -11,6 +11,7 @@
     "diagnose:website": "node scripts/diagnose-website-fetch.mjs",
     "diagnose:google-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-google-acquisition.ts",
     "diagnose:bing-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-bing-acquisition.ts",
+    "diagnose:apple-maps-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-apple-maps-acquisition.ts",
     "test:proving-001": "node --import tsx scripts/test-website-audit.ts && node --import tsx scripts/test-website-evidence-contract.ts",
     "test:proving-002": "node --import tsx scripts/test-browser-website-observation.ts",
     "test:profile-separation": "node --import tsx scripts/test-profile-separation.ts",
@@ -57,7 +58,8 @@
     "test:bing-search-auto-verification": "node --import tsx scripts/test-bing-search-auto-verification.tsx",
     "test:bing-acquisition-routing": "node --import tsx scripts/test-bing-acquisition-routing.ts",
     "test:app-scan-acquisition-wiring": "node --import tsx scripts/test-app-scan-acquisition-wiring.ts",
-    "test:bing-local-business-acquisition": "node --import tsx scripts/test-bing-local-business-acquisition.ts"
+    "test:bing-local-business-acquisition": "node --import tsx scripts/test-bing-local-business-acquisition.ts",
+    "test:apple-maps-auto-verification": "node --import tsx scripts/test-apple-maps-auto-verification.tsx"
   },
   "dependencies": {
     "express": "^5.2.1",
