@@ -60,7 +60,7 @@ globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) =>
   })
 }) as typeof fetch
 try {
-  await applicationScanDependencies.acquireBing?.('https://www.bing.com/search?q=fixture')
+  await applicationScanDependencies.acquireBingSearch('https://www.bing.com/search?q=fixture')
 } finally { globalThis.fetch = originalFetch }
 assert.equal(endpoint, '/api/acquire-bing-search', 'the application adapter calls the dedicated backend endpoint')
 assert.equal(endpointMethod, 'POST')
@@ -83,7 +83,7 @@ const run = await runVisibilityScan(current, {
   website: async () => websiteAudit,
   acquireGoogle: async (url) => { googleCalls.push(url); return failed(url) },
   acquireGoogleMaps: async (url) => { mapsCalls.push(url); return failed(url) },
-  acquireBing: async (url) => { dedicatedUrls.push(url); return bingSuccess(url) },
+  acquireBingSearch: async (url) => { dedicatedUrls.push(url); return bingSuccess(url) },
   acquire: async (url, method) => { genericCalls.push({ url, method }); throw new Error('Public acquisition busy. Retry this check later.') },
 }, (update) => { current = update(current) })
 
@@ -105,7 +105,7 @@ let unavailableState = state()
 const unavailableGeneric: Array<{ url: string; method: string }> = []
 const unavailableRun = await runVisibilityScan(unavailableState, {
   automationVersion: 2, website: async () => websiteAudit,
-  acquireBing: async (url) => ({ ...failed(url), provider: 'bing-native-fetch', checkedDestination: 'Bing Search' }),
+  acquireBingSearch: async (url) => ({ ...failed(url), provider: 'bing-native-fetch', checkedDestination: 'Bing Search' }),
   acquire: async (url, method) => { unavailableGeneric.push({ url, method }); return failed(url, method) },
 }, (update) => { unavailableState = update(unavailableState) })
 const unavailableBrand = unavailableRun.checks.find((check) => check.destination === 'Bing Search' && check.queryMode === 'brand')!
@@ -124,7 +124,8 @@ const missingProviderRun = await runVisibilityScan(missingProviderState, {
 const missingProviderBrand = missingProviderRun.checks.find((check) => check.destination === 'Bing Search' && check.queryMode === 'brand')!
 assert.equal(missingProviderBrand.captures.length, 1)
 assert.equal(missingProviderBrand.captures[0].provider, 'bing-native-request')
-assert.equal(missingProviderBrand.captures[0].blocker, 'runtime_unavailable')
+assert.equal(missingProviderBrand.captures[0].blocker, 'bing_acquisition_not_configured')
+assert.equal(missingProviderBrand.captures[0].error, 'Dedicated Bing acquisition is not configured.')
 assert.equal(missingProviderGeneric.some((call) => call.url === missingProviderBrand.url), false, 'missing dedicated wiring fails closed instead of entering generic acquisition')
 
 console.log('Bing acquisition routing PASS: explicit endpoint dispatch, independent native lane, locality query, no generic/browser fallback, matcher handoff, neutral failure, and unchanged destination routing.')

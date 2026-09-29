@@ -266,6 +266,14 @@ generic/browser lane, so a late or active unrelated request does not report
 Bing as busy while the existing Google/generic concurrency protection remains
 unchanged.
 
+Production visibility-scan dependencies are constructed by the single
+`createApplicationVisibilityScanDependencies()` composition used by `App` and
+the production-composition regression test. Its production contract requires
+the dedicated Bing adapter, which posts to `/api/acquire-bing-search`. The
+general scan contract remains injectable for fixtures and CLI tools, but a
+missing Bing adapter fails closed as `bing_acquisition_not_configured`; it can
+never select generic public acquisition or rendered-browser acquisition.
+
 Bing Brand Presence uses one bounded native server request to the clean
 `bing.com/search?q=...` verification query. The request does not execute
 scripts, follow an unreviewed redirect, launch a browser, maintain a profile,

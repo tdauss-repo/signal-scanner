@@ -32,13 +32,20 @@ export interface ScanDependencies {
   /** Dedicated Google Maps provider with the same unconfigured fallback contract. */
   acquireGoogleMaps?(url: string): Promise<AcquisitionResult | undefined>
   /** Dedicated native Bing Brand Search provider. Other Bing query modes retain their existing path. */
-  acquireBing?(url: string): Promise<AcquisitionResult | undefined>
+  acquireBingSearch?(url: string): Promise<AcquisitionResult | undefined>
   cancelled?: () => boolean
   /** Test/runtime override. Application defaults keep each operation and the entire run bounded. */
   operationTimeoutMs?: number
   /** Brand Google Search override; explicit general test/runtime overrides still win when omitted. */
   googleBrandOperationTimeoutMs?: number
   overallTimeoutMs?: number
+}
+
+export interface ApplicationVisibilityScanDependencies extends ScanDependencies {
+  automationVersion: 2
+  acquireGoogle(url: string): Promise<AcquisitionResult | undefined>
+  acquireGoogleMaps(url: string): Promise<AcquisitionResult | undefined>
+  acquireBingSearch(url: string): Promise<AcquisitionResult | undefined>
 }
 const defaultOperationTimeoutMs = 30_000
 /** Two bounded SERP attempts plus one optional remote-browser fallback fit below the 180-second scan boundary. */
@@ -47,34 +54,48 @@ const defaultOverallTimeoutMs = 180_000
 class VisibilityScanTimeoutError extends Error {
   constructor(message: string) { super(message); this.name = 'VisibilityScanTimeoutError' }
 }
-export const applicationScanDependencies: ScanDependencies = {
-  automationVersion: 2,
-  website: (profile) => runWebsiteAutoAudit(profile, { machineReadability: true }),
-  async acquire(url, method) {
-    const response = await fetch('/api/acquire-public-presence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, method }), signal: AbortSignal.timeout(45_000) })
-    const body = await response.json()
-    if (!response.ok) throw new Error(body.error || 'Acquisition request failed.')
-    return body.capture
-  },
-  async acquireGoogle(url) {
-    const response = await fetch('/api/acquire-google-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(165_000) })
-    const body = await response.json()
-    if (!response.ok) throw new Error(body.error || 'Google acquisition request failed.')
-    return body.capture
-  },
-  async acquireGoogleMaps(url) {
-    const response = await fetch('/api/acquire-google-maps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(90_000) })
-    const body = await response.json()
-    if (!response.ok) throw new Error(body.error || 'Google Maps acquisition request failed.')
-    return body.capture
-  },
-  async acquireBing(url) {
-    const response = await fetch('/api/acquire-bing-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(20_000) })
-    const body = await response.json()
-    if (!response.ok) throw new Error(body.error || 'Bing acquisition request failed.')
-    return body.capture
-  },
+const acquirePublicPresenceFromApi: ScanDependencies['acquire'] = async (url, method) => {
+  const response = await fetch('/api/acquire-public-presence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, method }), signal: AbortSignal.timeout(45_000) })
+  const body = await response.json()
+  if (!response.ok) throw new Error(body.error || 'Acquisition request failed.')
+  return body.capture
 }
+const acquireGoogleSearchFromApi: NonNullable<ScanDependencies['acquireGoogle']> = async (url) => {
+  const response = await fetch('/api/acquire-google-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(165_000) })
+  const body = await response.json()
+  if (!response.ok) throw new Error(body.error || 'Google acquisition request failed.')
+  return body.capture
+}
+const acquireGoogleMapsFromApi: NonNullable<ScanDependencies['acquireGoogleMaps']> = async (url) => {
+  const response = await fetch('/api/acquire-google-maps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(90_000) })
+  const body = await response.json()
+  if (!response.ok) throw new Error(body.error || 'Google Maps acquisition request failed.')
+  return body.capture
+}
+const acquireBingSearchFromApi: NonNullable<ScanDependencies['acquireBingSearch']> = async (url) => {
+  const response = await fetch('/api/acquire-bing-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(20_000) })
+  const body = await response.json()
+  if (!response.ok) throw new Error(body.error || 'Bing acquisition request failed.')
+  return body.capture
+}
+
+/** The sole production composition path used by App and production-wiring tests. */
+export function createApplicationVisibilityScanDependencies(
+  options: Pick<ScanDependencies, 'cancelled'> = {},
+): ApplicationVisibilityScanDependencies {
+  return {
+    automationVersion: 2,
+    website: (profile) => runWebsiteAutoAudit(profile, { machineReadability: true }),
+    acquire: acquirePublicPresenceFromApi,
+    acquireGoogle: acquireGoogleSearchFromApi,
+    acquireGoogleMaps: acquireGoogleMapsFromApi,
+    acquireBingSearch: acquireBingSearchFromApi,
+    ...options,
+  }
+}
+
+/** Compatibility export for existing CLI/proving callers; App constructs a fresh dependency object. */
+export const applicationScanDependencies = createApplicationVisibilityScanDependencies()
 
 export type DestinationAcquisitionRoute = 'google_search' | 'google_maps' | 'bing_native_search' | 'generic'
 
@@ -242,7 +263,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireGoogleMaps
     const dedicatedProvider = acquisitionRoute === 'google_search' ? googleProvider
       : acquisitionRoute === 'google_maps' ? googleMapsProvider
-        : acquisitionRoute === 'bing_native_search' ? dependencies.acquireBing : undefined
+        : acquisitionRoute === 'bing_native_search' ? dependencies.acquireBingSearch : undefined
     if (dedicatedProvider) {
       try {
         const timeoutMs = item.destination === 'Google Search' && item.queryMode === 'brand' ? googleBrandOperationTimeoutMs : operationTimeoutMs
@@ -284,9 +305,9 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       captures.push({
         version: 1, requestedUrl: item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch',
         provider: 'bing-native-request', checkedDestination: 'Bing Search', outcome: 'unavailable', confidence: 'unavailable',
-        resultRegionInspected: false, blocker: 'runtime_unavailable',
+        resultRegionInspected: false, blocker: 'bing_acquisition_not_configured',
         notes: ['The dedicated Bing Brand acquisition route was unavailable. This is not evidence that the business is absent.'],
-        error: 'Dedicated Bing Brand acquisition dependency unavailable.',
+        error: 'Dedicated Bing acquisition is not configured.',
       })
       dedicatedProviderHandled = true
     }

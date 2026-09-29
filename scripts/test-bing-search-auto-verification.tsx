@@ -179,7 +179,7 @@ let genericBingCalls = 0
 await runVisibilityScan(scanned, {
   automationVersion: 2,
   website: async () => websiteAudit,
-  acquireBing: async (url) => { bingBrandCalls += 1; return { ...capture, requestedUrl: url, finalUrl: url } },
+  acquireBingSearch: async (url) => { bingBrandCalls += 1; return { ...capture, requestedUrl: url, finalUrl: url } },
   acquire: async (url, method) => {
     if (url.includes('bing.com/search')) genericBingCalls += 1
     return { version: 1, requestedUrl: url, acquiredAt: observedAt, provider: 'fixture-unavailable', method, outcome: 'failed', confidence: 'unavailable', blocker: 'network_failure', notes: [], error: 'Fixture unavailable.' }

@@ -14,7 +14,12 @@ const port = Number(process.env.PORT ?? 5174)
 app.use(express.json({ limit: '32kb' }))
 
 app.get('/api/health', (_request, response) => {
-  response.json({ ok: true, service: 'business-scanner-tool-api', googleSearchAcquisition: googleSearchRuntimeConfigurationStatus() })
+  response.json({
+    ok: true,
+    service: 'business-scanner-tool-api',
+    googleSearchAcquisition: googleSearchRuntimeConfigurationStatus(),
+    bingSearchAcquisition: 'configured',
+  })
 })
 
 app.post('/api/acquire-public-presence', async (request, response) => {

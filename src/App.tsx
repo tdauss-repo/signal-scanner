@@ -1301,12 +1301,11 @@ function App() {
     setWebsiteAuditLoading(true)
     setWebsiteAuditError('')
     try {
-      const { applicationScanDependencies, runVisibilityScan } = await import('./utils/visibilityScan')
+      const { createApplicationVisibilityScanDependencies, runVisibilityScan } = await import('./utils/visibilityScan')
       if (requestGeneration !== websiteRequestGeneration.current) return
-      await runVisibilityScan(auditState, {
-        ...applicationScanDependencies,
+      await runVisibilityScan(auditState, createApplicationVisibilityScanDependencies({
         cancelled: () => requestGeneration !== websiteRequestGeneration.current,
-      }, (update) => setAuditState((current) => requestGeneration === websiteRequestGeneration.current ? update(current) : current))
+      }), (update) => setAuditState((current) => requestGeneration === websiteRequestGeneration.current ? update(current) : current))
     } catch (error) {
       if (requestGeneration === websiteRequestGeneration.current) setWebsiteAuditError(String(error))
     } finally {

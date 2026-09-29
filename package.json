@@ -55,7 +55,8 @@
     "test:google-maps-derived-verification": "node --import tsx scripts/test-google-maps-derived-verification.tsx",
     "test:address-identity-normalization": "node --import tsx scripts/test-address-identity-normalization.ts",
     "test:bing-search-auto-verification": "node --import tsx scripts/test-bing-search-auto-verification.tsx",
-    "test:bing-acquisition-routing": "node --import tsx scripts/test-bing-acquisition-routing.ts"
+    "test:bing-acquisition-routing": "node --import tsx scripts/test-bing-acquisition-routing.ts",
+    "test:app-scan-acquisition-wiring": "node --import tsx scripts/test-app-scan-acquisition-wiring.ts"
   },
   "dependencies": {
     "express": "^5.2.1",
