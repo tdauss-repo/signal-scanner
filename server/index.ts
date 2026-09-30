@@ -1,4 +1,4 @@
-import { acquireAppleMapsRuntime, acquireBingSearchRuntime, acquireDuckDuckGoSearchRuntime, acquireGoogleMapsRuntime, acquireGoogleSearchRuntime, acquireRuntime, acquireYelpSearchRuntime, googleSearchRuntimeConfigurationStatus } from './acquisitionRuntime.ts'
+import { acquireAppleMapsRuntime, acquireBingSearchRuntime, acquireDuckDuckGoSearchRuntime, acquireFacebookPageRuntime, acquireGoogleMapsRuntime, acquireGoogleSearchRuntime, acquireRuntime, acquireYelpSearchRuntime, googleSearchRuntimeConfigurationStatus } from './acquisitionRuntime.ts'
 import express from 'express'
 import type { ErrorRequestHandler } from 'express'
 import { discoverDirectoryCandidates } from './directoryCandidates.ts'
@@ -22,6 +22,7 @@ app.get('/api/health', (_request, response) => {
     appleMapsAcquisition: 'configured',
     duckDuckGoSearchAcquisition: 'configured',
     yelpSearchAcquisition: 'configured',
+    facebookPageAcquisition: 'configured',
   })
 })
 
@@ -78,6 +79,14 @@ app.post('/api/acquire-yelp-search', async (request, response) => {
     response.json(await acquireYelpSearchRuntime(String(request.body.url || '')))
   } catch (error) {
     response.status(400).json({ error: error instanceof Error ? error.message : 'Yelp acquisition unavailable.' })
+  }
+})
+
+app.post('/api/acquire-facebook-page', async (request, response) => {
+  try {
+    response.json(await acquireFacebookPageRuntime(String(request.body.url || '')))
+  } catch (error) {
+    response.status(400).json({ error: error instanceof Error ? error.message : 'Facebook acquisition unavailable.' })
   }
 })
 

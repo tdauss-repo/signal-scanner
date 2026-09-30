@@ -48,6 +48,8 @@ export type BingIdentityDecision = GoogleIdentityDecision
 export type DuckDuckGoIdentityDecision = GoogleIdentityDecision
 /** Explainable Yelp Brand decision using the shared strong-identifier rule. */
 export type YelpIdentityDecision = GoogleIdentityDecision
+/** Explainable Facebook Brand decision using the shared strong-identifier rule. */
+export type FacebookIdentityDecision = GoogleIdentityDecision
 export interface SearchEntityAssessment {
   matches: EntityMatch[]
   selected?: EntityMatch
@@ -67,4 +69,6 @@ export interface SearchEntityAssessment {
   duckDuckGoIdentityDecision?: DuckDuckGoIdentityDecision
   /** Explainable Yelp Brand identity decision. Raw acquired candidates remain unchanged. */
   yelpIdentityDecision?: YelpIdentityDecision
+  /** Explainable Facebook Brand identity decision. Raw acquired candidates remain unchanged. */
+  facebookIdentityDecision?: FacebookIdentityDecision
 }

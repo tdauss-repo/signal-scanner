@@ -117,6 +117,7 @@ const materialSearchEvidence = (
       bingIdentityDecision: assessment.bingIdentityDecision,
       duckDuckGoIdentityDecision: assessment.duckDuckGoIdentityDecision,
       yelpIdentityDecision: assessment.yelpIdentityDecision,
+      facebookIdentityDecision: assessment.facebookIdentityDecision,
       selected: assessment.selected ? materialEntityMatch(assessment.selected) : undefined,
       matches: assessment.matches.map(materialEntityMatch),
     } : undefined,
@@ -181,6 +182,8 @@ export function customerStrengthCandidates(state: AuditState, items: AuditItem[]
           ? `We verified that ${profile.businessName || 'the business'} has an Apple Maps listing matching the reviewed business information.`
         : entry.destination === 'Yelp'
           ? `We verified that ${profile.businessName || 'the business'} has a Yelp listing matching the reviewed business information.`
+        : entry.destination === 'Facebook'
+          ? `We verified that ${profile.businessName || 'the business'} has a Facebook business presence matching the reviewed business information.`
         : `We verified that the business identity shown in ${entry.destination} matches the reviewed information${profile.businessName ? ` for ${profile.businessName}` : ''}.`,
       evidenceKey: evidenceFingerprint(material),
     }

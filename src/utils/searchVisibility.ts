@@ -14,6 +14,7 @@ import type {
   SearchVisibilityTestState,
 } from '../types/audit'
 import { bingSearch, duckDuckGoSearch, googleMapsSearch, googleSearch, yelpSearch } from './links'
+import { canonicalMetaProfileUrl } from './metaPublicEvidence'
 import { normalizeEvidenceTimestamp } from './evidenceTime'
 
 const splitList = (value: string) => value.split(/[,;\n]/).map((item) => item.trim()).filter(Boolean)
@@ -144,7 +145,7 @@ export const canonicalProfileUrlForDestination = (destination: SearchDestination
   if (destination === 'Bing Search') return host === 'bing.com' && /\/maps(?:[/?#]|$)/i.test(url.pathname) ? safe : undefined
   if (destination === 'Apple Maps') return host === 'maps.apple.com' && /\/place(?:[/?#]|$)/i.test(url.pathname) ? safe : undefined
   if (destination === 'Yelp') return host === 'yelp.com' && /\/biz(?:[/?#]|$)/i.test(url.pathname) ? safe : undefined
-  if (destination === 'Facebook') return (host === 'facebook.com' || host.endsWith('.facebook.com')) && !/^\/(?:search|login|help|share)(?:[/?#]|$)/i.test(url.pathname) && url.pathname !== '/' ? safe : undefined
+  if (destination === 'Facebook') return canonicalMetaProfileUrl('Facebook', safe)
   return (host === 'instagram.com' || host.endsWith('.instagram.com')) && !/^\/(?:accounts|explore|reels?)(?:[/?#]|$)/i.test(url.pathname) && url.pathname !== '/' ? safe : undefined
 }
 

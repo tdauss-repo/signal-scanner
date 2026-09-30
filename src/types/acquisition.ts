@@ -21,6 +21,8 @@ export interface RenderedResultEvidence {
 export interface AcquisitionResult {
   version: 1
   requestedUrl: string
+  /** False when a bounded discovery stage intentionally made no destination request. */
+  requestAttempted?: boolean
   /** Approved public redirect target, retained separately from the requested and final URLs. */
   redirectUrl?: string
   finalUrl?: string
@@ -59,6 +61,13 @@ export interface AcquisitionResult {
     statusCode?: number
     outcome: 'not_used' | 'success' | 'restricted' | 'unavailable'
     blocker?: string
+  }
+  /** Explicit public social-profile seed retained separately from page verification. */
+  profileDiscovery?: {
+    source: 'first_party_website' | 'search_evidence'
+    profileUrl: string
+    sourceUrl?: string
+    observedName?: string
   }
   notes: string[]
   confidence: 'captured' | 'operator_supplied' | 'unavailable'

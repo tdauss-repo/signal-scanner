@@ -5,6 +5,8 @@ import { acquireBingSearch } from './bingSearch.ts'
 import { acquireAppleMaps } from './appleMaps.ts'
 import { acquireDuckDuckGoSearch } from './duckDuckGoSearch.ts'
 import { acquireYelpSearch } from './yelpSearch.ts'
+import { acquireFacebookPage } from './facebookPage.ts'
+import { canonicalMetaProfileUrl } from '../src/utils/metaPublicEvidence.ts'
 import type { AcquisitionProvider, AcquisitionResult } from '../src/types/acquisition.ts'
 
 const destinationHosts = ['www.google.com', 'www.bing.com', 'maps.apple.com', 'duckduckgo.com', 'www.yelp.com', 'www.facebook.com', 'www.instagram.com']
@@ -30,12 +32,12 @@ export async function runtimeRenderedProvider(): Promise<AcquisitionProvider | u
   }
 }
 
-type AcquisitionLane = 'shared' | 'bing_native' | 'apple_maps_native' | 'duckduckgo_native' | 'yelp_native'
+type AcquisitionLane = 'shared' | 'bing_native' | 'apple_maps_native' | 'duckduckgo_native' | 'yelp_native' | 'facebook_native'
 const activeLanes = new Set<AcquisitionLane>()
 
 /** Dedicated native Bing work does not contend with unrelated Google or generic/browser work. */
 export async function runInAcquisitionLane<T>(lane: AcquisitionLane, work: () => Promise<T>): Promise<T> {
-  if (activeLanes.has(lane)) throw new Error(`${lane === 'bing_native' ? 'Bing native' : lane === 'apple_maps_native' ? 'Apple Maps native' : lane === 'duckduckgo_native' ? 'DuckDuckGo native' : lane === 'yelp_native' ? 'Yelp native' : 'Public'} acquisition busy. Retry this check later.`)
+  if (activeLanes.has(lane)) throw new Error(`${lane === 'bing_native' ? 'Bing native' : lane === 'apple_maps_native' ? 'Apple Maps native' : lane === 'duckduckgo_native' ? 'DuckDuckGo native' : lane === 'yelp_native' ? 'Yelp native' : lane === 'facebook_native' ? 'Facebook native' : 'Public'} acquisition busy. Retry this check later.`)
   activeLanes.add(lane)
   try { return await work() } finally { activeLanes.delete(lane) }
 }
@@ -191,6 +193,13 @@ export async function acquireYelpSearchRuntime(value: string) {
     throw new Error('Yelp acquisition requires a public search URL with business and location context.')
   }
   return runInAcquisitionLane('yelp_native', async () => ({ capture: await acquireYelpSearch(url.href) }))
+}
+
+export async function acquireFacebookPageRuntime(value: string) {
+  const url = runtimeAllowedUrl(value)
+  const canonical = canonicalMetaProfileUrl('Facebook', url.href)
+  if (!canonical) throw new Error('Facebook acquisition requires an explicit public Facebook profile URL.')
+  return runInAcquisitionLane('facebook_native', async () => ({ capture: await acquireFacebookPage(canonical) }))
 }
 
 export async function acquireRuntime(value: string, method: string) {

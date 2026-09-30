@@ -141,6 +141,16 @@ export function projectSalesVisibility(
     observation.destination === 'Yelp' && assessment?.yelpIdentityDecision?.decision === 'review_required' &&
     (assessment.yelpIdentityDecision.conflictingSignals.length || ['identifier_conflict', 'multiple_entities'].includes(assessment.blocker)),
   )
+  const facebookAutomaticVerified = Boolean(
+    observation.destination === 'Facebook' && assessment?.facebookIdentityDecision?.decision === 'verified' &&
+    assessment.automaticObservation && !assessment.operatorReviewRequired &&
+    assessment.visibilityResult === 'found' && assessment.blocker === 'none',
+  )
+  const facebookConflict = Boolean(
+    observation.destination === 'Facebook' && assessment?.facebookIdentityDecision?.decision === 'review_required' &&
+    (assessment.facebookIdentityDecision.conflictingSignals.length || ['identifier_conflict', 'multiple_entities'].includes(assessment.blocker)),
+  )
+  const facebookProfileDiscovery = observation.automation?.captures.find((capture) => capture.profileDiscovery)?.profileDiscovery
   const appleAutomaticVerified = Boolean(
     observation.destination === 'Apple Maps' && assessment?.automaticObservation &&
     assessment.visibilityResult === 'found' && !assessment.operatorReviewRequired && assessment.blocker === 'none',
@@ -153,17 +163,19 @@ export function projectSalesVisibility(
       capture.finalRequestState === 'shell' && capture.redirectAccepted && (() => {
         try { return new URL(capture.redirectUrl || '').pathname === '/search' } catch { return false }
       })()))
-  const automatedReview = assessment?.operatorReviewRequired === true && !googleAutomaticVerified && !googleRecentVerified && !bingAutomaticVerified && !bingRecentVerified && !appleAutomaticVerified && !duckDuckGoAutomaticVerified && !yelpAutomaticVerified
+  const automatedReview = assessment?.operatorReviewRequired === true && !googleAutomaticVerified && !googleRecentVerified && !bingAutomaticVerified && !bingRecentVerified && !appleAutomaticVerified && !duckDuckGoAutomaticVerified && !yelpAutomaticVerified && !facebookAutomaticVerified
   const googleConflict = googleAutomaticState === 'conflict'
-  const unavailable = !googleAutomaticVerified && !googleRecentVerified && !bingAutomaticVerified && !bingRecentVerified && !appleAutomaticVerified && !duckDuckGoAutomaticVerified && !yelpAutomaticVerified && (assessment?.visibilityResult === 'unavailable' || automatedReview || observation.overallResult === 'manual_review_needed' || observation.overallResult === 'unable_to_verify' || observation.overallResult === 'not_checked')
-  const profileDiscovered = Boolean(acquiredProfileUrl && !googleConflict && !assessment?.automaticObservation && !['not_found', 'unavailable'].includes(assessment?.visibilityResult || ''))
+  const unavailable = !googleAutomaticVerified && !googleRecentVerified && !bingAutomaticVerified && !bingRecentVerified && !appleAutomaticVerified && !duckDuckGoAutomaticVerified && !yelpAutomaticVerified && !facebookAutomaticVerified && (assessment?.visibilityResult === 'unavailable' || automatedReview || observation.overallResult === 'manual_review_needed' || observation.overallResult === 'unable_to_verify' || observation.overallResult === 'not_checked')
+  const profileDiscovered = Boolean(acquiredProfileUrl && !googleConflict && !assessment?.automaticObservation && (
+    facebookProfileDiscovery || !['not_found', 'unavailable'].includes(assessment?.visibilityResult || '')
+  ))
   const organicWebsiteResult = Boolean(
     observation.destination === 'Google Search' && observedResultUrl && !acquiredProfileUrl &&
     selectedCandidate?.kind === 'result_link' && selectedCandidate.fields.website &&
     !observation.reviewed && assessment?.visibilityResult !== 'not_found' && assessment?.googleIdentityDecision?.decision !== 'verified',
   )
   const conflicting = observation.overallResult === 'found_conflicting_information'
-  const verified = googleAutomaticVerified || googleRecentVerified || bingAutomaticVerified || bingRecentVerified || appleAutomaticVerified || duckDuckGoAutomaticVerified || yelpAutomaticVerified || directMapsVerified || Boolean(derivedGoogleMapsVerification) || Boolean(assessment?.automaticObservation && !automatedReview && !organicWebsiteResult)
+  const verified = googleAutomaticVerified || googleRecentVerified || bingAutomaticVerified || bingRecentVerified || appleAutomaticVerified || duckDuckGoAutomaticVerified || yelpAutomaticVerified || facebookAutomaticVerified || directMapsVerified || Boolean(derivedGoogleMapsVerification) || Boolean(assessment?.automaticObservation && !automatedReview && !organicWebsiteResult)
   const evidenceConflict = Boolean(operatorVerification && verified && (
     operatorVerification.outcome === 'found_correct' ? conflicting : true
   ))
@@ -180,6 +192,7 @@ export function projectSalesVisibility(
   else if (appleAutomaticVerified) state = 'verified_correct'
   else if (duckDuckGoAutomaticVerified) state = 'verified_correct'
   else if (yelpAutomaticVerified) state = 'verified_correct'
+  else if (facebookAutomaticVerified) state = 'verified_correct'
   else if (directMapsVerified) state = 'verified_correct'
   else if (directMapsConflict) state = 'conflicting_evidence'
   else if (derivedGoogleMapsVerification?.freshness === 'fresh') state = 'verified_correct'
@@ -190,6 +203,7 @@ export function projectSalesVisibility(
   else if (appleConflict) state = 'conflicting_evidence'
   else if (duckDuckGoConflict) state = 'conflicting_evidence'
   else if (yelpConflict) state = 'conflicting_evidence'
+  else if (facebookConflict) state = 'conflicting_evidence'
   else if (profileDiscovered) state = 'profile_discovered'
   else if (organicWebsiteResult) state = 'website_result_discovered'
   else if (unavailable || assessment?.visibilityResult === 'not_found') state = 'manual_verification_needed'
@@ -214,6 +228,8 @@ export function projectSalesVisibility(
       ? `DuckDuckGo shows business information that matches the reviewed business details${reviewedName ? ` for ${reviewedName}` : ''}.`
     : state === 'verified_correct' && observation.destination === 'Yelp'
       ? `Yelp shows a business listing that matches the reviewed business details${reviewedName ? ` for ${reviewedName}` : ''}.`
+    : state === 'verified_correct' && observation.destination === 'Facebook'
+      ? `Facebook shows a business presence that matches the reviewed business details${reviewedName ? ` for ${reviewedName}` : ''}.`
     : state === 'manual_verification_needed' && appleSearchShellOnly
       ? 'Apple Maps responded to the public business search, but the automated check could not access enough structured place information to verify the listing.'
     : state === 'verified_recent' && observation.destination === 'Bing Search'
@@ -226,7 +242,9 @@ export function projectSalesVisibility(
           : state === 'operator_not_found' ? 'The operator checked this destination and did not find a matching business presence.'
             : state === 'operator_unable_to_determine' ? 'The operator attempted verification but could not determine a reliable result. The destination remains neutral.'
               : state === 'reconfirmation_needed' ? 'The business identity or material destination evidence changed after the prior operator review. Reconfirm it before using that decision.'
-                : state === 'profile_discovered' ? 'A likely public profile was discovered indirectly; its details have not yet been verified.'
+                : state === 'profile_discovered' && observation.destination === 'Facebook'
+                  ? 'A Facebook page URL associated with the business was discovered, but the automated check could not verify the current page details.'
+                  : state === 'profile_discovered' ? 'A likely public profile was discovered indirectly; its details have not yet been verified.'
                   : state === 'website_result_discovered' ? 'Google returned a page from the business website, but the business information shown in search has not yet been verified.'
                     : state === 'conflicting_evidence' ? `${observation.destination} evidence contains identity details that conflict or identify multiple plausible entities. Operator review is required.`
                     : assessment?.visibilityResult === 'not_found' ? 'Automation did not find a sufficient match. This is not absence evidence; an operator must verify the destination.'
@@ -236,7 +254,8 @@ export function projectSalesVisibility(
     : ['verified_correction_needed', 'operator_correction_needed'].includes(state) ? 'Review the confirmed difference and propose the appropriate correction'
       : state === 'operator_not_found' ? 'Review the observed absence before recommending listing work'
         : state === 'operator_unable_to_determine' ? `Revisit ${observation.destination} only when clearer evidence is available`
-          : state === 'profile_discovered' ? `Open ${observation.destination} and verify business details`
+          : state === 'profile_discovered' && observation.destination === 'Facebook' ? 'Open Facebook profile and verify business details'
+            : state === 'profile_discovered' ? `Open ${observation.destination} and verify business details`
             : state === 'website_result_discovered' ? 'Open Google Search and verify business details'
               : state === 'conflicting_evidence' ? `Open ${observation.destination} and resolve the conflicting business details`
               : `Open ${observation.destination} and record the review outcome`
@@ -245,13 +264,15 @@ export function projectSalesVisibility(
   return {
     destination: observation.destination,
     state,
-    headline: state === 'manual_verification_needed' && assessment?.visibilityResult === 'unavailable'
+    headline: state === 'profile_discovered' && observation.destination === 'Facebook'
+      ? 'Profile discovered — verification needed'
+      : state === 'manual_verification_needed' && assessment?.visibilityResult === 'unavailable'
       ? 'Automated check unavailable — verification needed'
       : labels[state],
     explanation,
     identitySummary: state === 'verified_recent' && observation.destination === 'Bing Search'
       ? 'Matches reviewed business details from recent verified evidence'
-      : ['verified_correct', 'verified_recent'].includes(state) && ['Google Search', 'Google Maps', 'Bing Search', 'Apple Maps', 'DuckDuckGo', 'Yelp'].includes(observation.destination) ? 'Matches reviewed business details'
+      : ['verified_correct', 'verified_recent'].includes(state) && ['Google Search', 'Google Maps', 'Bing Search', 'Apple Maps', 'DuckDuckGo', 'Yelp', 'Facebook'].includes(observation.destination) ? 'Matches reviewed business details'
       : ['verified_correct', 'verified_recent', 'verified_by_operator'].includes(state) ? 'Business identity aligns with reviewed details'
       : ['verified_correction_needed', 'operator_correction_needed'].includes(state) ? 'A reviewed identity difference was observed'
         : state === 'operator_not_found' ? 'No matching presence was found during operator review'
@@ -275,6 +296,10 @@ export function projectSalesVisibility(
     ...(state === 'verified_correct' && observation.destination === 'Apple Maps' && appleAutomaticVerified ? { automationSummary: 'Verified from acquired Apple Maps evidence' } : {}),
     ...(state === 'verified_correct' && observation.destination === 'DuckDuckGo' && duckDuckGoAutomaticVerified ? { automationSummary: 'Verified from acquired DuckDuckGo evidence' } : {}),
     ...(state === 'verified_correct' && observation.destination === 'Yelp' && yelpAutomaticVerified ? { automationSummary: 'Verified from acquired Yelp evidence' } : {}),
+    ...(state === 'verified_correct' && observation.destination === 'Facebook' && facebookAutomaticVerified ? { automationSummary: 'Verified from acquired Facebook evidence' } : {}),
+    ...(state === 'profile_discovered' && facebookProfileDiscovery ? {
+      evidenceSourceSummary: facebookProfileDiscovery.source === 'first_party_website' ? 'First-party business website link' : 'Verified search evidence',
+    } : {}),
     ...(state === 'verified_correct' && observation.destination !== 'Google Search' && !derivedGoogleMapsVerification && directMapsVerified
       ? { automationSummary: `Verified from acquired ${observation.destination} evidence` } : {}),
     ...(derivedGoogleMapsVerification?.freshness === 'fresh' ? {

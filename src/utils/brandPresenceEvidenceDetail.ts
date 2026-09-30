@@ -38,6 +38,8 @@ const acquisitionFailureReason = (observation: SearchDestinationObservation) => 
   if (blocker === 'apple_maps_acquisition_not_configured') return 'Dedicated Apple Maps acquisition is not configured.'
   if (blocker === 'duckduckgo_acquisition_not_configured') return 'Dedicated DuckDuckGo acquisition is not configured.'
   if (blocker === 'yelp_acquisition_not_configured') return 'Dedicated Yelp acquisition is not configured.'
+  if (blocker === 'facebook_acquisition_not_configured') return 'Dedicated Facebook acquisition is not configured.'
+  if (blocker === 'login_required') return 'Facebook requires a login before its public page details can be inspected.'
   if (blocker === 'runtime_exception') return 'Acquisition server could not complete the request.'
   if (blocker === 'http_5xx' || blocker === 'embedded_5xx') return 'Provider service returned an error.'
   if (blocker === 'http_error') return capture?.statusCode ? `Provider request returned HTTP ${capture.statusCode}.` : 'Provider request returned an error.'
@@ -63,9 +65,9 @@ const resultLabel = (observation: SearchDestinationObservation, sales: SalesVisi
     ? 'Maps business identity verified from recent Google evidence'
     : 'Maps business identity verified'
   if (sales.state === 'verified_recent') return 'Business identity verified from recent evidence'
-  if (unavailable(observation)) return 'No verified result'
   if (sales.state === 'website_result_discovered') return 'Website result discovered'
   if (sales.state === 'profile_discovered') return 'Profile candidate discovered'
+  if (unavailable(observation)) return 'No verified result'
   if (['verified_correct', 'verified_recent', 'verified_by_operator'].includes(sales.state)) return 'Business identity verified'
   if (['verified_correction_needed', 'operator_correction_needed'].includes(sales.state)) return 'Business information needs correction'
   if (sales.state === 'operator_not_found') return 'Not found during operator review'
@@ -98,6 +100,7 @@ const automaticIdentityEvidence = (observation: SearchDestinationObservation, sa
     || observation.automation?.assessment?.bingIdentityDecision
     || observation.automation?.assessment?.duckDuckGoIdentityDecision
     || observation.automation?.assessment?.yelpIdentityDecision
+    || observation.automation?.assessment?.facebookIdentityDecision
   if (!decision && observation.destination === 'Apple Maps' && sales.state === 'verified_correct') {
     const match = observation.automation?.assessment?.selected || observation.automation?.assessment?.matches[0]
     return match ? [
@@ -148,6 +151,7 @@ export function brandPresenceEvidenceSummary(
   const applePlaceResolution = observation.destination === 'Apple Maps' && Boolean(
     observation.automation?.assessment?.selected?.evidence.some((item) => item.locator === 'redirect-place-url'),
   )
+  const facebookDiscovery = observation.automation?.captures.find((capture) => capture.profileDiscovery)?.profileDiscovery
   return {
     acquisition,
     result: resultLabel(observation, sales),
@@ -160,6 +164,8 @@ export function brandPresenceEvidenceSummary(
     source: derived ? 'Google Search knowledge panel'
       : applePlaceResolution ? 'Public Apple Maps place resolution'
         : appleSearchCompleted ? 'Public Apple Maps search'
+          : facebookDiscovery?.source === 'first_party_website' ? 'First-party business website'
+            : facebookDiscovery?.source === 'search_evidence' ? 'Verified search evidence'
           : observation.destination,
     ...(sales.state === 'verified_recent' && observation.destination === 'Bing Search' && observation.automation?.assessment?.blocker === 'no_match'
       ? { automationState: 'Inconclusive' }
@@ -187,8 +193,8 @@ export function brandPresenceEvidenceSummary(
     ...(derived ? { decision: derived.freshness === 'recent' ? 'Verified from recent evidence' : 'Verified automatically' }
       : retained ? { decision: 'Verified from recent evidence' }
       : observation.destination === 'Apple Maps' && sales.state === 'verified_correct' ? { decision: 'Verified automatically' }
-      : observation.automation?.assessment?.googleIdentityDecision || observation.automation?.assessment?.bingIdentityDecision || observation.automation?.assessment?.duckDuckGoIdentityDecision || observation.automation?.assessment?.yelpIdentityDecision ? {
-        decision: (observation.automation.assessment.googleIdentityDecision || observation.automation.assessment.bingIdentityDecision || observation.automation.assessment.duckDuckGoIdentityDecision || observation.automation.assessment.yelpIdentityDecision)?.decision === 'verified' ? 'Verified automatically' : 'Assisted verification required',
+      : observation.automation?.assessment?.googleIdentityDecision || observation.automation?.assessment?.bingIdentityDecision || observation.automation?.assessment?.duckDuckGoIdentityDecision || observation.automation?.assessment?.yelpIdentityDecision || observation.automation?.assessment?.facebookIdentityDecision ? {
+        decision: (observation.automation.assessment.googleIdentityDecision || observation.automation.assessment.bingIdentityDecision || observation.automation.assessment.duckDuckGoIdentityDecision || observation.automation.assessment.yelpIdentityDecision || observation.automation.assessment.facebookIdentityDecision)?.decision === 'verified' ? 'Verified automatically' : 'Assisted verification required',
       } : {}),
   }
 }

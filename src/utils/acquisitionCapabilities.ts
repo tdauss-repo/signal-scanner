@@ -47,9 +47,9 @@ export const destinationAcquisitionCapabilities: DestinationAcquisitionCapabilit
     blockerTypes: ['search endpoint HTTP 403', 'challenge page', 'direct discovered-profile path not yet live-validated'],
   },
   {
-    destination: 'Facebook', preferredProvider: 'Operator public observation', fallbackProvider: 'Open Facebook search', provingProvider: 'Bright Data Browser API',
-    productionStatus: 'manual_fallback', shape: 'manual', automaticFound: false, automaticNotFound: false,
-    blockerTypes: ['login wall', 'public result not inspectable', 'Browser API path not yet live-validated'],
+    destination: 'Facebook', preferredProvider: 'Found Local bounded Facebook profile fetch', fallbackProvider: 'Assisted verification',
+    productionStatus: 'production', shape: 'native_fetch_then_assisted', automaticFound: true, automaticNotFound: false,
+    blockerTypes: ['profile not discovered', 'login wall', 'access restriction', 'public profile metadata insufficient'],
   },
   {
     destination: 'DuckDuckGo', preferredProvider: 'Found Local bounded DuckDuckGo HTML fetch', fallbackProvider: 'Assisted verification',

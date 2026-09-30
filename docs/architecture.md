@@ -259,7 +259,8 @@ Brand Presence destination dispatch is explicit:
 | Apple Maps | Dedicated bounded native Apple Maps acquisition |
 | DuckDuckGo | Dedicated bounded native DuckDuckGo HTML acquisition |
 | Yelp | Dedicated bounded native Yelp search acquisition with optional one-profile enrichment |
-| Facebook, Instagram | Existing destination/generic path |
+| Facebook | Explicit-profile discovery, then dedicated bounded native Facebook page acquisition |
+| Instagram | Existing destination/generic path |
 
 Bing Search Brand Presence must not fall through to generic public acquisition
 or its rendered-browser fallback. Missing dedicated wiring and native Bing
@@ -272,16 +273,18 @@ unchanged.
 Production visibility-scan dependencies are constructed by the single
 `createApplicationVisibilityScanDependencies()` composition used by `App` and
 the production-composition regression test. Its production contract requires
-the dedicated Bing, Apple Maps, DuckDuckGo, and Yelp adapters, which post to
+the dedicated Bing, Apple Maps, DuckDuckGo, Yelp, and Facebook adapters, which post to
 `/api/acquire-bing-search`, `/api/acquire-apple-maps`, and
-`/api/acquire-duckduckgo-search`, and `/api/acquire-yelp-search`. The
+`/api/acquire-duckduckgo-search`, `/api/acquire-yelp-search`, and
+`/api/acquire-facebook-page`. The
 general scan contract remains injectable for fixtures and CLI tools, but a
 missing Bing adapter fails closed as `bing_acquisition_not_configured`; it can
 never select generic public acquisition or rendered-browser acquisition. The
-Apple Maps, DuckDuckGo, and Yelp adapters follow the same fail-closed composition rule
+Apple Maps, DuckDuckGo, Yelp, and Facebook adapters follow the same fail-closed composition rule
 with `apple_maps_acquisition_not_configured` and
 `duckduckgo_acquisition_not_configured`, and
-`yelp_acquisition_not_configured`.
+`yelp_acquisition_not_configured`, and
+`facebook_acquisition_not_configured`.
 
 Bing Brand Presence uses one bounded native server request to the clean
 `bing.com/search?q=...` verification query. The request does not execute
@@ -501,6 +504,54 @@ Verified Yelp evidence may support the destination-specific Yelp strength
 through include/hide/refine controls. Profile URLs, provider/follow details,
 matcher decisions, candidates, and raw acquisition evidence remain outside
 customer JSON.
+
+### Facebook Brand Presence verification
+
+Facebook Brand Presence is profile-URL first. Found Local never constructs or
+guesses a Facebook handle from a business name. It first looks for an explicit
+public Facebook URL in the latest successful first-party website audit, then
+in current automatically verified search evidence whose candidate name matches
+the reviewed business. A website link proves only that the business website
+links to that destination; it is discovery evidence, not proof that the current
+Facebook page exists or remains identity-consistent.
+
+An explicit discovered URL is canonicalized to an HTTPS public Facebook
+profile route with tracking parameters removed, then sent to the dedicated
+`/api/acquire-facebook-page` route. The `facebook-native-fetch` adapter makes
+one bounded public HTML request with ordinary desktop and US-English headers,
+a twelve-second timeout, and a one-megabyte response limit. It may follow at
+most one approved same-host public-profile redirect. Search, login, account,
+sharing, arbitrary-host, and non-HTTPS targets are rejected. It uses no copied
+cookies, authenticated state, private API, challenge bypass, or rendered-
+browser fallback. Missing discovery or missing production composition fails
+closed and cannot enter generic acquisition.
+
+Only bounded canonical/Open Graph business metadata and business JSON-LD are
+normalized. Public name, official website, phone, address, category, and
+canonical page URL are accepted only when explicitly asserted. Timelines,
+comments, reviews, follower or engagement counts, and login-gated content are
+outside the evidence contract. Automatic verification reuses the established
+reviewed-identity threshold: at least two strong groups from name, official
+domain, phone, or address; one must be name or official domain; and no material
+conflict or competing plausible entity may exist. A page URL plus name alone
+is insufficient.
+
+Login walls, auth redirects, challenges, 403/access denials, and public pages
+without enough structured identity remain neutral. When an explicit profile
+was discovered but its current details cannot be acquired, operator UI uses
+“Profile discovered — verification needed,” retains the canonical page link,
+and does not create a strength or absence finding. Only an explicit operator
+Not found result may establish absence. Verified Facebook evidence may support
+the Facebook presence-and-identity strength through normal include/hide/refine
+controls; discovery sources, URLs, provider data, matcher decisions, and raw
+page evidence remain outside customer JSON.
+
+The bounded URL canonicalizer, explicit social-profile discovery record,
+login/access classifier, and public Open Graph/metadata extractor are shared
+Meta primitives. They can support a future Instagram adapter, but Instagram
+routing and verification are deliberately unchanged: a future implementation
+must separately prove that Instagram exposes sufficient public identity under
+the same no-login/no-bypass boundary.
 
 ### Configured Google acquisition runtime
 

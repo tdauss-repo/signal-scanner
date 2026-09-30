@@ -23,6 +23,7 @@ import {
   buildRetainedBingAutomaticVerification,
   retainedBingAutomaticVerificationIsCurrent,
 } from './bingAcquisitionResilience'
+import { discoverSocialProfile } from './socialProfileDiscovery'
 
 export { scanProfileKey, scanStateLabel, scanAreaState, restoreVisibilityRuns } from './visibilityScanState'
 import { scanProfileKey } from './visibilityScanState'
@@ -44,6 +45,8 @@ export interface ScanDependencies {
   acquireDuckDuckGoSearch?(url: string): Promise<AcquisitionResult | undefined>
   /** Dedicated bounded public Yelp Brand Search provider. */
   acquireYelpSearch?(url: string): Promise<AcquisitionResult | undefined>
+  /** Dedicated bounded public Facebook page provider. Requires an explicit discovered profile URL. */
+  acquireFacebookPage?(url: string): Promise<AcquisitionResult | undefined>
   cancelled?: () => boolean
   /** Test/runtime override. Application defaults keep each operation and the entire run bounded. */
   operationTimeoutMs?: number
@@ -60,6 +63,7 @@ export interface ApplicationVisibilityScanDependencies extends ScanDependencies 
   acquireAppleMaps(url: string): Promise<AcquisitionResult | undefined>
   acquireDuckDuckGoSearch(url: string): Promise<AcquisitionResult | undefined>
   acquireYelpSearch(url: string): Promise<AcquisitionResult | undefined>
+  acquireFacebookPage(url: string): Promise<AcquisitionResult | undefined>
 }
 const defaultOperationTimeoutMs = 30_000
 /** Two bounded SERP attempts plus one optional remote-browser fallback fit below the 180-second scan boundary. */
@@ -110,6 +114,12 @@ const acquireYelpSearchFromApi: NonNullable<ScanDependencies['acquireYelpSearch'
   if (!response.ok) throw new Error(body.error || 'Yelp acquisition request failed.')
   return body.capture
 }
+const acquireFacebookPageFromApi: NonNullable<ScanDependencies['acquireFacebookPage']> = async (url) => {
+  const response = await fetch('/api/acquire-facebook-page', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(20_000) })
+  const body = await response.json()
+  if (!response.ok) throw new Error(body.error || 'Facebook acquisition request failed.')
+  return body.capture
+}
 
 /** The sole production composition path used by App and production-wiring tests. */
 export function createApplicationVisibilityScanDependencies(
@@ -125,6 +135,7 @@ export function createApplicationVisibilityScanDependencies(
     acquireAppleMaps: acquireAppleMapsFromApi,
     acquireDuckDuckGoSearch: acquireDuckDuckGoSearchFromApi,
     acquireYelpSearch: acquireYelpSearchFromApi,
+    acquireFacebookPage: acquireFacebookPageFromApi,
     ...options,
   }
 }
@@ -132,7 +143,7 @@ export function createApplicationVisibilityScanDependencies(
 /** Compatibility export for existing CLI/proving callers; App constructs a fresh dependency object. */
 export const applicationScanDependencies = createApplicationVisibilityScanDependencies()
 
-export type DestinationAcquisitionRoute = 'google_search' | 'google_maps' | 'bing_native_search' | 'apple_maps_native' | 'duckduckgo_native_search' | 'yelp_native_search' | 'generic'
+export type DestinationAcquisitionRoute = 'google_search' | 'google_maps' | 'bing_native_search' | 'apple_maps_native' | 'duckduckgo_native_search' | 'yelp_native_search' | 'facebook_native_page' | 'generic'
 
 /** Brand destination dispatch is explicit so dedicated routes cannot silently enter the generic ladder. */
 export function destinationAcquisitionRoute(
@@ -145,6 +156,7 @@ export function destinationAcquisitionRoute(
   if (destination === 'Apple Maps' && queryMode === 'brand') return 'apple_maps_native'
   if (destination === 'DuckDuckGo' && queryMode === 'brand') return 'duckduckgo_native_search'
   if (destination === 'Yelp' && queryMode === 'brand') return 'yelp_native_search'
+  if (destination === 'Facebook' && queryMode === 'brand') return 'facebook_native_page'
   return 'generic'
 }
 
@@ -340,6 +352,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
   const start = (item: VisibilityCheck) => { item.state = 'scanning'; item.startedAt = new Date().toISOString(); publish() }
   const end = (item: VisibilityCheck) => { item.endedAt = new Date().toISOString(); item.elapsedMs = Date.parse(item.endedAt) - Date.parse(item.startedAt!); publish() }
   const rawCaptures: AcquisitionResult[] = []
+  let latestSuccessfulWebsite = initial.websiteAudit.lastSuccessful
   if (website.state !== 'not_checked' && alive()) {
     start(website)
     try {
@@ -357,6 +370,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       website.evidenceCaptured = result.ok
       website.interpreted = result.ok
       if (result.ok) {
+        latestSuccessfulWebsite = result
         rawCaptures.push({ version: 1, requestedUrl: profile.website, finalUrl: result.fetchedUrl, acquiredAt: result.analyzedAt, method: 'server_fetch', provider: result.acquisition.provider,
           outcome: 'success', confidence: 'captured', notes: [], visibleText: result.visibleTextSummary,
           html: result.jsonLdSchemaBlocks.map((block) => `<script type="application/ld+json">${JSON.stringify(block)}</script>`).join('') })
@@ -377,6 +391,9 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
     const captures: AcquisitionResult[] = []
     let dedicatedProviderHandled = false
     const acquisitionRoute = destinationAcquisitionRoute(item.destination, item.queryMode)
+    const facebookDiscovery = acquisitionRoute === 'facebook_native_page'
+      ? discoverSocialProfile('Facebook', reviewedProfileValue(profile, initial.businessProfile, 'businessName'), latestSuccessfulWebsite, state.searchDestinationObservations)
+      : undefined
     // A caller that spreads application dependencies and replaces only `acquire`
     // is supplying a complete fixture/CLI provider and must not inherit a live API call.
     const googleProvider = dependencies.acquireGoogle === applicationScanDependencies.acquireGoogle
@@ -389,19 +406,34 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireDuckDuckGoSearch
     const yelpProvider = dependencies.acquireYelpSearch === applicationScanDependencies.acquireYelpSearch
       && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireYelpSearch
+    const facebookProvider = dependencies.acquireFacebookPage === applicationScanDependencies.acquireFacebookPage
+      && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireFacebookPage
     const dedicatedProvider = acquisitionRoute === 'google_search' ? googleProvider
       : acquisitionRoute === 'google_maps' ? googleMapsProvider
         : acquisitionRoute === 'bing_native_search' ? dependencies.acquireBingSearch
           : acquisitionRoute === 'apple_maps_native' ? appleMapsProvider
             : acquisitionRoute === 'duckduckgo_native_search' ? duckDuckGoProvider
-              : acquisitionRoute === 'yelp_native_search' ? yelpProvider : undefined
-    if (dedicatedProvider) {
+              : acquisitionRoute === 'yelp_native_search' ? yelpProvider
+                : acquisitionRoute === 'facebook_native_page' ? facebookProvider : undefined
+    const dedicatedUrl = acquisitionRoute === 'facebook_native_page' ? facebookDiscovery?.profileUrl : item.url
+    if (acquisitionRoute === 'facebook_native_page' && !facebookDiscovery) {
+      captures.push({
+        version: 1, requestedUrl: profile.website || item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch',
+        provider: 'facebook-profile-discovery', checkedDestination: 'Facebook', requestAttempted: false,
+        outcome: 'partial', confidence: 'unavailable', resultRegionInspected: true, blocker: 'no_match',
+        notes: ['No explicit public Facebook profile URL was found in first-party website evidence or verified search evidence. No Facebook slug was guessed.'],
+      })
+      dedicatedProviderHandled = true
+    }
+    if (dedicatedProvider && dedicatedUrl) {
       try {
         const timeoutMs = item.destination === 'Google Search' && item.queryMode === 'brand' ? googleBrandOperationTimeoutMs : operationTimeoutMs
-        const capture = await awaitBounded(() => dedicatedProvider(item.url!), `${item.destination || 'destination'} acquisition`, timeoutMs)
+        const capture = await awaitBounded(() => dedicatedProvider(dedicatedUrl), `${item.destination || 'destination'} acquisition`, timeoutMs)
         if (!alive()) return run
         if (capture) {
-          captures.push(capture)
+          captures.push(acquisitionRoute === 'facebook_native_page' && facebookDiscovery
+            ? { ...capture, profileDiscovery: facebookDiscovery }
+            : capture)
           dedicatedProviderHandled = true
           item.captures = captures.map(compactCapture)
           publish()
@@ -424,14 +456,16 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       } catch (error) {
         const errorText = `${error instanceof Error ? error.name : ''} ${error instanceof Error ? error.message : String(error)}`
         const blocker = error instanceof VisibilityScanTimeoutError ? 'provider_timeout'
-          : /(?:Bing native|Apple Maps native|DuckDuckGo native|Yelp native) acquisition busy/i.test(errorText) ? 'capacity_busy'
+          : /(?:Bing native|Apple Maps native|DuckDuckGo native|Yelp native|Facebook native) acquisition busy/i.test(errorText) ? 'capacity_busy'
             : /Failed to fetch|network/i.test(errorText) ? 'network_failure' : 'acquisition_failure'
         const provider = item.destination === 'Google Maps' ? 'brightdata-google-maps-request'
           : item.destination === 'Google Search' ? 'brightdata-google-request'
             : item.destination === 'Apple Maps' ? 'apple-maps-native-request'
               : item.destination === 'DuckDuckGo' ? 'duckduckgo-native-request'
-                : item.destination === 'Yelp' ? 'yelp-native-request' : 'bing-native-request'
-        captures.push({ version: 1, requestedUrl: item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch', provider, outcome: 'failed', confidence: 'unavailable', notes: [`${item.destination || 'Destination'} provider request failed. This is not evidence that the business is absent.`], blocker, error: String(error) })
+                : item.destination === 'Yelp' ? 'yelp-native-request'
+                  : item.destination === 'Facebook' ? 'facebook-native-request' : 'bing-native-request'
+        captures.push({ version: 1, requestedUrl: dedicatedUrl || item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch', provider, outcome: 'failed', confidence: 'unavailable', notes: [`${item.destination || 'Destination'} provider request failed. This is not evidence that the business is absent.`], blocker, error: String(error),
+          ...(facebookDiscovery ? { profileDiscovery: facebookDiscovery } : {}) })
         dedicatedProviderHandled = true
       }
     }
@@ -475,6 +509,17 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       })
       dedicatedProviderHandled = true
     }
+    if (acquisitionRoute === 'facebook_native_page' && facebookDiscovery && !dedicatedProvider) {
+      captures.push({
+        version: 1, requestedUrl: facebookDiscovery.profileUrl, acquiredAt: new Date().toISOString(), method: 'server_fetch',
+        provider: 'facebook-native-request', checkedDestination: 'Facebook', requestAttempted: false,
+        outcome: 'unavailable', confidence: 'unavailable', resultRegionInspected: false, blocker: 'facebook_acquisition_not_configured',
+        profileDiscovery: facebookDiscovery,
+        notes: ['An explicit Facebook profile was discovered, but the dedicated Facebook Brand acquisition route was unavailable. This is not evidence that the business is absent.'],
+        error: 'Dedicated Facebook acquisition is not configured.',
+      })
+      dedicatedProviderHandled = true
+    }
     if (!dedicatedProviderHandled) {
       for (const method of ['server_fetch', 'rendered_browser'] as const) {
         if (!alive()) return run
@@ -505,8 +550,9 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
           : item.destination === 'Google Search' ? 'google_search'
             : item.destination === 'Bing Search' ? 'bing_search'
               : item.destination === 'Apple Maps' ? 'apple_maps'
-                : item.destination === 'DuckDuckGo' ? 'duckduckgo_search'
-                  : item.destination === 'Yelp' ? 'yelp' : undefined,
+                  : item.destination === 'DuckDuckGo' ? 'duckduckgo_search'
+                  : item.destination === 'Yelp' ? 'yelp'
+                    : item.destination === 'Facebook' ? 'facebook' : undefined,
       })
         : assessments.find((value) => value.visibilityResult === 'not_found') || assessments.at(-1) || { matches: [], confidence: 'unavailable' as const, automaticObservation: false, visibilityResult: 'unavailable' as const, operatorReviewRequired: true, resultRegionInspected: false, ambiguityReasons: [item.error || 'No usable public evidence was captured.'], blocker: 'runtime_unavailable' as const, tier3Candidate: false }
       assessment.resultRegionInspected ||= assessments.some((value) => value.resultRegionInspected)
@@ -540,14 +586,15 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       const absenceEvidence = assessment.visibilityResult === 'not_found'
         ? `${absenceCapture?.finalUrl || item.url} (bounded result region): ${assessment.ambiguityReasons.join(' ')}` : ''
       const normalizedEvidence = evidence || absenceEvidence
+      const profileDiscovery = captures.find((capture) => capture.profileDiscovery)?.profileDiscovery
       const observation: SearchDestinationObservation = { ...defaultSearchDestinationObservation(item.destination, item.query!),
         verificationUrl: verificationUrlFor(item.destination, item.query!, profile, item.queryMode === 'brand'),
         ...(selected?.candidate.resultUrl ? { observedResultUrl: selected.candidate.resultUrl } : {}),
-        ...(selected?.candidate.fields.publicProfileUrl ? { canonicalProfileUrl: selected.candidate.fields.publicProfileUrl } : {}),
+        ...((selected?.candidate.fields.publicProfileUrl || profileDiscovery?.profileUrl) ? { canonicalProfileUrl: selected?.candidate.fields.publicProfileUrl || profileDiscovery?.profileUrl } : {}),
         observedAt: selected?.evidence[0]?.acquiredAt || captures.at(-1)?.acquiredAt || '', provenance: 'automated_acquisition', overallResult: assessment.automaticObservation ? 'found_match' : assessment.visibilityResult === 'not_found' ? 'not_found' : 'manual_review_needed',
         observedResultTypes: [...new Set(types)].filter((type) => resultTypesForDestination(item.destination!).includes(type)), evidenceNotes: normalizedEvidence,
         confidence: item.evidenceCaptured ? 'scanner_detected_public_page' : 'manual_needs_confirmation', evidenceKind: item.evidenceCaptured ? 'external_observation' : captures.some((capture) => ['success', 'partial'].includes(capture.outcome)) ? 'unable_to_verify' : 'acquisition_failure',
-        automation: { runId: run.id, queryMode: item.queryMode, state: item.state, inspectedUrl: item.url!, captures: item.captures, evidence: normalizedEvidence, interpreted: item.interpreted, automaticObservation: assessment.automaticObservation,
+        automation: { runId: run.id, queryMode: item.queryMode, state: item.state, inspectedUrl: captures.find((capture) => capture.requestAttempted !== false)?.requestedUrl || profileDiscovery?.profileUrl || item.url!, captures: item.captures, evidence: normalizedEvidence, interpreted: item.interpreted, automaticObservation: assessment.automaticObservation,
           ...(['Google Search', 'Bing Search'].includes(item.destination) && item.queryMode === 'brand'
             ? { businessIdentityKey: brandPresenceBusinessIdentityKey(profile, initial.businessProfile) } : {}), assessment },
       }

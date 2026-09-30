@@ -1,8 +1,8 @@
 import type { BusinessProfile, BusinessProfileField, BusinessProfileState } from '../types/audit'
-import type { BingIdentityDecision, BusinessResultCandidate, DuckDuckGoIdentityDecision, EntityField, EntityMatch, FieldComparison, GoogleIdentityDecision, SearchEntityAssessment, SearchQueryMode, YelpIdentityDecision } from '../types/entityMatch'
+import type { BingIdentityDecision, BusinessResultCandidate, DuckDuckGoIdentityDecision, EntityField, EntityMatch, FacebookIdentityDecision, FieldComparison, GoogleIdentityDecision, SearchEntityAssessment, SearchQueryMode, YelpIdentityDecision } from '../types/entityMatch'
 
 export interface BusinessCandidateAssessmentOptions {
-  automaticIdentityPolicy?: 'google_search' | 'bing_search' | 'apple_maps' | 'duckduckgo_search' | 'yelp'
+  automaticIdentityPolicy?: 'google_search' | 'bing_search' | 'apple_maps' | 'duckduckgo_search' | 'yelp' | 'facebook'
 }
 
 export const normalizedWords = (value: string) => value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ')
@@ -185,8 +185,11 @@ export function assessBusinessCandidates(candidates: BusinessResultCandidate[], 
   const yelpIdentityDecision: YelpIdentityDecision | undefined = options.automaticIdentityPolicy === 'yelp' && selected
     ? bingAutomaticIdentityDecision(selected, matches, sameIdentity, multiple, conflictingEvidence)
     : undefined
-  const explicitIdentityDecision = googleIdentityDecision || bingIdentityDecision || appleIdentityDecision || duckDuckGoIdentityDecision || yelpIdentityDecision
-  const reasons = [...(selected?.ambiguityReasons || ['No identifiable business result was extracted.']), ...(multiple ? ['Multiple plausible business records require disambiguation; fields were not combined across candidates.'] : []), ...(conflictingEvidence && !selected?.conflictingFields.length ? ['Another plausible result representation conflicts with reviewed profile fields.'] : []), ...(googleIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Google evidence did not contain the required independent identity signals for automatic verification.'] : []), ...(bingIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Bing evidence did not contain the required independent identity signals for automatic verification.'] : []), ...(appleIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Apple Maps evidence did not contain the required independent identity signals for automatic verification.'] : []), ...(duckDuckGoIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['DuckDuckGo evidence did not contain the required independent identity signals for automatic verification.'] : []), ...(yelpIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Yelp evidence did not contain the required independent identity signals for automatic verification.'] : [])]
+  const facebookIdentityDecision: FacebookIdentityDecision | undefined = options.automaticIdentityPolicy === 'facebook' && selected
+    ? bingAutomaticIdentityDecision(selected, matches, sameIdentity, multiple, conflictingEvidence)
+    : undefined
+  const explicitIdentityDecision = googleIdentityDecision || bingIdentityDecision || appleIdentityDecision || duckDuckGoIdentityDecision || yelpIdentityDecision || facebookIdentityDecision
+  const reasons = [...(selected?.ambiguityReasons || ['No identifiable business result was extracted.']), ...(multiple ? ['Multiple plausible business records require disambiguation; fields were not combined across candidates.'] : []), ...(conflictingEvidence && !selected?.conflictingFields.length ? ['Another plausible result representation conflicts with reviewed profile fields.'] : []), ...(googleIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Google evidence did not contain the required independent identity signals for automatic verification.'] : []), ...(bingIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Bing evidence did not contain the required independent identity signals for automatic verification.'] : []), ...(appleIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Apple Maps evidence did not contain the required independent identity signals for automatic verification.'] : []), ...(duckDuckGoIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['DuckDuckGo evidence did not contain the required independent identity signals for automatic verification.'] : []), ...(yelpIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Yelp evidence did not contain the required independent identity signals for automatic verification.'] : []), ...(facebookIdentityDecision?.decision === 'review_required' && !multiple && !conflictingEvidence ? ['Facebook evidence did not contain the required independent identity signals for automatic verification.'] : [])]
   const automaticObservation = explicitIdentityDecision
     ? explicitIdentityDecision.decision === 'verified'
     : Boolean(selected?.automaticObservation && !multiple && !conflictingEvidence)
@@ -196,7 +199,8 @@ export function assessBusinessCandidates(candidates: BusinessResultCandidate[], 
     ...(googleIdentityDecision ? { googleIdentityDecision } : {}),
     ...(bingIdentityDecision ? { bingIdentityDecision } : {}),
     ...(duckDuckGoIdentityDecision ? { duckDuckGoIdentityDecision } : {}),
-    ...(yelpIdentityDecision ? { yelpIdentityDecision } : {}) }
+    ...(yelpIdentityDecision ? { yelpIdentityDecision } : {}),
+    ...(facebookIdentityDecision ? { facebookIdentityDecision } : {}) }
 }
 
 const identitySignalGroup = (field: EntityField) => field === 'streetAddress' || field === 'address' ? 'address' : field
