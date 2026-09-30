@@ -88,10 +88,14 @@ const automaticIdentityEvidence = (observation: SearchDestinationObservation, sa
     label: identityLabel(signal.field),
     result: signal.field === 'name' ? 'Matches' : `Matches ${signal.observed}`,
   }))
-  const decision = observation.automation?.assessment?.googleIdentityDecision
+  const retainedDecision = sales.state === 'verified_recent'
+    ? observation.retainedGoogleVerification?.automation.assessment?.googleIdentityDecision
+      || observation.retainedBingVerification?.automation.assessment?.bingIdentityDecision
+    : undefined
+  const decision = retainedDecision
+    || observation.automation?.assessment?.googleIdentityDecision
     || observation.automation?.assessment?.bingIdentityDecision
     || observation.automation?.assessment?.duckDuckGoIdentityDecision
-    || observation.retainedGoogleVerification?.automation.assessment?.googleIdentityDecision
   if (!decision && observation.destination === 'Apple Maps' && sales.state === 'verified_correct') {
     const match = observation.automation?.assessment?.selected || observation.automation?.assessment?.matches[0]
     return match ? [
@@ -123,7 +127,8 @@ export function brandPresenceEvidenceSummary(
   sales: SalesVisibilityProjection,
 ): BrandPresenceEvidenceSummary {
   const failed = unavailable(observation)
-  const retained = sales.state === 'verified_recent' ? observation.retainedGoogleVerification : undefined
+  const retained = sales.state === 'verified_recent'
+    ? observation.retainedGoogleVerification || observation.retainedBingVerification : undefined
   const derived = sales.derivedGoogleMapsVerification
   const appleSearchCapture = acceptedAppleSearchCapture(observation)
   const appleSearchCompleted = Boolean(appleSearchCapture?.outcome === 'success' && appleSearchCapture.resultRegionInspected)
@@ -154,7 +159,9 @@ export function brandPresenceEvidenceSummary(
       : applePlaceResolution ? 'Public Apple Maps place resolution'
         : appleSearchCompleted ? 'Public Apple Maps search'
           : observation.destination,
-    ...(derived?.freshness === 'fresh' ? { automationState: 'Completed' }
+    ...(sales.state === 'verified_recent' && observation.destination === 'Bing Search' && observation.automation?.assessment?.blocker === 'no_match'
+      ? { automationState: 'Inconclusive' }
+      : derived?.freshness === 'fresh' ? { automationState: 'Completed' }
       : appleSearchCompleted ? { automationState: 'Completed' }
       : automationStateLabel(observation) ? { automationState: automationStateLabel(observation) } : {}),
     ...(appleSearchCompleted ? {
@@ -202,6 +209,7 @@ export function brandPresenceTechnicalEvidence(observation: SearchDestinationObs
     canonicalProfileUrl: observation.canonicalProfileUrl,
     automation: observation.automation,
     retainedGoogleVerification: observation.retainedGoogleVerification,
+    retainedBingVerification: observation.retainedBingVerification,
     derivedGoogleMapsVerification: sales?.derivedGoogleMapsVerification,
     operatorAssisted: observation.operatorAssisted,
     operatorVerification: observation.operatorVerification,

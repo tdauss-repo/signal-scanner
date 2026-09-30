@@ -60,6 +60,7 @@
     "test:bing-acquisition-routing": "node --import tsx scripts/test-bing-acquisition-routing.ts",
     "test:app-scan-acquisition-wiring": "node --import tsx scripts/test-app-scan-acquisition-wiring.ts",
     "test:bing-local-business-acquisition": "node --import tsx scripts/test-bing-local-business-acquisition.ts",
+    "test:bing-recent-evidence-resilience": "node --import tsx scripts/test-bing-recent-evidence-resilience.tsx",
     "test:apple-maps-auto-verification": "node --import tsx scripts/test-apple-maps-auto-verification.tsx",
     "test:apple-maps-production-wiring": "node --import tsx scripts/test-apple-maps-production-wiring.ts",
     "test:apple-maps-redirect-evidence": "node --import tsx scripts/test-apple-maps-redirect-evidence.ts",

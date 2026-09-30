@@ -15,9 +15,14 @@ import { workspaceFindings } from './workspaceFindings'
 import { compareIdentity, host, interpretPresence, isChallenge, pageText } from './presenceExtraction'
 import {
   buildRetainedGoogleAutomaticVerification,
-  googleBrandBusinessIdentityKey,
   retainedGoogleAutomaticVerificationIsCurrent,
 } from './googleAcquisitionResilience'
+import { brandPresenceBusinessIdentityKey } from './brandPresenceAcquisitionResilience'
+import {
+  bingRefreshCanRetainRecentVerification,
+  buildRetainedBingAutomaticVerification,
+  retainedBingAutomaticVerificationIsCurrent,
+} from './bingAcquisitionResilience'
 
 export { scanProfileKey, scanStateLabel, scanAreaState, restoreVisibilityRuns } from './visibilityScanState'
 import { scanProfileKey } from './visibilityScanState'
@@ -133,6 +138,13 @@ export function destinationAcquisitionRoute(
 }
 
 type StateUpdate = (state: AuditState) => AuditState
+interface AutomatedObservationMergeContext {
+  profile: BusinessProfile
+  profileState: AuditState['businessProfile']
+  sourceProfileReviewKey?: string
+  now?: number
+  retainedBingSource?: { observation: SearchDestinationObservation; sourceProfileReviewKey?: string }
+}
 const compactCapture = (capture: AcquisitionResult): AcquisitionResult => {
   const compact = { ...capture, visibleText: pageText(capture).slice(0, 6000) }
   if (compact.renderedResultEvidence) compact.renderedResultEvidence = { ...compact.renderedResultEvidence,
@@ -151,7 +163,7 @@ const compactCapture = (capture: AcquisitionResult): AcquisitionResult => {
 export function mergeAutomatedObservation(
   previous: SearchDestinationObservation | undefined,
   incoming: SearchDestinationObservation,
-  context?: { profile: BusinessProfile; profileState: AuditState['businessProfile']; sourceProfileReviewKey?: string; now?: number },
+  context?: AutomatedObservationMergeContext,
 ): SearchDestinationObservation {
   if (previous && previous.query !== incoming.query) return incoming
   const currentGoogleUnavailable = incoming.destination === 'Google Search' && incoming.automation?.queryMode === 'brand' &&
@@ -166,6 +178,24 @@ export function mergeAutomatedObservation(
           retainedGoogleAutomaticVerificationIsCurrent(previous.retainedGoogleVerification, context.profile, context.profileState, context.now)
         ? previous.retainedGoogleVerification : undefined
     : undefined
+  const currentBingInconclusive = bingRefreshCanRetainRecentVerification(incoming)
+  const priorOperatorCorrection = previous?.operatorVerification?.outcome === 'found_correction_needed'
+  const newlyRetainedBing = currentBingInconclusive && previous && context && !priorOperatorCorrection
+    ? buildRetainedBingAutomaticVerification(previous, context.profile, context.profileState, context.sourceProfileReviewKey)
+      || (context.retainedBingSource ? buildRetainedBingAutomaticVerification(
+        context.retainedBingSource.observation,
+        context.profile,
+        context.profileState,
+        context.retainedBingSource.sourceProfileReviewKey,
+      ) : undefined)
+    : undefined
+  const retainedBingVerification = currentBingInconclusive && previous && context && !priorOperatorCorrection
+    ? newlyRetainedBing && retainedBingAutomaticVerificationIsCurrent(newlyRetainedBing, context.profile, context.profileState, context.now)
+      ? newlyRetainedBing
+      : bingRefreshCanRetainRecentVerification(previous) &&
+          retainedBingAutomaticVerificationIsCurrent(previous.retainedBingVerification, context.profile, context.profileState, context.now)
+        ? previous.retainedBingVerification : undefined
+    : undefined
   const manual = previous && (previous.reviewed || (previous.provenance !== 'automated_acquisition' && Boolean(previous.evidenceNotes.trim() || previous.competitorsObserved.trim() || previous.recommendedAction.trim() || !['not_checked', 'manual_review_needed'].includes(previous.overallResult))))
   const merged = manual ? { ...previous, verificationUrl: incoming.verificationUrl, observedResultUrl: incoming.observedResultUrl || previous.observedResultUrl, canonicalProfileUrl: incoming.canonicalProfileUrl || previous.canonicalProfileUrl, automation: incoming.automation, reviewed: false } : {
     ...incoming, observedResultUrl: incoming.observedResultUrl || previous?.observedResultUrl,
@@ -173,7 +203,66 @@ export function mergeAutomatedObservation(
     competitorsObserved: previous?.competitorsObserved || '', recommendedAction: previous?.recommendedAction || '',
     operatorVerification: previous?.operatorVerification,
   }
-  return { ...merged, retainedGoogleVerification }
+  return { ...merged, retainedGoogleVerification, retainedBingVerification }
+}
+
+/** Recover a still-material prior Bing success already preserved in workspace run history. */
+export function retainedBingSourceFromVisibilityRuns(
+  state: AuditState,
+  checkId: string,
+  profile: BusinessProfile,
+): AutomatedObservationMergeContext['retainedBingSource'] {
+  for (const historicalRun of [...(state.visibilityRuns || [])].reverse()) {
+    if (!matchesEvidenceFingerprint(historicalRun.profileKey, profile) ||
+      !historicalRun.profileReviewKey || !matchesEvidenceFingerprint(historicalRun.profileReviewKey, state.businessProfile)) continue
+    const historicalCheck = historicalRun.checks.find((check) => check.id === checkId && check.destination === 'Bing Search' && check.queryMode === 'brand')
+    const assessment = historicalCheck?.assessment
+    const conflictBlocker = assessment?.blocker === 'identifier_conflict' || assessment?.blocker === 'multiple_entities'
+    if (assessment && (conflictBlocker || assessment.bingIdentityDecision?.conflictingSignals.length)) return undefined
+    if (!historicalCheck || !assessment || !assessment.automaticObservation || assessment.operatorReviewRequired ||
+      assessment.bingIdentityDecision?.decision !== 'verified' || assessment.visibilityResult !== 'found' || assessment.blocker !== 'none' ||
+      !historicalCheck.captures.some((capture) => capture.outcome === 'success')) continue
+    const selected = assessment.selected
+    const evidence = assessment.matches.map((match) => `${JSON.stringify(match.candidate.fields)}\n${match.evidence.map((reference) => `${reference.sourceUrl} (${reference.locator}): ${reference.excerpt}`).join('\n')}`).join('\n').slice(0, 12000)
+    const observedResultTypes: SearchVisibilityObservedResultType[] = []
+    if (selected?.matchedFields.some((field) => field.field === 'website')) observedResultTypes.push('official_website')
+    else observedResultTypes.push('third_party_mention')
+    for (const field of selected?.matchedFields || []) {
+      if (field.field === 'name') observedResultTypes.push('business_name_correct')
+      if (field.field === 'phone') observedResultTypes.push('phone_correct')
+      if (field.field === 'website') observedResultTypes.push('website_correct')
+      if (['streetAddress', 'address'].includes(field.field)) observedResultTypes.push('address_correct')
+    }
+    const observedAt = selected?.evidence[0]?.acquiredAt || historicalCheck.captures.findLast((capture) => capture.outcome === 'success')?.acquiredAt || historicalRun.endedAt || historicalRun.startedAt
+    const query = historicalCheck.query || profile.businessName
+    const observation: SearchDestinationObservation = {
+      ...defaultSearchDestinationObservation('Bing Search', query),
+      verificationUrl: verificationUrlFor('Bing Search', query, profile, true),
+      ...(selected?.candidate.resultUrl ? { observedResultUrl: selected.candidate.resultUrl } : {}),
+      ...(selected?.candidate.fields.publicProfileUrl ? { canonicalProfileUrl: selected.candidate.fields.publicProfileUrl } : {}),
+      overallResult: 'found_match',
+      observedResultTypes: [...new Set(observedResultTypes)],
+      observedAt,
+      provenance: 'automated_acquisition',
+      confidence: 'scanner_detected_public_page',
+      evidenceNotes: evidence,
+      evidenceKind: 'external_observation',
+      reviewed: false,
+      automation: {
+        runId: historicalRun.id,
+        queryMode: 'brand',
+        state: historicalCheck.state,
+        inspectedUrl: historicalCheck.url || verificationUrlFor('Bing Search', query, profile, true),
+        captures: historicalCheck.captures,
+        evidence,
+        interpreted: true,
+        automaticObservation: true,
+        assessment,
+      },
+    }
+    return { observation, sourceProfileReviewKey: historicalRun.profileReviewKey }
+  }
+  return undefined
 }
 
 /** One runner shared by customer, Workbench and proving CLI. Every progress transition follows real work. */
@@ -433,14 +522,18 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
         observedResultTypes: [...new Set(types)].filter((type) => resultTypesForDestination(item.destination!).includes(type)), evidenceNotes: normalizedEvidence,
         confidence: item.evidenceCaptured ? 'scanner_detected_public_page' : 'manual_needs_confirmation', evidenceKind: item.evidenceCaptured ? 'external_observation' : captures.some((capture) => ['success', 'partial'].includes(capture.outcome)) ? 'unable_to_verify' : 'acquisition_failure',
         automation: { runId: run.id, queryMode: item.queryMode, state: item.state, inspectedUrl: item.url!, captures: item.captures, evidence: normalizedEvidence, interpreted: item.interpreted, automaticObservation: assessment.automaticObservation,
-          ...(item.destination === 'Google Search' && item.queryMode === 'brand' ? { businessIdentityKey: googleBrandBusinessIdentityKey(profile, initial.businessProfile) } : {}), assessment },
+          ...(['Google Search', 'Bing Search'].includes(item.destination) && item.queryMode === 'brand'
+            ? { businessIdentityKey: brandPresenceBusinessIdentityKey(profile, initial.businessProfile) } : {}), assessment },
       }
       update((current) => {
         const previous = current.searchDestinationObservations[item.queryId!]?.[item.destination!]
         const sourceRun = current.visibilityRuns?.find((candidate) => candidate.id === previous?.automation?.runId)
+        const retainedBingSource = item.destination === 'Bing Search' && item.queryMode === 'brand'
+          ? retainedBingSourceFromVisibilityRuns(current, item.id, profile) : undefined
         return { ...current, searchDestinationObservations: { ...current.searchDestinationObservations,
           [item.queryId!]: { ...current.searchDestinationObservations[item.queryId!], [item.destination!]: mergeAutomatedObservation(previous, observation, {
             profile, profileState: initial.businessProfile, sourceProfileReviewKey: sourceRun?.profileReviewKey,
+            retainedBingSource,
           }) } } }
       })
     } else if (item.destination) {

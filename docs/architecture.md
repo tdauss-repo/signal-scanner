@@ -325,6 +325,30 @@ Successful Brand Presence identity verification is separate from local-intent
 discovery performance. Candidate details, matcher decisions, provider names,
 blockers, and acquisition metadata remain outside customer JSON.
 
+Bing Brand uses the same centrally defined seven-day automatic-evidence
+freshness window and material reviewed-identity fingerprint as Google Brand.
+When a later native Bing refresh is unavailable or successfully inspects a
+normal result region but produces only `review_required` / `no_match`, the
+current refresh remains stored while a recent prior provider-acquired Bing
+identity decision may remain effective as “Verified from recent evidence.” A
+no-match result variant is inconclusive, not contradictory, and does not erase
+the earlier verified fact. Retained evidence is never represented as fresh.
+For compatible saved workspaces created before this retention projection was
+available, the next scan may reconstruct the same bounded fact from a recent
+verified Bing assessment already present in visibility-run history. A newer
+conflicting run is a hard barrier to that recovery.
+
+Retention requires a prior successful automatic Bing acquisition with an
+explicit verified identity decision, an unchanged reviewed business name,
+domain, address, and phone fingerprint, and evidence within the freshness
+window. A current material identity conflict, expiry, reviewed-identity
+change, or operator correction blocks the retained positive interpretation.
+Operator-only verification is preserved under operator provenance and is never
+relabeled as retained automatic evidence. While valid, retained Bing evidence
+continues to support the stable Bing strength and stays outside neutral and
+customer “Still being verified” counts; provider history and retention
+metadata remain operator-only.
+
 ### Apple Maps Brand Presence verification
 
 Apple Maps Brand Presence uses one bounded public HTTP request to the clean

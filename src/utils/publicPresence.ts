@@ -5,6 +5,7 @@ import { buildSearchVisibilityQueries, primarySearchDestinations } from './searc
 import { operatorAssistedEvidenceIsCurrent } from './operatorAssistedSearch'
 import { currentBrandPresenceVerification } from './brandPresenceVerification'
 import { effectiveGoogleAutomaticIdentityState, projectSalesVisibility } from './salesVisibilityProjection'
+import { effectiveBingAutomaticIdentityState } from './bingAcquisitionResilience'
 
 const profileNameForDestination: Partial<Record<SearchDestination, string>> = {
   'Google Maps': 'Google Business Profile',
@@ -107,11 +108,15 @@ export function summarizePublicPresence(state: import('../types/audit').AuditSta
       profile: state.profile,
       profileState: state.businessProfile,
     }) || '')
+    const explicitBingVerification = ['verified', 'verified_recent'].includes(effectiveBingAutomaticIdentityState(observation, {
+      profile: state.profile,
+      profileState: state.businessProfile,
+    }) || '')
     const derivedMapsVerification = Boolean(sales.derivedGoogleMapsVerification)
-    const automatic = derivedMapsVerification || Boolean((explicitGoogleVerification || automated?.automaticObservation && observation.provenance === 'automated_acquisition') && currentProfileEvidence)
+    const automatic = derivedMapsVerification || Boolean((explicitGoogleVerification || explicitBingVerification || automated?.automaticObservation && observation.provenance === 'automated_acquisition') && currentProfileEvidence)
     const normalizedReview = automated?.assessment?.operatorReviewRequired
     const needsReview = verification ? verification.outcome === 'unable_to_determine'
-      : explicitGoogleVerification || derivedMapsVerification ? false
+      : explicitGoogleVerification || explicitBingVerification || derivedMapsVerification ? false
       : assisted && observation.operatorAssisted?.assessment.operatorReviewRequired === false ? false : observation.provenance === 'automated_acquisition' && typeof normalizedReview === 'boolean'
         ? normalizedReview : attempted && !observation.reviewed && !automatic
     records.set(`${query.id}:${destination}`, { attempted, evidence, automatic, reviewed: Boolean(verification || observation.reviewed), needsReview })

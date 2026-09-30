@@ -4,6 +4,7 @@ import { reviewedBusinessProfile } from './businessProfileState'
 import { customerBusinessNoun, localBusinessModel } from './businessContext'
 import { evidenceFingerprint } from './evidenceFingerprint'
 import { effectiveGoogleAutomaticIdentityState } from './googleAcquisitionResilience'
+import { effectiveBingAutomaticIdentityState } from './bingAcquisitionResilience'
 import { salesCockpitVisibility } from './salesVisibilityProjection'
 import type { SalesVisibilityProjection } from './salesVisibilityProjection'
 
@@ -76,7 +77,9 @@ const materialSearchEvidence = (
     }
   }
   const retained = effectiveGoogleAutomaticIdentityState(observation, { profile: state.profile, profileState: state.businessProfile }) === 'verified_recent'
-    ? observation.retainedGoogleVerification : undefined
+    ? observation.retainedGoogleVerification
+    : effectiveBingAutomaticIdentityState(observation, { profile: state.profile, profileState: state.businessProfile }) === 'verified_recent'
+      ? observation.retainedBingVerification : undefined
   const assessment = retained?.automation.assessment || observation.automation?.assessment
   const profile = reviewedBusinessProfile(state.profile, state.businessProfile)
   return {

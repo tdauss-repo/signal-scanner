@@ -9,7 +9,7 @@ export type ScanArea = 'WebsiteTechnical' | 'SearchMaps' | 'BusinessInformation'
 export interface PresenceAutomation {
   assessment?: SearchEntityAssessment
   automaticObservation?: boolean
-  /** Material reviewed identity used for Google Brand freshness reconciliation. */
+  /** Material reviewed identity used for Brand Presence freshness reconciliation. */
   businessIdentityKey?: string
   queryMode?: 'brand' | 'location' | 'discovery'
   runId: string
