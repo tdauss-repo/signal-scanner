@@ -51,6 +51,15 @@ export interface AcquisitionResult {
   /** Public destination represented by a provider-normalized capture. */
   checkedDestination?: SearchDestination
   providerAttempts?: Array<{ provider: string; stage?: 'serp_initial' | 'serp_retry' | 'browser_fallback'; outcome: 'success' | 'unavailable'; blocker: string; elapsedMs: number; statusCode?: number }>
+  /** Sanitized record of Yelp's optional one-hop public business-profile enrichment. */
+  profileFollow?: {
+    used: boolean
+    requestedUrl?: string
+    finalUrl?: string
+    statusCode?: number
+    outcome: 'not_used' | 'success' | 'restricted' | 'unavailable'
+    blocker?: string
+  }
   notes: string[]
   confidence: 'captured' | 'operator_supplied' | 'unavailable'
   error?: string

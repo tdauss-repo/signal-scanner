@@ -37,12 +37,13 @@ const acquisitionFailureReason = (observation: SearchDestinationObservation) => 
   if (blocker === 'bing_acquisition_not_configured') return 'Dedicated Bing acquisition is not configured.'
   if (blocker === 'apple_maps_acquisition_not_configured') return 'Dedicated Apple Maps acquisition is not configured.'
   if (blocker === 'duckduckgo_acquisition_not_configured') return 'Dedicated DuckDuckGo acquisition is not configured.'
+  if (blocker === 'yelp_acquisition_not_configured') return 'Dedicated Yelp acquisition is not configured.'
   if (blocker === 'runtime_exception') return 'Acquisition server could not complete the request.'
   if (blocker === 'http_5xx' || blocker === 'embedded_5xx') return 'Provider service returned an error.'
   if (blocker === 'http_error') return capture?.statusCode ? `Provider request returned HTTP ${capture.statusCode}.` : 'Provider request returned an error.'
   if (['malformed_response', 'structurally_insufficient'].includes(blocker)) return 'Provider response could not be parsed into usable evidence.'
   if (blocker === 'missing_result_region' || blocker === 'provider_failure') return 'Provider returned no usable response.'
-  if (['provider_captcha', 'google_sorry', 'captcha_or_challenge', 'access_failure', 'access_blocked'].includes(blocker)) return 'Provider access was restricted.'
+  if (['provider_captcha', 'google_sorry', 'captcha_or_challenge', 'access_failure', 'access_blocked', 'access_restricted'].includes(blocker)) return 'Provider access was restricted.'
   if (blocker === 'acquisition_failure') return 'Acquisition server unavailable.'
   return 'Provider could not complete this check.'
 }
@@ -96,6 +97,7 @@ const automaticIdentityEvidence = (observation: SearchDestinationObservation, sa
     || observation.automation?.assessment?.googleIdentityDecision
     || observation.automation?.assessment?.bingIdentityDecision
     || observation.automation?.assessment?.duckDuckGoIdentityDecision
+    || observation.automation?.assessment?.yelpIdentityDecision
   if (!decision && observation.destination === 'Apple Maps' && sales.state === 'verified_correct') {
     const match = observation.automation?.assessment?.selected || observation.automation?.assessment?.matches[0]
     return match ? [
@@ -185,8 +187,8 @@ export function brandPresenceEvidenceSummary(
     ...(derived ? { decision: derived.freshness === 'recent' ? 'Verified from recent evidence' : 'Verified automatically' }
       : retained ? { decision: 'Verified from recent evidence' }
       : observation.destination === 'Apple Maps' && sales.state === 'verified_correct' ? { decision: 'Verified automatically' }
-      : observation.automation?.assessment?.googleIdentityDecision || observation.automation?.assessment?.bingIdentityDecision || observation.automation?.assessment?.duckDuckGoIdentityDecision ? {
-        decision: (observation.automation.assessment.googleIdentityDecision || observation.automation.assessment.bingIdentityDecision || observation.automation.assessment.duckDuckGoIdentityDecision)?.decision === 'verified' ? 'Verified automatically' : 'Assisted verification required',
+      : observation.automation?.assessment?.googleIdentityDecision || observation.automation?.assessment?.bingIdentityDecision || observation.automation?.assessment?.duckDuckGoIdentityDecision || observation.automation?.assessment?.yelpIdentityDecision ? {
+        decision: (observation.automation.assessment.googleIdentityDecision || observation.automation.assessment.bingIdentityDecision || observation.automation.assessment.duckDuckGoIdentityDecision || observation.automation.assessment.yelpIdentityDecision)?.decision === 'verified' ? 'Verified automatically' : 'Assisted verification required',
       } : {}),
   }
 }

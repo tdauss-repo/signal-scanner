@@ -258,7 +258,8 @@ Brand Presence destination dispatch is explicit:
 | Bing Search | Dedicated bounded native Bing acquisition |
 | Apple Maps | Dedicated bounded native Apple Maps acquisition |
 | DuckDuckGo | Dedicated bounded native DuckDuckGo HTML acquisition |
-| Yelp, Facebook, Instagram | Existing destination/generic path |
+| Yelp | Dedicated bounded native Yelp search acquisition with optional one-profile enrichment |
+| Facebook, Instagram | Existing destination/generic path |
 
 Bing Search Brand Presence must not fall through to generic public acquisition
 or its rendered-browser fallback. Missing dedicated wiring and native Bing
@@ -271,15 +272,16 @@ unchanged.
 Production visibility-scan dependencies are constructed by the single
 `createApplicationVisibilityScanDependencies()` composition used by `App` and
 the production-composition regression test. Its production contract requires
-the dedicated Bing and Apple Maps adapters, which post to
+the dedicated Bing, Apple Maps, DuckDuckGo, and Yelp adapters, which post to
 `/api/acquire-bing-search`, `/api/acquire-apple-maps`, and
-`/api/acquire-duckduckgo-search`. The
+`/api/acquire-duckduckgo-search`, and `/api/acquire-yelp-search`. The
 general scan contract remains injectable for fixtures and CLI tools, but a
 missing Bing adapter fails closed as `bing_acquisition_not_configured`; it can
 never select generic public acquisition or rendered-browser acquisition. The
-Apple Maps and DuckDuckGo adapters follow the same fail-closed composition rule
+Apple Maps, DuckDuckGo, and Yelp adapters follow the same fail-closed composition rule
 with `apple_maps_acquisition_not_configured` and
-`duckduckgo_acquisition_not_configured`.
+`duckduckgo_acquisition_not_configured`, and
+`yelp_acquisition_not_configured`.
 
 Bing Brand Presence uses one bounded native server request to the clean
 `bing.com/search?q=...` verification query. The request does not execute
@@ -456,6 +458,49 @@ outcome can establish absence. A verified result may support the independent
 DuckDuckGo strength through the existing include/hide/refine workflow, while
 provider, matcher, candidate, and diagnostic metadata remain outside customer
 JSON.
+
+### Yelp Brand Presence verification
+
+Yelp Brand Presence uses a dedicated bounded native route rather than the
+generic public-acquisition/rendered-browser ladder. The authoritative operator
+and acquisition URL is `yelp.com/search` with the reviewed business name in
+`find_desc` and reviewed city, state, and ZIP in `find_loc`. Production posts
+that URL to `/api/acquire-yelp-search`; missing composition fails closed as
+`yelp_acquisition_not_configured`. Yelp native acquisition has its own bounded
+runtime lane and never launches a browser or inherits a busy generic browser
+lane.
+
+The native contract performs one public HTML search request with an ordinary
+desktop user agent, US-English HTML accept headers, a twelve-second transport
+limit, and a one-megabyte response limit. It sends no copied cookies,
+authenticated state, private-API request, or challenge bypass. Explicit JSON-LD
+business records and public `/biz/` result links may become search candidates;
+ratings and review counts are non-identity metadata and are not proof.
+
+When search evidence contains one strongly name-matching, unambiguous public
+`/biz/` link but not yet enough identity fields, the runtime may make exactly
+one additional HTTPS request to the exact `www.yelp.com` `/biz/<slug>` route.
+No recursive profile following, login/auth redirect, external host, or rendered
+fallback is permitted. Bounded business JSON-LD, canonical metadata, and
+explicitly asserted fields may add name, address, phone, official website,
+category, and canonical Yelp profile URL. Strong structured search-page
+identity can verify without the profile request.
+
+The shared reviewed-identity matcher remains authoritative: automatic Yelp
+verification requires at least two strong groups from name, official domain,
+phone, or address; one must be name or official domain, with no material
+conflict or competing plausible entity. A canonical Yelp link plus name alone
+is insufficient. A material identifier conflict requires review.
+
+A normal inspected result region without a sufficient match is
+`review_required` with blocker `no_match`, never automated absence. HTTP and
+network failures, explicit access restriction, challenges, and unsupported
+result structure retain bounded internal failure classifications and remain
+neutral. Only explicit operator Not found evidence can support absence.
+Verified Yelp evidence may support the destination-specific Yelp strength
+through include/hide/refine controls. Profile URLs, provider/follow details,
+matcher decisions, candidates, and raw acquisition evidence remain outside
+customer JSON.
 
 ### Configured Google acquisition runtime
 

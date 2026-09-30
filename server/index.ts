@@ -1,4 +1,4 @@
-import { acquireAppleMapsRuntime, acquireBingSearchRuntime, acquireDuckDuckGoSearchRuntime, acquireGoogleMapsRuntime, acquireGoogleSearchRuntime, acquireRuntime, googleSearchRuntimeConfigurationStatus } from './acquisitionRuntime.ts'
+import { acquireAppleMapsRuntime, acquireBingSearchRuntime, acquireDuckDuckGoSearchRuntime, acquireGoogleMapsRuntime, acquireGoogleSearchRuntime, acquireRuntime, acquireYelpSearchRuntime, googleSearchRuntimeConfigurationStatus } from './acquisitionRuntime.ts'
 import express from 'express'
 import type { ErrorRequestHandler } from 'express'
 import { discoverDirectoryCandidates } from './directoryCandidates.ts'
@@ -21,6 +21,7 @@ app.get('/api/health', (_request, response) => {
     bingSearchAcquisition: 'configured',
     appleMapsAcquisition: 'configured',
     duckDuckGoSearchAcquisition: 'configured',
+    yelpSearchAcquisition: 'configured',
   })
 })
 
@@ -69,6 +70,14 @@ app.post('/api/acquire-duckduckgo-search', async (request, response) => {
     response.json(await acquireDuckDuckGoSearchRuntime(String(request.body.url || '')))
   } catch (error) {
     response.status(400).json({ error: error instanceof Error ? error.message : 'DuckDuckGo acquisition unavailable.' })
+  }
+})
+
+app.post('/api/acquire-yelp-search', async (request, response) => {
+  try {
+    response.json(await acquireYelpSearchRuntime(String(request.body.url || '')))
+  } catch (error) {
+    response.status(400).json({ error: error instanceof Error ? error.message : 'Yelp acquisition unavailable.' })
   }
 })
 

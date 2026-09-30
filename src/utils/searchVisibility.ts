@@ -13,7 +13,7 @@ import type {
   SearchVisibilityResult,
   SearchVisibilityTestState,
 } from '../types/audit'
-import { bingSearch, duckDuckGoSearch, googleMapsSearch, googleSearch } from './links'
+import { bingSearch, duckDuckGoSearch, googleMapsSearch, googleSearch, yelpSearch } from './links'
 import { normalizeEvidenceTimestamp } from './evidenceTime'
 
 const splitList = (value: string) => value.split(/[,;\n]/).map((item) => item.trim()).filter(Boolean)
@@ -155,12 +155,24 @@ export const brandVerificationQuery = (profile: BusinessProfile) => {
   return [profile.businessName.trim(), location].filter(Boolean).join(' ')
 }
 
+export const yelpBrandLocation = (profile: BusinessProfile) => {
+  const locality = [profile.city.trim(), profile.state.trim()].filter(Boolean).join(', ')
+  return [locality, profile.zip.trim()].filter(Boolean).join(' ')
+    || profile.targetLocation.trim()
+    || profile.localMarket.trim()
+}
+
+export const yelpBrandSearchUrl = (profile: BusinessProfile) =>
+  yelpSearch(profile.businessName, yelpBrandLocation(profile))
+
 export const verificationUrlFor = (
   destination: SearchDestination,
   query: string,
   profile?: BusinessProfile,
   brandPresence = false,
-) => publicPresenceUrl(destination, brandPresence && profile ? brandVerificationQuery(profile) || query : query)
+) => destination === 'Yelp' && brandPresence && profile
+  ? yelpBrandSearchUrl(profile)
+  : publicPresenceUrl(destination, brandPresence && profile ? brandVerificationQuery(profile) || query : query)
 
 interface ObservationNormalizationContext {
   profile?: BusinessProfile
@@ -297,4 +309,4 @@ export const recommendedActionForSearchObservation = (query: SearchVisibilityQue
 export { duckDuckGoSearch }
 
 /** Shared destination links for manual and automated acquisition. */
-export const publicPresenceUrl = (destination: SearchDestination, query: string) => destination === 'Google Search' ? googleSearch(query) : destination === 'Google Maps' ? googleMapsSearch(query) : destination === 'Bing Search' ? bingSearch(query) : destination === 'Apple Maps' ? `https://maps.apple.com/?q=${encodeURIComponent(query)}` : destination === 'Yelp' ? `https://www.yelp.com/search?find_desc=${encodeURIComponent(query)}` : destination === 'Facebook' ? `https://www.facebook.com/search/top?q=${encodeURIComponent(query)}` : destination === 'Instagram' ? `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(query)}` : duckDuckGoSearch(query)
+export const publicPresenceUrl = (destination: SearchDestination, query: string) => destination === 'Google Search' ? googleSearch(query) : destination === 'Google Maps' ? googleMapsSearch(query) : destination === 'Bing Search' ? bingSearch(query) : destination === 'Apple Maps' ? `https://maps.apple.com/?q=${encodeURIComponent(query)}` : destination === 'Yelp' ? yelpSearch(query) : destination === 'Facebook' ? `https://www.facebook.com/search/top?q=${encodeURIComponent(query)}` : destination === 'Instagram' ? `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(query)}` : duckDuckGoSearch(query)

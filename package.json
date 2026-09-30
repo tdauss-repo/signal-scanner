@@ -13,6 +13,7 @@
     "diagnose:bing-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-bing-acquisition.ts",
     "diagnose:apple-maps-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-apple-maps-acquisition.ts",
     "diagnose:duckduckgo-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-duckduckgo-acquisition.ts",
+    "diagnose:yelp-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-yelp-acquisition.ts",
     "test:proving-001": "node --import tsx scripts/test-website-audit.ts && node --import tsx scripts/test-website-evidence-contract.ts",
     "test:proving-002": "node --import tsx scripts/test-browser-website-observation.ts",
     "test:profile-separation": "node --import tsx scripts/test-profile-separation.ts",
@@ -65,7 +66,9 @@
     "test:apple-maps-production-wiring": "node --import tsx scripts/test-apple-maps-production-wiring.ts",
     "test:apple-maps-redirect-evidence": "node --import tsx scripts/test-apple-maps-redirect-evidence.ts",
     "test:apple-maps-search-redirect": "node --import tsx scripts/test-apple-maps-search-redirect.ts",
-    "test:duckduckgo-auto-verification": "node --import tsx scripts/test-duckduckgo-auto-verification.tsx"
+    "test:duckduckgo-auto-verification": "node --import tsx scripts/test-duckduckgo-auto-verification.tsx",
+    "test:yelp-production-wiring": "node --import tsx scripts/test-yelp-production-wiring.ts",
+    "test:yelp-auto-verification": "node --import tsx scripts/test-yelp-auto-verification.tsx"
   },
   "dependencies": {
     "express": "^5.2.1",

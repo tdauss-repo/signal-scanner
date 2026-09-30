@@ -14,6 +14,13 @@ export const bingSearch = (query: string) =>
 export const duckDuckGoSearch = (query: string) =>
   `https://duckduckgo.com/?q=${encode(query)}`
 
+export const yelpSearch = (businessName: string, location = '') => {
+  const url = new URL('https://www.yelp.com/search')
+  url.searchParams.set('find_desc', businessName.trim())
+  if (location.trim()) url.searchParams.set('find_loc', location.trim())
+  return url.href
+}
+
 export const richResultsTest = (url: string) =>
   `https://search.google.com/test/rich-results?url=${encode(url)}`
 

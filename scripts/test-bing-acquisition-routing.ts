@@ -47,7 +47,7 @@ assert.equal(destinationAcquisitionRoute('Google Search', 'brand'), 'google_sear
 assert.equal(destinationAcquisitionRoute('Google Maps', 'brand'), 'google_maps')
 assert.equal(destinationAcquisitionRoute('Bing Search', 'brand'), 'bing_native_search', '1: Bing Brand has an explicit dedicated route')
 assert.equal(destinationAcquisitionRoute('Bing Search', 'location'), 'generic', 'Location Diagnostic retains its existing route')
-assert.equal(destinationAcquisitionRoute('Yelp', 'brand'), 'generic', '9: other destinations retain the generic route')
+assert.equal(destinationAcquisitionRoute('Yelp', 'brand'), 'yelp_native_search', 'Yelp Brand has its own dedicated route')
 
 const originalFetch = globalThis.fetch
 let endpoint = ''
@@ -99,7 +99,8 @@ assert.equal(brandCheck.captures[0].provider, 'bing-native-fetch')
 assert.equal(brandCheck.assessment?.bingIdentityDecision?.decision, 'verified', '6: successful dedicated evidence reaches the existing matcher')
 assert.equal(current.searchDestinationObservations['search-brand-canonical']?.['Bing Search']?.overallResult, 'found_match')
 assert(googleCalls.length > 0 && mapsCalls.length > 0, '8: Google routes remain dedicated')
-assert(genericCalls.some((call) => call.url.includes('yelp.com')), '9: other destinations retain generic routing')
+const yelpBrand = run.checks.find((check) => check.destination === 'Yelp' && check.queryMode === 'brand')!
+assert.equal(genericCalls.some((call) => call.url === yelpBrand.url), false, 'Yelp Brand cannot fall through to generic routing')
 
 let unavailableState = state()
 const unavailableGeneric: Array<{ url: string; method: string }> = []

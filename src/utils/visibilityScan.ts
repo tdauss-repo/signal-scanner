@@ -42,6 +42,8 @@ export interface ScanDependencies {
   acquireAppleMaps?(url: string): Promise<AcquisitionResult | undefined>
   /** Dedicated bounded public DuckDuckGo Brand Search provider. */
   acquireDuckDuckGoSearch?(url: string): Promise<AcquisitionResult | undefined>
+  /** Dedicated bounded public Yelp Brand Search provider. */
+  acquireYelpSearch?(url: string): Promise<AcquisitionResult | undefined>
   cancelled?: () => boolean
   /** Test/runtime override. Application defaults keep each operation and the entire run bounded. */
   operationTimeoutMs?: number
@@ -57,6 +59,7 @@ export interface ApplicationVisibilityScanDependencies extends ScanDependencies 
   acquireBingSearch(url: string): Promise<AcquisitionResult | undefined>
   acquireAppleMaps(url: string): Promise<AcquisitionResult | undefined>
   acquireDuckDuckGoSearch(url: string): Promise<AcquisitionResult | undefined>
+  acquireYelpSearch(url: string): Promise<AcquisitionResult | undefined>
 }
 const defaultOperationTimeoutMs = 30_000
 /** Two bounded SERP attempts plus one optional remote-browser fallback fit below the 180-second scan boundary. */
@@ -101,6 +104,12 @@ const acquireDuckDuckGoSearchFromApi: NonNullable<ScanDependencies['acquireDuckD
   if (!response.ok) throw new Error(body.error || 'DuckDuckGo acquisition request failed.')
   return body.capture
 }
+const acquireYelpSearchFromApi: NonNullable<ScanDependencies['acquireYelpSearch']> = async (url) => {
+  const response = await fetch('/api/acquire-yelp-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(35_000) })
+  const body = await response.json()
+  if (!response.ok) throw new Error(body.error || 'Yelp acquisition request failed.')
+  return body.capture
+}
 
 /** The sole production composition path used by App and production-wiring tests. */
 export function createApplicationVisibilityScanDependencies(
@@ -115,6 +124,7 @@ export function createApplicationVisibilityScanDependencies(
     acquireBingSearch: acquireBingSearchFromApi,
     acquireAppleMaps: acquireAppleMapsFromApi,
     acquireDuckDuckGoSearch: acquireDuckDuckGoSearchFromApi,
+    acquireYelpSearch: acquireYelpSearchFromApi,
     ...options,
   }
 }
@@ -122,7 +132,7 @@ export function createApplicationVisibilityScanDependencies(
 /** Compatibility export for existing CLI/proving callers; App constructs a fresh dependency object. */
 export const applicationScanDependencies = createApplicationVisibilityScanDependencies()
 
-export type DestinationAcquisitionRoute = 'google_search' | 'google_maps' | 'bing_native_search' | 'apple_maps_native' | 'duckduckgo_native_search' | 'generic'
+export type DestinationAcquisitionRoute = 'google_search' | 'google_maps' | 'bing_native_search' | 'apple_maps_native' | 'duckduckgo_native_search' | 'yelp_native_search' | 'generic'
 
 /** Brand destination dispatch is explicit so dedicated routes cannot silently enter the generic ladder. */
 export function destinationAcquisitionRoute(
@@ -134,6 +144,7 @@ export function destinationAcquisitionRoute(
   if (destination === 'Bing Search' && queryMode === 'brand') return 'bing_native_search'
   if (destination === 'Apple Maps' && queryMode === 'brand') return 'apple_maps_native'
   if (destination === 'DuckDuckGo' && queryMode === 'brand') return 'duckduckgo_native_search'
+  if (destination === 'Yelp' && queryMode === 'brand') return 'yelp_native_search'
   return 'generic'
 }
 
@@ -314,7 +325,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       (destination !== 'Google Search' || new URL(url).pathname === '/search') &&
       (destination !== 'Google Maps' || new URL(url).pathname.startsWith('/maps')))
     run.checks.push({ ...check(`${query.id}:${destination}`, 'SearchMaps'), destination, queryId: query.id, query: query.query, queryMode: query.isDiagnostic ? 'location' : query.role === 'Brand Presence' ? 'brand' : 'discovery',
-      url: destination === 'Google Search' || ['Bing Search', 'Apple Maps', 'DuckDuckGo'].includes(destination) && query.id === 'search-brand-canonical'
+      url: destination === 'Google Search' || ['Bing Search', 'Apple Maps', 'DuckDuckGo', 'Yelp'].includes(destination) && query.id === 'search-brand-canonical'
         ? verificationUrl
         : enhanced && query.isDiagnostic ? publicPresenceUrl(destination, query.query) : query.role === 'Brand Presence' ? configured || recorded || publicPresenceUrl(destination, query.query) : publicPresenceUrl(destination, query.query) })
   }
@@ -376,11 +387,14 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireAppleMaps
     const duckDuckGoProvider = dependencies.acquireDuckDuckGoSearch === applicationScanDependencies.acquireDuckDuckGoSearch
       && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireDuckDuckGoSearch
+    const yelpProvider = dependencies.acquireYelpSearch === applicationScanDependencies.acquireYelpSearch
+      && dependencies.acquire !== applicationScanDependencies.acquire ? undefined : dependencies.acquireYelpSearch
     const dedicatedProvider = acquisitionRoute === 'google_search' ? googleProvider
       : acquisitionRoute === 'google_maps' ? googleMapsProvider
         : acquisitionRoute === 'bing_native_search' ? dependencies.acquireBingSearch
           : acquisitionRoute === 'apple_maps_native' ? appleMapsProvider
-            : acquisitionRoute === 'duckduckgo_native_search' ? duckDuckGoProvider : undefined
+            : acquisitionRoute === 'duckduckgo_native_search' ? duckDuckGoProvider
+              : acquisitionRoute === 'yelp_native_search' ? yelpProvider : undefined
     if (dedicatedProvider) {
       try {
         const timeoutMs = item.destination === 'Google Search' && item.queryMode === 'brand' ? googleBrandOperationTimeoutMs : operationTimeoutMs
@@ -410,12 +424,13 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       } catch (error) {
         const errorText = `${error instanceof Error ? error.name : ''} ${error instanceof Error ? error.message : String(error)}`
         const blocker = error instanceof VisibilityScanTimeoutError ? 'provider_timeout'
-          : /(?:Bing native|Apple Maps native|DuckDuckGo native) acquisition busy/i.test(errorText) ? 'capacity_busy'
+          : /(?:Bing native|Apple Maps native|DuckDuckGo native|Yelp native) acquisition busy/i.test(errorText) ? 'capacity_busy'
             : /Failed to fetch|network/i.test(errorText) ? 'network_failure' : 'acquisition_failure'
         const provider = item.destination === 'Google Maps' ? 'brightdata-google-maps-request'
           : item.destination === 'Google Search' ? 'brightdata-google-request'
             : item.destination === 'Apple Maps' ? 'apple-maps-native-request'
-              : item.destination === 'DuckDuckGo' ? 'duckduckgo-native-request' : 'bing-native-request'
+              : item.destination === 'DuckDuckGo' ? 'duckduckgo-native-request'
+                : item.destination === 'Yelp' ? 'yelp-native-request' : 'bing-native-request'
         captures.push({ version: 1, requestedUrl: item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch', provider, outcome: 'failed', confidence: 'unavailable', notes: [`${item.destination || 'Destination'} provider request failed. This is not evidence that the business is absent.`], blocker, error: String(error) })
         dedicatedProviderHandled = true
       }
@@ -450,6 +465,16 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       })
       dedicatedProviderHandled = true
     }
+    if (acquisitionRoute === 'yelp_native_search' && !dedicatedProvider) {
+      captures.push({
+        version: 1, requestedUrl: item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch',
+        provider: 'yelp-native-request', checkedDestination: 'Yelp', outcome: 'unavailable', confidence: 'unavailable',
+        resultRegionInspected: false, blocker: 'yelp_acquisition_not_configured',
+        notes: ['The dedicated Yelp Brand acquisition route was unavailable. This is not evidence that the business is absent.'],
+        error: 'Dedicated Yelp acquisition is not configured.',
+      })
+      dedicatedProviderHandled = true
+    }
     if (!dedicatedProviderHandled) {
       for (const method of ['server_fetch', 'rendered_browser'] as const) {
         if (!alive()) return run
@@ -480,7 +505,8 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
           : item.destination === 'Google Search' ? 'google_search'
             : item.destination === 'Bing Search' ? 'bing_search'
               : item.destination === 'Apple Maps' ? 'apple_maps'
-                : item.destination === 'DuckDuckGo' ? 'duckduckgo_search' : undefined,
+                : item.destination === 'DuckDuckGo' ? 'duckduckgo_search'
+                  : item.destination === 'Yelp' ? 'yelp' : undefined,
       })
         : assessments.find((value) => value.visibilityResult === 'not_found') || assessments.at(-1) || { matches: [], confidence: 'unavailable' as const, automaticObservation: false, visibilityResult: 'unavailable' as const, operatorReviewRequired: true, resultRegionInspected: false, ambiguityReasons: [item.error || 'No usable public evidence was captured.'], blocker: 'runtime_unavailable' as const, tier3Candidate: false }
       assessment.resultRegionInspected ||= assessments.some((value) => value.resultRegionInspected)

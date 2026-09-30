@@ -46,6 +46,8 @@ export interface GoogleIdentityDecision {
 export type BingIdentityDecision = GoogleIdentityDecision
 /** Explainable DuckDuckGo Brand decision with destination-specific provenance. */
 export type DuckDuckGoIdentityDecision = GoogleIdentityDecision
+/** Explainable Yelp Brand decision using the shared strong-identifier rule. */
+export type YelpIdentityDecision = GoogleIdentityDecision
 export interface SearchEntityAssessment {
   matches: EntityMatch[]
   selected?: EntityMatch
@@ -63,4 +65,6 @@ export interface SearchEntityAssessment {
   bingIdentityDecision?: BingIdentityDecision
   /** Explainable DuckDuckGo Brand identity decision. Raw acquired candidates remain unchanged. */
   duckDuckGoIdentityDecision?: DuckDuckGoIdentityDecision
+  /** Explainable Yelp Brand identity decision. Raw acquired candidates remain unchanged. */
+  yelpIdentityDecision?: YelpIdentityDecision
 }
