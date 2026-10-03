@@ -260,7 +260,7 @@ Brand Presence destination dispatch is explicit:
 | DuckDuckGo | Dedicated bounded native DuckDuckGo HTML acquisition |
 | Yelp | Dedicated bounded native Yelp search acquisition with optional one-profile enrichment |
 | Facebook | Explicit-profile discovery, then dedicated bounded native Facebook page acquisition |
-| Instagram | Existing destination/generic path |
+| Instagram | Explicit-profile discovery, then dedicated bounded native Instagram profile acquisition |
 
 Bing Search Brand Presence must not fall through to generic public acquisition
 or its rendered-browser fallback. Missing dedicated wiring and native Bing
@@ -273,18 +273,19 @@ unchanged.
 Production visibility-scan dependencies are constructed by the single
 `createApplicationVisibilityScanDependencies()` composition used by `App` and
 the production-composition regression test. Its production contract requires
-the dedicated Bing, Apple Maps, DuckDuckGo, Yelp, and Facebook adapters, which post to
+the dedicated Bing, Apple Maps, DuckDuckGo, Yelp, Facebook, and Instagram adapters, which post to
 `/api/acquire-bing-search`, `/api/acquire-apple-maps`, and
 `/api/acquire-duckduckgo-search`, `/api/acquire-yelp-search`, and
-`/api/acquire-facebook-page`. The
+`/api/acquire-facebook-page`, and `/api/acquire-instagram-profile`. The
 general scan contract remains injectable for fixtures and CLI tools, but a
 missing Bing adapter fails closed as `bing_acquisition_not_configured`; it can
 never select generic public acquisition or rendered-browser acquisition. The
-Apple Maps, DuckDuckGo, Yelp, and Facebook adapters follow the same fail-closed composition rule
+Apple Maps, DuckDuckGo, Yelp, Facebook, and Instagram adapters follow the same fail-closed composition rule
 with `apple_maps_acquisition_not_configured` and
 `duckduckgo_acquisition_not_configured`, and
 `yelp_acquisition_not_configured`, and
-`facebook_acquisition_not_configured`.
+`facebook_acquisition_not_configured`, and
+`instagram_acquisition_not_configured`.
 
 Bing Brand Presence uses one bounded native server request to the clean
 `bing.com/search?q=...` verification query. The request does not execute
@@ -546,12 +547,72 @@ the Facebook presence-and-identity strength through normal include/hide/refine
 controls; discovery sources, URLs, provider data, matcher decisions, and raw
 page evidence remain outside customer JSON.
 
-The bounded URL canonicalizer, explicit social-profile discovery record,
-login/access classifier, and public Open Graph/metadata extractor are shared
-Meta primitives. They can support a future Instagram adapter, but Instagram
-routing and verification are deliberately unchanged: a future implementation
-must separately prove that Instagram exposes sufficient public identity under
-the same no-login/no-bypass boundary.
+The bounded URL canonicalizer, material explicit social-profile discovery
+record, login/access classifier, and public Open Graph/business-metadata and
+JSON-LD normalizer are shared Meta primitives. Facebook keeps its platform-
+specific public route and one-approved-redirect policy.
+
+### Instagram Brand Presence verification
+
+Instagram Brand Presence follows the same profile-URL-first architecture as
+Facebook. Found Local never derives or guesses an Instagram handle from a
+business name. It discovers only an explicit public Instagram profile link in
+the latest successful first-party website audit, in current automatically
+verified search evidence whose candidate name matches the reviewed business,
+or in already modeled operator-reviewed business-profile URL metadata.
+Icon-only markup, plain-text references to Instagram, keyword similarity, and
+non-profile routes such as `/explore/`, `/accounts/`, `/reel/`, `/p/`,
+`/stories/`, and `/direct/` are not profile discovery. A discovered link is
+canonicalized to `https://www.instagram.com/<handle>` with query and fragment
+noise removed. The retained discovery record includes the canonical URL,
+source, source URL when available, and a material evidence fingerprint.
+Discovery proves only that trusted public evidence linked to the profile; it
+does not prove current profile identity.
+
+The exact discovered profile is sent to `/api/acquire-instagram-profile`. The
+`instagram-native-fetch` adapter makes exactly one public HTML request with an
+ordinary desktop user agent, US-English headers, a twelve-second timeout, and
+a one-megabyte response limit. Redirects are classified but not followed. The
+adapter uses no cookies, login state, copied operator cookies, private Meta
+API, challenge bypass, local browser, or rendered-browser fallback. Missing
+production composition fails closed as
+`instagram_acquisition_not_configured`; missing discovery makes no Instagram
+request and remains neutral.
+
+Only bounded public profile identity metadata is normalized: canonical and
+Open Graph profile URL and title, meta description as bounded supporting
+evidence, explicitly linked website, public business category and contact
+fields when structurally exposed, and clearly public business JSON-LD. Posts,
+comments, followers, likes, stories, private content, and interaction feeds are
+outside the contract. Follower counts are never identity proof.
+
+Automatic Instagram verification reuses the reviewed-identity matcher and its
+existing threshold: at least two strong groups from name, official domain,
+phone, or address; one must be name or official domain; and no material
+conflict or competing plausible entity may exist. Profile URL, handle, and
+business name alone are insufficient. A matching public profile name plus the
+reviewed official domain can verify. A materially different asserted domain
+is conflicting evidence and requires operator review.
+
+Login walls, auth redirects, challenges, HTTP 403/access denial, and accessible
+profiles without enough stable identity metadata remain neutral. When an
+explicit profile was discovered, the operator surface says “Profile discovered
+— verification needed,” retains the canonical profile link, and offers manual
+verification. Without an explicit profile, it says “Verification needed” and
+makes no guessed request. Only explicit operator `not_found` evidence may
+establish absence. Only fully verified automatic or operator evidence may
+support the Instagram customer strength; discovery, URLs, acquisition details,
+matcher decisions, and blockers remain outside Customer Visibility Review
+JSON.
+
+### Meta future authenticated operator assistance
+
+Facebook and Instagram are candidates for a future authenticated operator-
+assisted verification layer using the operator's normal logged-in browser
+context. That future capability would sit above the current bounded public
+acquisition layer and is not implemented. Found Local stores no Meta
+credentials and performs no automated login. No guessed handles are permitted
+in either the public or future operator-assisted flow.
 
 ### Configured Google acquisition runtime
 

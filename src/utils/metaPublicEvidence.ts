@@ -41,6 +41,8 @@ export function classifyMetaPublicAccess(platform: MetaPlatform, status: number,
   if (/\/(?:accounts\/)?(?:login|signin)(?:[/?#]|$)/i.test(finalUrl) ||
     /<form\b[^>]*action=["'][^"']*(?:login|signin)/i.test(page) ||
     (!hasPublicPageIdentity && new RegExp(`(?:log in|sign in) to ${platform}`, 'i').test(page))) return 'login_required'
+  if (!hasPublicPageIdentity && (/\/(?:consent|privacy\/consent)(?:[/?#]|$)/i.test(finalUrl) ||
+    /(?:before you continue|allow (?:all|essential|optional) cookies|consent required)/i.test(page))) return 'access_restricted'
   if ([401, 403, 407, 429].includes(status) || /\b(?:access denied|forbidden|request blocked)\b/i.test(page)) return 'access_restricted'
   if (/captcha|verify (?:that )?you are human|not a robot|unusual traffic|automated quer/i.test(page)) return 'challenge'
   return undefined

@@ -138,7 +138,7 @@ assert.equal(operatorFallback.ok, true)
 assert.equal(projectSalesVisibility({ ...blocked, operatorVerification: operatorFallback.ok ? operatorFallback.verification : undefined }, { profile, profileState }).state, 'verified_by_operator')
 
 assert.equal(destinationAcquisitionRoute('Facebook', 'brand'), 'facebook_native_page')
-assert.equal(destinationAcquisitionRoute('Instagram', 'brand'), 'generic')
+assert.equal(destinationAcquisitionRoute('Instagram', 'brand'), 'instagram_native_profile')
 const requests: Array<{ endpoint: string; body: Record<string, unknown> }> = []
 const originalFetch = globalThis.fetch
 globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {

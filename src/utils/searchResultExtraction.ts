@@ -288,12 +288,13 @@ export function assessSearchCapture(capture: AcquisitionResult, profile: Busines
           : destination === 'Apple Maps' ? 'apple_maps'
               : destination === 'DuckDuckGo' ? 'duckduckgo_search'
               : destination === 'Yelp' ? 'yelp'
-                : destination === 'Facebook' ? 'facebook' : undefined,
+                : destination === 'Facebook' ? 'facebook'
+                  : destination === 'Instagram' ? 'instagram' : undefined,
   })
   const resultRegionInspected = Boolean(capture.resultRegionInspected || capture.renderedResultEvidence?.resultRegionInspected || (candidates.length && /<(?:main|article)\b|role=["'](?:main|listitem)["']/i.test(capture.html || '')))
   assessment.resultRegionInspected = resultRegionInspected
   if (!assessment.matches.length && resultRegionInspected && reviewedProfileValue(profile, profileState, 'businessName')) {
-    const neutralBrandNoMatch = queryMode === 'brand' && ['Bing Search', 'Apple Maps', 'DuckDuckGo', 'Yelp', 'Facebook'].includes(destination)
+    const neutralBrandNoMatch = destination === 'Instagram' || queryMode === 'brand' && ['Bing Search', 'Apple Maps', 'DuckDuckGo', 'Yelp', 'Facebook'].includes(destination)
     assessment.visibilityResult = neutralBrandNoMatch ? 'review_required' : 'not_found'
     assessment.operatorReviewRequired = neutralBrandNoMatch
     assessment.blocker = 'no_match'

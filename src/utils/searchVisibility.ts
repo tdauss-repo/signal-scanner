@@ -146,7 +146,7 @@ export const canonicalProfileUrlForDestination = (destination: SearchDestination
   if (destination === 'Apple Maps') return host === 'maps.apple.com' && /\/place(?:[/?#]|$)/i.test(url.pathname) ? safe : undefined
   if (destination === 'Yelp') return host === 'yelp.com' && /\/biz(?:[/?#]|$)/i.test(url.pathname) ? safe : undefined
   if (destination === 'Facebook') return canonicalMetaProfileUrl('Facebook', safe)
-  return (host === 'instagram.com' || host.endsWith('.instagram.com')) && !/^\/(?:accounts|explore|reels?)(?:[/?#]|$)/i.test(url.pathname) && url.pathname !== '/' ? safe : undefined
+  return canonicalMetaProfileUrl('Instagram', safe) || undefined
 }
 
 export const brandVerificationQuery = (profile: BusinessProfile) => {

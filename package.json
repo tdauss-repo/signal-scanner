@@ -15,6 +15,7 @@
     "diagnose:duckduckgo-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-duckduckgo-acquisition.ts",
     "diagnose:yelp-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-yelp-acquisition.ts",
     "diagnose:facebook-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-facebook-acquisition.ts",
+    "diagnose:instagram-acquisition": "node --env-file-if-exists=.env.runtime.local --import tsx scripts/diagnose-instagram-acquisition.ts",
     "test:proving-001": "node --import tsx scripts/test-website-audit.ts && node --import tsx scripts/test-website-evidence-contract.ts",
     "test:proving-002": "node --import tsx scripts/test-browser-website-observation.ts",
     "test:profile-separation": "node --import tsx scripts/test-profile-separation.ts",
@@ -70,7 +71,9 @@
     "test:duckduckgo-auto-verification": "node --import tsx scripts/test-duckduckgo-auto-verification.tsx",
     "test:yelp-production-wiring": "node --import tsx scripts/test-yelp-production-wiring.ts",
     "test:yelp-auto-verification": "node --import tsx scripts/test-yelp-auto-verification.tsx",
-    "test:facebook-auto-verification": "node --import tsx scripts/test-facebook-auto-verification.tsx"
+    "test:facebook-auto-verification": "node --import tsx scripts/test-facebook-auto-verification.tsx",
+    "test:instagram-production-wiring": "node --import tsx scripts/test-instagram-production-wiring.ts",
+    "test:instagram-auto-verification": "node --import tsx scripts/test-instagram-auto-verification.tsx"
   },
   "dependencies": {
     "express": "^5.2.1",

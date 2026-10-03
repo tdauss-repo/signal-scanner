@@ -64,10 +64,12 @@ export interface AcquisitionResult {
   }
   /** Explicit public social-profile seed retained separately from page verification. */
   profileDiscovery?: {
-    source: 'first_party_website' | 'search_evidence'
+    source: 'first_party_website' | 'search_evidence' | 'reviewed_business_profile'
     profileUrl: string
     sourceUrl?: string
     observedName?: string
+    /** Present on newly discovered profiles; optional for saved-workspace compatibility. */
+    evidenceKey?: string
   }
   notes: string[]
   confidence: 'captured' | 'operator_supplied' | 'unavailable'

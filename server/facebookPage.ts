@@ -1,8 +1,8 @@
 import type { AcquisitionResult } from '../src/types/acquisition.ts'
-import type { BusinessResultCandidate, EntityField, EvidenceReference } from '../src/types/entityMatch.ts'
-import { canonicalMetaProfileUrl, classifyMetaPublicAccess, extractMetaPublicMetadata } from '../src/utils/metaPublicEvidence.ts'
-import { isBusinessEntityType, parseJsonLdBlocks, structuredEntityAddress, textValue, walkStructuredData } from '../src/utils/structuredEntities.ts'
+import type { BusinessResultCandidate } from '../src/types/entityMatch.ts'
+import { canonicalMetaProfileUrl, classifyMetaPublicAccess } from '../src/utils/metaPublicEvidence.ts'
 import { checkPublicDns, publicUrl } from './acquisition.ts'
+import { normalizeMetaProfileCandidates } from './metaProfileCandidates.ts'
 import { fetchPage } from './pageTransport.ts'
 
 export interface FacebookTransportResult {
@@ -24,76 +24,18 @@ export const facebookRequestHeaders = {
   'accept-language': 'en-US,en;q=0.9',
 } as const
 
-const clean = (value: unknown, max = 1000) => typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : ''
 const facebookRedirectStatuses = new Set([301, 302, 303, 307, 308])
-const host = (value: string) => { try { return new URL(value).hostname.toLowerCase().replace(/^www\./, '') } catch { return '' } }
 const safeHttpsUrl = (value: unknown, base: string) => {
   try {
-    const url = new URL(clean(value, 3000), base)
+    const url = new URL(typeof value === 'string' ? value.trim().slice(0, 3000) : '', base)
     return url.protocol === 'https:' && !url.username && !url.password ? url.href : ''
   } catch { return '' }
 }
-const safePublicUrl = (value: unknown, base: string) => {
-  try {
-    const url = new URL(clean(value, 3000), base)
-    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : ''
-  } catch { return '' }
-}
-const reference = (sourceUrl: string, acquiredAt: string, locator: string, excerpt: string): EvidenceReference => ({
-  sourceUrl, acquiredAt, provider: 'facebook-native-fetch', method: 'server_fetch', locator, excerpt: excerpt.slice(0, 2500),
-})
-const structuredCandidates = (html: string, sourceUrl: string, profileUrl: string, acquiredAt: string): BusinessResultCandidate[] => {
-  const nodes = walkStructuredData(parseJsonLdBlocks(html).blocks)
-  return nodes.filter((entry) => entry.types.some(isBusinessEntityType)).slice(0, 30).flatMap(({ node, types, path }, index) => {
-    const name = textValue(node.name)
-    if (!name || /^(?:facebook|meta|meta platforms)(?: inc\.?|,? inc\.?)?$/i.test(name)) return []
-    const assertedUrl = safePublicUrl(textValue(node.url) || textValue(node['@id']), sourceUrl)
-    const assertedProfile = canonicalMetaProfileUrl('Facebook', assertedUrl, sourceUrl)
-    if (assertedProfile && assertedProfile !== profileUrl) return []
-    const address = structuredEntityAddress(node, nodes)
-    const fields: BusinessResultCandidate['fields'] = { name, publicProfileUrl: profileUrl }
-    const mapping: Array<[EntityField, unknown]> = [
-      ['phone', node.telephone], ['category', node.category], ['streetAddress', address.streetAddress],
-      ['locality', address.addressLocality], ['region', address.addressRegion], ['postalCode', address.postalCode],
-    ]
-    for (const [field, value] of mapping) if (textValue(value)) fields[field] = textValue(value)
-    const fullAddress = typeof node.address === 'string' ? clean(node.address) : [fields.streetAddress, fields.locality, fields.region, fields.postalCode].filter(Boolean).join(', ')
-    if (fullAddress) fields.address = fullAddress
-    // `sameAs` commonly mixes social and directory links; only an explicitly asserted
-    // entity URL that is not the Facebook page itself may serve as the website field.
-    const website = assertedUrl && !assertedProfile && !['facebook.com', 'instagram.com'].includes(host(assertedUrl)) ? assertedUrl : ''
-    if (website) fields.website = website
-    return [{
-      id: `facebook-structured-${index + 1}`, kind: 'structured_entity' as const, sourceType: 'local_place' as const,
-      resultUrl: profileUrl, fields, schemaTypes: types,
-      evidence: [reference(sourceUrl, acquiredAt, path, JSON.stringify(node))],
-    }]
-  })
-}
-
 /** Extract only canonical/Open Graph business metadata and bounded JSON-LD. */
 export function normalizeFacebookPageCandidates(html: string, sourceUrl: string, acquiredAt: string): BusinessResultCandidate[] {
-  const metadata = extractMetaPublicMetadata(html)
-  const canonical = canonicalMetaProfileUrl('Facebook', metadata.canonical || metadata['og:url'] || sourceUrl, sourceUrl)
-    || canonicalMetaProfileUrl('Facebook', sourceUrl)
-  if (!canonical) return []
-  const fields: BusinessResultCandidate['fields'] = { publicProfileUrl: canonical }
-  const assertedWebsite = safePublicUrl(metadata['business:contact_data:website'], sourceUrl)
-  const mapping: Array<[EntityField, string | undefined]> = [
-    ['name', metadata['og:title']], ['website', assertedWebsite && !['facebook.com', 'instagram.com'].includes(host(assertedWebsite)) ? assertedWebsite : undefined],
-    ['phone', metadata['business:contact_data:phone_number']], ['streetAddress', metadata['business:contact_data:street_address']],
-    ['locality', metadata['business:contact_data:locality']], ['region', metadata['business:contact_data:region']],
-    ['postalCode', metadata['business:contact_data:postal_code']],
-  ]
-  for (const [field, value] of mapping) if (value) fields[field] = value
-  if (fields.streetAddress && fields.locality && fields.region && fields.postalCode) {
-    fields.address = [fields.streetAddress, fields.locality, fields.region, fields.postalCode].join(', ')
-  }
-  const metadataCandidate: BusinessResultCandidate[] = fields.name ? [{
-    id: 'facebook-open-graph', kind: 'semantic_card', sourceType: 'local_place', resultUrl: canonical, fields,
-    evidence: [reference(sourceUrl, acquiredAt, 'public Open Graph/business metadata', JSON.stringify(Object.fromEntries(Object.entries(metadata).filter(([key]) => key === 'canonical' || key === 'og:url' || key === 'og:title' || key.startsWith('business:contact_data:')))))],
-  }] : []
-  return [...structuredCandidates(html, sourceUrl, canonical, acquiredAt), ...metadataCandidate]
+  return normalizeMetaProfileCandidates(html, sourceUrl, acquiredAt, {
+    platform: 'Facebook', provider: 'facebook-native-fetch', candidatePrefix: 'facebook',
+  })
 }
 
 const defaultTransport = async (url: URL, signal: AbortSignal): Promise<FacebookTransportResult> => {
