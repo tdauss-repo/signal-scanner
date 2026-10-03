@@ -28,7 +28,7 @@ import { createIsolatedBusinessWorkspace } from './utils/workspaceIsolation'
 import { buildAuditItems } from './data/auditCatalog'
 import { applyCurrentCatalogMetadata, migrateSystemGeneratedFix } from './utils/catalogMetadata'
 import { defaultProfile } from './data/demoProfile'
-import type { AIAnswerObservation, AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem, SavedScanFile, SavedScanRecord, SearchDestinationObservation, SearchVisibilityQuery, VoiceAssistantObservation, VoicePromptTestState } from './types/audit'
+import type { AIAnswerObservation, AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem, PackageCommercialPricing, SavedScanFile, SavedScanRecord, SearchDestinationObservation, SearchVisibilityQuery, VoiceAssistantObservation, VoicePromptTestState } from './types/audit'
 import type { ManualWebsiteObservation } from './types/websiteAudit'
 import { aiAnswerPlatforms, numericOverallScoreAreas, overallVisibilityCheckedCount, overallVisibilityScore, scoreItems, trafficStatusForScore } from './utils/scoring'
 import { analyzeBrowserWebsiteObservation, analyzeManualWebsiteObservation, mergeBrowserMappingWithServerPrecedence } from './utils/websiteAutoAudit'
@@ -72,6 +72,7 @@ import { projectPublicObservationToProfiles, summarizePublicPresence } from './u
 import { entityAction, normalizeSalesReadiness, questionAction, sortSalesActions } from './utils/salesReadiness'
 import { buildPackageScopeOverride, type PackageScopeInput } from './utils/packagePreparation'
 import { buildCustomerStrengthPresentation, type CustomerStrengthCandidate, type CustomerStrengthInput } from './utils/customerStrengths'
+import { normalizePackagePricingState } from './utils/packagePricing'
 
 const storageKey = 'local-signal-scanner-state'
 const activeViewStorageKey = 'business-scanner-active-view'
@@ -478,6 +479,7 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
           ),
         ),
       salesReadiness: normalizeSalesReadiness(parsed.salesReadiness, profile),
+      packagePricing: normalizePackagePricingState(parsed.packagePricing),
     }
 }
 
@@ -738,6 +740,18 @@ function App() {
         lastUpdated: new Date().toISOString(),
       }
     })
+  }
+
+  const savePackagePricing = (key: string, pricing: PackageCommercialPricing) => {
+    setAuditState((current) => ({
+      ...current,
+      packagePricing: {
+        version: 1,
+        currency: 'USD',
+        packages: { ...current.packagePricing?.packages, [key]: pricing },
+      },
+      lastUpdated: new Date().toISOString(),
+    }))
   }
 
   const currentSavedScan = savedScans.find((scan) => scan.id === currentScanId)
@@ -1621,7 +1635,7 @@ function App() {
             </div>
           </section>
 
-          <PackagePreparationPanel state={auditState} fixes={salesFixes} onSaveScope={savePackageScope} />
+          <PackagePreparationPanel state={auditState} fixes={salesFixes} onSaveScope={savePackageScope} onSavePricing={savePackagePricing} />
         </div>
       )
     }
@@ -2080,6 +2094,7 @@ function App() {
       onConfirmFinding={confirmCustomerFinding}
       onSaveStrength={saveCustomerStrength}
       onSavePackageScope={savePackageScope}
+      onSavePackagePricing={savePackagePricing}
       currentScanId={currentScanId}
       dirty={hasUnsavedChanges}
       scans={savedScans}

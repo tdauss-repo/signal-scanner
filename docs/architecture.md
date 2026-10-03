@@ -95,7 +95,10 @@ Review → Verification`:
    visible in a separate reconciliation queue until the current finding and
    its delivery scope are reconfirmed. Snapshot-backed decisions also keep a
    prior finding visible when it no longer appears in the latest candidate set.
-   Internal scope notes stay inside the operator workspace.
+   Internal scope notes stay inside the operator workspace. Operator-controlled
+   package pricing is stored separately from evidence-bound scope overrides, so
+   a commercial edit never changes finding truth, approval, wording, or scope
+   reconciliation.
 5. **Customer Review** is the final operator quality gate. Its human-readable
    QA frame, copyable review text, and sanitized version 1.0 JSON are all built
    from the same customer-safe projection of reviewed identity, area-specific
@@ -103,7 +106,10 @@ Review → Verification`:
    scope. The version 1.0 contract keeps Starter line items in
    `recommendedPackage.included`; separate assignments use each approved
    issue's existing customer-safe package label and delivery-action fields, so
-   separate work is not misrepresented as Starter scope.
+   separate work is not misrepresented as Starter scope. Additive optional
+   pricing fields carry the exact operator-entered offer without changing the
+   version 1.0 customer contract or requiring historical workspaces to invent a
+   zero price.
 6. **Verification** records completed outcomes only after execution and a
    follow-up check.
 
@@ -119,6 +125,50 @@ details and are hidden from normal navigation.
 - Preserve the internal scanner / external presentation boundary
 - Design for future integrations without overcomplicating the initial version
 - Protect privacy and minimize unnecessary data collection
+
+## Package Pricing Model
+
+Package pricing is operator-controlled proposal and presentation metadata. It
+does not influence evidence, finding truth, approval, verification, customer
+wording identity, package-scope classification, or any reconciliation
+fingerprint. Prices are not global Found Local defaults; each workspace records
+only the commercial terms the operator intentionally enters for that customer.
+
+Internal amounts use integer cents and the bounded v1 currency `USD`. A price
+has a billing type of `one_time`, `monthly`, `annual`, or `custom`. The Package
+screen accepts ordinary dollar input, validates and converts it once, and uses
+one shared formatter for operator and customer projections. Blank means absent,
+including for recurring terms; an absent price is never rendered as `$0`.
+Explicit zero remains a valid entered price.
+
+Pricing is attached to effective package identity rather than individual
+findings. Starter Visibility Cleanup has one package price regardless of how
+many approved findings it includes. Active separate-scope assignments are
+grouped by their concise customer package name and may each carry their own
+one-time price, optional recurring price, customer-facing pricing note, and
+operator-only internal note. Customer/third-party action and not-included scope
+do not create a Found Local price. If separate scope leaves the offer, its price
+does not contribute; the keyed terms may be reused if the same material package
+identity is restored.
+
+The initial project total is the sum of each effective package's explicit
+one-time price, counted once per package. Recurring terms are always presented
+separately and never enter that total. The total is omitted until every
+effective package has an explicit one-time price, preventing a partial sum from
+being presented as the complete offer.
+
+Customer Review operator QA text and Customer Visibility Review JSON are built
+from the same customer-safe projection. Version 1.0 keeps its existing fields
+and adds optional package price, additional recommended work, and pricing
+summary fields. Exported amounts use customer-readable dollar values and
+display strings; cents storage, pricing state keys, and internal pricing notes
+never cross the customer boundary or Sites handoff.
+
+Missing pricing produces an operator warning rather than blocking Ready for
+Customer Presentation. This allows Found Local to review or present approved
+scope before commercial terms are finalized while making the omission clear.
+No subscription billing, payment processing, or invoicing is part of this
+model.
 
 ## Brand Presence Evidence URL Contract
 

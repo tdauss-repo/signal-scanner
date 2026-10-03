@@ -1,6 +1,15 @@
 import { useState } from 'react'
-import type { AuditState, FixItem, PackageAssignmentChoice, PackageScopeClassification } from '../types/audit'
+import type { AuditState, FixItem, PackageAssignmentChoice, PackageCommercialPricing, PackageScopeClassification } from '../types/audit'
 import { derivePackagePreparation, type PackagePreparationItem, type PackageScopeInput } from '../utils/packagePreparation'
+import {
+  buildPackageCommercialPricing,
+  deriveEffectivePackageOffers,
+  formatPriceDisplay,
+  initialProjectTotal,
+  packagePricingIsComplete,
+  type EffectivePackageOffer,
+  type RecurringBillingType,
+} from '../utils/packagePricing'
 
 const scopeLabels: Record<PackageScopeClassification, string> = {
   starter: 'Included in Starter',
@@ -68,8 +77,39 @@ function PackageScopeCard({ item, fix, onSave, reconciliation = false }: { item:
   </article>
 }
 
-export function PackagePreparationPanel({ state, fixes, onSaveScope = () => undefined }: { state: AuditState; fixes: FixItem[]; onSaveScope?: (fix: FixItem, input: PackageScopeInput) => void }) {
+const amountInput = (amountCents?: number) => amountCents === undefined ? '' : (amountCents / 100).toFixed(2)
+
+function PackagePricingCard({ offer, onSave }: { offer: EffectivePackageOffer; onSave: (key: string, pricing: PackageCommercialPricing) => void }) {
+  const [oneTimeAmount, setOneTimeAmount] = useState(amountInput(offer.pricing?.oneTimePrice?.amountCents))
+  const [recurringAmount, setRecurringAmount] = useState(amountInput(offer.pricing?.recurringPrice?.amountCents))
+  const [recurringBillingType, setRecurringBillingType] = useState<RecurringBillingType>(offer.pricing?.recurringPrice?.billingType === 'annual' || offer.pricing?.recurringPrice?.billingType === 'custom' ? offer.pricing.recurringPrice.billingType : 'monthly')
+  const [customerPricingNote, setCustomerPricingNote] = useState(offer.pricing?.customerPricingNote || '')
+  const [internalPricingNote, setInternalPricingNote] = useState(offer.pricing?.internalPricingNote || '')
+  const [errors, setErrors] = useState<string[]>([])
+  const save = () => {
+    const result = buildPackageCommercialPricing(offer, { oneTimeAmount, recurringAmount, recurringBillingType, customerPricingNote, internalPricingNote })
+    setErrors(result.errors)
+    if (result.pricing) onSave(offer.key, result.pricing)
+  }
+  return <article className="package-pricing-card">
+    <div className="package-pricing-heading"><div><h4>{offer.name}</h4><p>{offer.scopeClassification === 'starter' ? 'Customer package' : 'Separate-scope package'}</p></div><span className="method-pill">USD</span></div>
+    <div className="package-pricing-form">
+      <label>One-time price<span className="money-input"><span aria-hidden="true">$</span><input inputMode="decimal" placeholder="optional" value={oneTimeAmount} onChange={(event) => setOneTimeAmount(event.target.value)} /></span></label>
+      <label>Recurring price <span>(optional)</span><span className="money-input"><span aria-hidden="true">$</span><input inputMode="decimal" placeholder="optional" value={recurringAmount} onChange={(event) => setRecurringAmount(event.target.value)} /></span></label>
+      <label>Recurring billing<select value={recurringBillingType} onChange={(event) => setRecurringBillingType(event.target.value as RecurringBillingType)}><option value="monthly">Monthly</option><option value="annual">Annual</option><option value="custom">Custom</option></select></label>
+      <label className="full-width-label">Customer-facing pricing note <span>(optional)</span><textarea value={customerPricingNote} onChange={(event) => setCustomerPricingNote(event.target.value)} /></label>
+      <label className="full-width-label">Internal pricing note <span>(operator only)</span><textarea value={internalPricingNote} onChange={(event) => setInternalPricingNote(event.target.value)} /></label>
+    </div>
+    {errors.length ? <div className="customer-refinement-warning" role="alert">{errors.map((error) => <p key={error}>{error}</p>)}</div> : null}
+    <button type="button" onClick={save}>Save pricing</button>
+  </article>
+}
+
+export function PackagePreparationPanel({ state, fixes, onSaveScope = () => undefined, onSavePricing = () => undefined }: { state: AuditState; fixes: FixItem[]; onSaveScope?: (fix: FixItem, input: PackageScopeInput) => void; onSavePricing?: (key: string, pricing: PackageCommercialPricing) => void }) {
   const preparation = derivePackagePreparation(state, fixes)
+  const packageOffers = deriveEffectivePackageOffers(state, fixes)
+  const pricingComplete = packagePricingIsComplete(packageOffers)
+  const initialTotal = initialProjectTotal(packageOffers)
   const fixesById = new Map([
     ...Object.values(state.customerFindingDecisionSnapshots || {}).map((snapshot) => [snapshot.finding.id, snapshot.finding] as const),
     ...fixes.map((fix) => [fix.id, fix] as const),
@@ -86,6 +126,11 @@ export function PackagePreparationPanel({ state, fixes, onSaveScope = () => unde
       {preparation.confirmedItems.map((item) => <PackageScopeCard item={item} fix={fixesById.get(item.findingId)!} onSave={onSaveScope} key={item.findingId} />)}
     </div> : null}
     {preparation.reconciliationItems.length ? <div className="fix-list package-scope-list package-reconciliation-list"><h3>Scope needing reconfirmation</h3><p>{preparation.reconciliationItems.length} {preparation.reconciliationItems.length === 1 ? 'finding requires' : 'findings require'} an operator decision before Customer Review.</p>{preparation.reconciliationItems.map((item) => <PackageScopeCard reconciliation item={item} fix={fixesById.get(item.findingId)!} onSave={onSaveScope} key={`reconcile-${item.findingId}`} />)}</div> : null}
+    {packageOffers.length ? <section className="package-pricing-section" aria-label="Package Pricing">
+      <div className="package-pricing-summary"><div><p className="eyebrow">Package Pricing</p><h3>Commercial offer</h3><p>Pricing is operator-controlled proposal metadata. It does not change findings or package scope.</p></div><div><span className={`profile-status profile-status-${pricingComplete ? 'ready' : 'review'}`}>{pricingComplete ? 'Pricing complete' : 'Pricing not entered'}</span>{initialTotal ? <strong>Initial project total: {formatPriceDisplay(initialTotal)}</strong> : null}</div></div>
+      <div className="package-pricing-list">{packageOffers.map((offer) => <PackagePricingCard offer={offer} onSave={onSavePricing} key={offer.key} />)}</div>
+      <p className="customer-small">Recurring charges are optional and shown separately. Blank pricing remains a warning, not a Customer Review blocker.</p>
+    </section> : null}
     <p className="customer-small">Candidate, dismissed, and neutral needs-review observations do not create package scope. Package scope does not authorize implementation.</p>
   </section>
 }

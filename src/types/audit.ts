@@ -143,6 +143,8 @@ export interface AuditState {
   customerFindingRefinements?: Record<string, CustomerFindingRefinement>
   /** Operator delivery-scope decisions, valid only for the approved finding identity they reference. */
   packageScopeOverrides?: Record<string, PackageScopeOverride>
+  /** Operator-controlled proposal pricing. Independent from finding evidence and approval identity. */
+  packagePricing?: PackagePricingState
   /** Last explicit finding decision, retained only for operator reconciliation after evidence refresh. */
   customerFindingDecisionSnapshots?: Record<string, CustomerFindingDecisionSnapshot>
   /** Customer-only strength inclusion and wording, bound to material positive evidence. */
@@ -188,6 +190,30 @@ export interface PackageScopeOverride {
   deliveryDescription: string
   includedScope: string
   internalNote?: string
+}
+
+export type PricingCurrency = 'USD'
+export type PricingBillingType = 'one_time' | 'monthly' | 'annual' | 'custom'
+
+export interface PackagePrice {
+  amountCents: number
+  currency: PricingCurrency
+  billingType: PricingBillingType
+}
+
+export interface PackageCommercialPricing {
+  packageName: string
+  scopeClassification: 'starter' | 'separate'
+  oneTimePrice?: PackagePrice
+  recurringPrice?: PackagePrice
+  customerPricingNote?: string
+  internalPricingNote?: string
+}
+
+export interface PackagePricingState {
+  version: 1
+  currency: PricingCurrency
+  packages: Record<string, PackageCommercialPricing>
 }
 
 export interface WebsiteAuditWorkspaceState {

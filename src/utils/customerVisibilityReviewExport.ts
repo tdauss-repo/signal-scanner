@@ -3,10 +3,26 @@ import { summarizeCustomerScan, type VisibilitySnapshotOverall } from './custome
 import { derivePackagePreparation, type PackagePreparationItem } from './packagePreparation'
 import { reviewedBusinessProfile } from './businessProfileState'
 import { effectiveCustomerStrengths } from './customerStrengths'
+import { deriveEffectivePackageOffers, formatPriceDisplay, initialProjectTotal } from './packagePricing'
 
 export type CustomerVisibilityReviewAreaId = 'website' | 'search_maps' | 'business_information' | 'ai_discovery'
 export type CustomerVisibilityReviewAreaState = 'good' | 'review' | 'issue'
 export type CustomerVisibilityReviewOverallState = 'mostly_visible' | 'looking_strong' | 'improvements_recommended' | 'needs_attention' | 'not_fully_verified'
+
+export interface CustomerVisibilityPrice {
+  amount: number
+  currency: 'USD'
+  billing: 'one_time' | 'monthly' | 'annual' | 'custom'
+  display: string
+}
+
+export interface CustomerVisibilityAdditionalWork {
+  name: string
+  price?: CustomerVisibilityPrice
+  recurringPrice?: CustomerVisibilityPrice
+  pricingNote?: string
+  included: string[]
+}
 
 /**
  * The intentionally small, customer-safe contract consumed by Found Local
@@ -29,8 +45,29 @@ export interface CustomerVisibilityReviewExport {
   verifiedStrengths: Array<{ title: string; summary: string }>
   confirmedIssues: Array<{ id: string; title: string; label: string; summary: string; foundLocalAction: string }>
   needsReview: string[]
-  recommendedPackage: { name: string; summary: string; included: string[]; cta: string }
+  recommendedPackage: {
+    name: string
+    summary: string
+    price?: CustomerVisibilityPrice
+    recurringPrice?: CustomerVisibilityPrice
+    pricingNote?: string
+    included: string[]
+    cta: string
+  }
+  /** Additive v1 fields; older Sites consumers can safely ignore them. */
+  additionalRecommendedWork?: CustomerVisibilityAdditionalWork[]
+  pricingSummary?: {
+    initialTotal?: CustomerVisibilityPrice
+    recurringCharges?: Array<{ name: string; price: CustomerVisibilityPrice }>
+  }
 }
+
+const customerPrice = (price: import('../types/audit').PackagePrice): CustomerVisibilityPrice => ({
+  amount: price.amountCents / 100,
+  currency: price.currency,
+  billing: price.billingType,
+  display: formatPriceDisplay(price),
+})
 
 const areaDefinitions: Array<{ id: CustomerVisibilityReviewAreaId; name: string }> = [
   { id: 'website', name: 'Website & Technical' },
@@ -123,6 +160,20 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
   const strengths = effectiveCustomerStrengths(state, items)
   const included = packagePreparation.starterItems.map((item) => item.includedScope)
   const hasStarterPackage = packagePreparation.recommendedPackage !== null
+  const packageOffers = deriveEffectivePackageOffers(state, fixes)
+  const starterOffer = packageOffers.find((offer) => offer.scopeClassification === 'starter')
+  const additionalRecommendedWork = packageOffers
+    .filter((offer) => offer.scopeClassification === 'separate')
+    .map((offer) => ({
+      name: offer.name,
+      ...(offer.pricing?.oneTimePrice ? { price: customerPrice(offer.pricing.oneTimePrice) } : {}),
+      ...(offer.pricing?.recurringPrice ? { recurringPrice: customerPrice(offer.pricing.recurringPrice) } : {}),
+      ...(offer.pricing?.customerPricingNote ? { pricingNote: offer.pricing.customerPricingNote } : {}),
+      included: offer.included,
+    }))
+  const initialTotal = initialProjectTotal(packageOffers)
+  const recurringCharges = packageOffers.flatMap((offer) => offer.pricing?.recurringPrice
+    ? [{ name: offer.name, price: customerPrice(offer.pricing.recurringPrice) }] : [])
   const profile = reviewedBusinessProfile(state.profile, state.businessProfile)
   const category = profile.primaryCategory || profile.secondaryCategories || 'Local business'
   const place = [profile.city || profile.localMarket, profile.state].filter(Boolean).join(', ')
@@ -142,6 +193,9 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
     recommendedPackage: hasStarterPackage ? {
       name: 'Starter Visibility Cleanup',
       summary: 'Found Local can address the approved visibility work and verify the agreed changes after implementation.',
+      ...(starterOffer?.pricing?.oneTimePrice ? { price: customerPrice(starterOffer.pricing.oneTimePrice) } : {}),
+      ...(starterOffer?.pricing?.recurringPrice ? { recurringPrice: customerPrice(starterOffer.pricing.recurringPrice) } : {}),
+      ...(starterOffer?.pricing?.customerPricingNote ? { pricingNote: starterOffer.pricing.customerPricingNote } : {}),
       included,
       cta: 'Review Recommended Plan',
     } : {
@@ -150,12 +204,19 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
       included: [],
       cta: 'Review findings',
     },
+    additionalRecommendedWork,
+    ...(initialTotal || recurringCharges.length ? {
+      pricingSummary: {
+        ...(initialTotal ? { initialTotal: customerPrice(initialTotal) } : {}),
+        ...(recurringCharges.length ? { recurringCharges } : {}),
+      },
+    } : {}),
   }
 }
 
 export const serializeCustomerVisibilityReview = (review: CustomerVisibilityReviewExport) => JSON.stringify(review, null, 2)
 
-export const customerVisibilityReviewAdditionalWork = (review: CustomerVisibilityReviewExport) => [...new Set(
+export const customerVisibilityReviewAdditionalWork = (review: CustomerVisibilityReviewExport) => review.additionalRecommendedWork?.map((work) => work.name) ?? [...new Set(
   review.confirmedIssues.filter((issue) => !['Starter Visibility Cleanup', 'Customer / third-party action required', 'Not included in proposed scope', 'Package scope requires review'].includes(issue.label)).map((issue) => issue.label),
 )]
 
@@ -172,6 +233,7 @@ export const customerVisibilityReviewQaText = (
   ready: boolean,
 ) => {
   const additionalWork = customerVisibilityReviewAdditionalWork(review)
+  const additionalWorkDetails: CustomerVisibilityAdditionalWork[] = review.additionalRecommendedWork ?? additionalWork.map((name) => ({ name, included: [] }))
   const customerActions = customerVisibilityReviewCustomerActions(review)
   const lines = [
     'CUSTOMER REVIEW — OPERATOR QA',
@@ -202,13 +264,24 @@ export const customerVisibilityReviewQaText = (
     ...(review.needsReview.length ? review.needsReview.map((item) => `- ${item}`) : ['- Nothing currently listed.']),
     '',
     'Recommended package:',
-    review.recommendedPackage.name,
+    `${review.recommendedPackage.name}${review.recommendedPackage.price ? ` — ${review.recommendedPackage.price.display}` : ''}`,
+    ...(review.recommendedPackage.pricingNote ? [review.recommendedPackage.pricingNote] : []),
     '',
     'Included:',
     ...(review.recommendedPackage.included.length ? review.recommendedPackage.included.map((item) => `- ${item}`) : ['- No approved package scope.']),
     '',
     'Additional recommended work:',
-    ...(additionalWork.length ? additionalWork.map((item) => `- ${item}`) : ['- None.']),
+    ...(additionalWorkDetails.length ? additionalWorkDetails.flatMap((item) => [
+      `${item.name}${item.price ? ` — ${item.price.display}` : ''}`,
+      ...(item.pricingNote ? [item.pricingNote] : []),
+      ...item.included.map((scope) => `- ${scope}`),
+    ]) : ['- None.']),
+    ...(review.pricingSummary?.initialTotal ? ['', 'Total proposed initial work:', review.pricingSummary.initialTotal.display] : []),
+    ...(review.pricingSummary?.recurringCharges?.length ? [
+      '',
+      'Recurring:',
+      ...review.pricingSummary.recurringCharges.map((charge) => `- ${charge.name} — ${charge.price.display}`),
+    ] : []),
     ...(customerActions.length ? ['', 'Customer / third-party action required:', ...customerActions.map((item) => `- ${item}`)] : []),
     '',
     'Readiness:',

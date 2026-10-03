@@ -50,6 +50,7 @@ export const createIsolatedBusinessWorkspace = (
   customerFindingDismissals: undefined,
   customerFindingRefinements: undefined,
   packageScopeOverrides: undefined,
+  packagePricing: undefined,
   customerFindingDecisionSnapshots: undefined,
   customerStrengthPresentations: undefined,
   profileProjectionConflicts: undefined,
