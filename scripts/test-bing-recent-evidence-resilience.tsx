@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { SearchVisibilityPanel } from '../src/components/SearchVisibilityPanel.tsx'
@@ -7,6 +8,7 @@ import type {
   BusinessProfile,
   BusinessProfileField,
   BusinessProfileState,
+  SavedScanFile,
   SearchDestination,
   SearchDestinationObservation,
 } from '../src/types/audit.ts'
@@ -18,7 +20,7 @@ import { buildBrandPresenceVerification } from '../src/utils/brandPresenceVerifi
 import { buildCustomerVisibilityReviewExport, serializeCustomerVisibilityReview } from '../src/utils/customerVisibilityReviewExport.ts'
 import { customerStrengthCandidates } from '../src/utils/customerStrengths.ts'
 import { assessBusinessCandidates } from '../src/utils/entityMatcher.ts'
-import { evidenceFingerprint } from '../src/utils/evidenceFingerprint.ts'
+import { evidenceFingerprint, matchesEvidenceFingerprint } from '../src/utils/evidenceFingerprint.ts'
 import { normalizeSalesReadiness } from '../src/utils/salesReadiness.ts'
 import { summarizePublicPresence } from '../src/utils/publicPresence.ts'
 import { projectSalesVisibility, salesCockpitVisibility } from '../src/utils/salesVisibilityProjection.ts'
@@ -27,6 +29,7 @@ import { normalizeWebsiteAuditWorkspaceState } from '../src/utils/websiteAuditSt
 import { normalizeWorkspaceProfile } from '../src/utils/workspaceProfile.ts'
 import { mergeAutomatedObservation, retainedBingSourceFromVisibilityRuns } from '../src/utils/visibilityScan.ts'
 import { scanProfileKey } from '../src/utils/visibilityScanState.ts'
+import { recoverRetainedBingVerificationFromWorkspace } from '../src/utils/bingWorkspaceRetention.ts'
 
 Object.assign(globalThis, { React })
 
@@ -240,4 +243,47 @@ assert.equal(projectSalesVisibility(reopened.searchDestinationObservations['sear
   profile: reopened.profile, profileState: reopened.businessProfile, now,
 }).state, 'verified_recent', 'saved workspace round-trip preserves retained Bing evidence')
 
-console.log('Bing recent-evidence resilience PASS: no-match/unavailable retention, shared freshness, identity/conflict/operator invalidation, UI, stable strength, neutral count, persistence, and customer boundary.')
+// Real persisted-workspace shape: current no-match is already saved, while the
+// prior verified run has the same material identity but older non-identity
+// profile metadata and a no-longer-equal full Business Profile fingerprint.
+const persistedFile = JSON.parse(readFileSync(new URL('./fixtures/mary-bing-retention-workspace.json', import.meta.url), 'utf8')) as SavedScanFile
+const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
+assert.match(appSource, /return recoverRetainedBingVerificationFromWorkspace\(normalized\)/, 'the real App saved-workspace normalization path applies Bing recovery')
+const persistedWorkspace = persistedFile.scan.payload
+persistedWorkspace.profile = normalizeWorkspaceProfile(persistedWorkspace.profile)
+persistedWorkspace.salesReadiness = normalizeSalesReadiness(persistedWorkspace.salesReadiness, persistedWorkspace.profile)
+persistedWorkspace.websiteAudit = normalizeWebsiteAuditWorkspaceState(persistedWorkspace.websiteAudit)
+persistedWorkspace.visibilityRuns!.at(-1)!.profileReviewKey = evidenceFingerprint(persistedWorkspace.businessProfile)
+const persistedCurrent = persistedWorkspace.searchDestinationObservations['search-brand-canonical']['Bing Search']!
+assert.equal(projectSalesVisibility(persistedCurrent, {
+  profile: persistedWorkspace.profile,
+  profileState: persistedWorkspace.businessProfile,
+  now: Date.parse('2026-10-03T12:00:00.000Z'),
+}).state, 'manual_verification_needed', 'persisted no-match has no retained projection before load-time recovery')
+assert.equal(matchesEvidenceFingerprint(persistedWorkspace.visibilityRuns![0].profileKey, persistedWorkspace.profile), false, 'persisted prior run differs in non-identity profile metadata')
+assert.equal(matchesEvidenceFingerprint(persistedWorkspace.visibilityRuns![0].profileReviewKey, persistedWorkspace.businessProfile), false, 'persisted prior run differs in non-material Business Profile metadata')
+assert(retainedBingSourceFromVisibilityRuns(persistedWorkspace, 'search-brand-canonical:Bing Search', persistedWorkspace.profile), 'material identity lookup recovers the prior verified run')
+
+const recoveredWorkspace = recoverRetainedBingVerificationFromWorkspace(persistedWorkspace, Date.parse('2026-10-03T12:00:00.000Z'))
+const recoveredBing = recoveredWorkspace.searchDestinationObservations['search-brand-canonical']['Bing Search']!
+const recoveredSales = projectSalesVisibility(recoveredBing, {
+  profile: recoveredWorkspace.profile,
+  profileState: recoveredWorkspace.businessProfile,
+  now: Date.parse('2026-10-03T12:00:00.000Z'),
+})
+assert.equal(recoveredSales.state, 'verified_recent', 'persisted workspace recovers Bing without another scan')
+assert.equal(recoveredBing.automation?.runId, 'visibility-mary-current', 'latest inconclusive acquisition remains the active technical record')
+assert.equal(recoveredBing.automation?.assessment?.blocker, 'no_match')
+assert.equal(recoveredBing.retainedBingVerification?.sourceRunId, 'visibility-mary-prior')
+assert.equal(salesCockpitVisibility([{ queryId: 'search-brand-canonical', observation: recoveredBing }], {
+  profile: recoveredWorkspace.profile,
+  profileState: recoveredWorkspace.businessProfile,
+  now: Date.parse('2026-10-03T12:00:00.000Z'),
+}).deeperReview.length, 0, 'recovered Bing is excluded from neutral destinations')
+assert.equal(summarizePublicPresence(recoveredWorkspace).automatic, 1, 'recovered Bing remains automatic public-presence evidence')
+assert(customerStrengthCandidates(recoveredWorkspace, []).some((item) => item.id === 'search:Bing Search'), 'recovered Bing is strength eligible')
+const recoveredReview = buildCustomerVisibilityReviewExport(recoveredWorkspace, [], [])
+assert.equal(recoveredReview.needsReview.includes('Bing Search'), false)
+assert(recoveredReview.verifiedStrengths.some((item) => item.title === 'Bing Search'))
+
+console.log('Bing recent-evidence resilience PASS: no-match/unavailable retention, shared freshness, identity/conflict/operator invalidation, UI, stable strength, neutral count, persisted-workspace recovery, and customer boundary.')

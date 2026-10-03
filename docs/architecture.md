@@ -89,8 +89,10 @@ Review → Verification`:
 4. **Package** derives scope only from explicitly approved effective customer
    findings. Its existing defaults remain available until the operator assigns
    an approved finding to Starter, separate scope, customer/third-party action,
-   or no proposed scope and optionally refines the customer-safe delivery and
-   line-item wording. Overrides are bound to the finding evidence identity;
+   or no proposed scope, records delivery-planning detail, and optionally
+   refines the concise customer-facing Included scope label. The detailed
+   `Found Local will` action remains owned by the effective Review wording and
+   is not overwritten by Package fields. Overrides are bound to the finding evidence identity;
    stale overrides cannot enter active package scope. Previous scope remains
    visible in a separate reconciliation queue until the current finding and
    its delivery scope are reconfirmed. Snapshot-backed decisions also keep a
@@ -107,7 +109,9 @@ Review → Verification`:
    `recommendedPackage.included`; separate assignments use each approved
    issue's existing customer-safe package label and delivery-action fields, so
    separate work is not misrepresented as Starter scope. Additive optional
-   pricing fields carry the exact operator-entered offer without changing the
+   `confirmedIssues[].foundLocalAction` comes from Review while
+   `recommendedPackage.included[]` comes from Package; editing either concept
+   never rewrites the other. Additive optional pricing fields carry the exact operator-entered offer without changing the
    version 1.0 customer contract or requiring historical workspaces to invent a
    zero price.
 6. **Verification** records completed outcomes only after execution and a
@@ -390,9 +394,13 @@ identity decision may remain effective as “Verified from recent evidence.” A
 no-match result variant is inconclusive, not contradictory, and does not erase
 the earlier verified fact. Retained evidence is never represented as fresh.
 For compatible saved workspaces created before this retention projection was
-available, the next scan may reconstruct the same bounded fact from a recent
-verified Bing assessment already present in visibility-run history. A newer
-conflicting run is a hard barrier to that recovery.
+available, load-time workspace normalization may reconstruct the same bounded
+fact from a recent verified Bing assessment already present in visibility-run
+history; no new scan is required. Historical run comparison uses the same
+material reviewed name, domain, address, and phone identity rather than full
+profile or review-record fingerprints, which may differ only in category,
+notes, timestamps, or other non-identity metadata. A newer conflicting run is
+a hard barrier to that recovery.
 
 Retention requires a prior successful automatic Bing acquisition with an
 explicit verified identity decision, an unchanged reviewed business name,

@@ -73,6 +73,7 @@ import { entityAction, normalizeSalesReadiness, questionAction, sortSalesActions
 import { buildPackageScopeOverride, type PackageScopeInput } from './utils/packagePreparation'
 import { buildCustomerStrengthPresentation, type CustomerStrengthCandidate, type CustomerStrengthInput } from './utils/customerStrengths'
 import { normalizePackagePricingState } from './utils/packagePricing'
+import { recoverRetainedBingVerificationFromWorkspace } from './utils/bingWorkspaceRetention'
 
 const storageKey = 'local-signal-scanner-state'
 const activeViewStorageKey = 'business-scanner-active-view'
@@ -405,7 +406,7 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
     const profile = reviewedBusinessProfile(compatibilityProfile, businessProfile)
     const profileProjectionConflicts = parsed.profileProjectionConflicts ?? businessProfileProjectionWarnings(compatibilityProfile, businessProfile)
 
-    return {
+    const normalized: AuditState = {
       ...initialState,
       ...parsed,
       profile,
@@ -481,6 +482,7 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
       salesReadiness: normalizeSalesReadiness(parsed.salesReadiness, profile),
       packagePricing: normalizePackagePricingState(parsed.packagePricing),
     }
+    return recoverRetainedBingVerificationFromWorkspace(normalized)
 }
 
 const loadState = (): AuditState => {

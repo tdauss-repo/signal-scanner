@@ -1,0 +1,258 @@
+{
+  "app": "Found Local Business Scanner Tool",
+  "fileType": "found-local-scan",
+  "version": 1,
+  "exportedAt": "2026-10-02T18:00:00.000Z",
+  "scan": {
+    "id": "montessori-center-of-downriver-real-workspace-shape",
+    "businessName": "Montessori Center of Downriver",
+    "website": "http://www.montessoridownriver.com/",
+    "localMarket": "Southgate, MI",
+    "createdAt": "2026-09-20T12:00:00.000Z",
+    "updatedAt": "2026-10-02T18:00:00.000Z",
+    "scanDate": "2026-10-02T18:00:00.000Z",
+    "notes": "Persisted-workspace regression fixture: prior verified Bing run followed by a saved no-match refresh.",
+    "payload": {
+      "profile": {
+        "businessName": "Montessori Center of Downriver",
+        "website": "http://www.montessoridownriver.com/",
+        "streetAddress": "15575 Northline Road",
+        "city": "Southgate",
+        "state": "MI",
+        "zip": "48195",
+        "phone": "734-282-6465",
+        "knownListingUrl": "",
+        "operatorNote": "Current reviewed workspace note.",
+        "phoneNumbers": [],
+        "contactStructureNote": "",
+        "primaryCategory": "Montessori school",
+        "secondaryCategories": "Preschool, Kindergarten",
+        "industryTags": "education",
+        "localMarket": "Southgate, MI",
+        "existingDirectoryUrls": "",
+        "serviceArea": "Downriver",
+        "primaryServices": "Montessori education",
+        "targetLocation": "Southgate MI",
+        "keywords": "montessori school"
+      },
+      "businessProfile": {
+        "schemaVersion": 1,
+        "values": {
+          "businessName": { "value": "Montessori Center of Downriver", "source": "operator_entered", "status": "operator_reviewed", "confidence": "high", "recordedAt": "2026-09-30T12:00:00.000Z" },
+          "website": { "value": "http://www.montessoridownriver.com/", "source": "operator_entered", "status": "operator_reviewed", "confidence": "high", "recordedAt": "2026-09-30T12:00:00.000Z" },
+          "streetAddress": { "value": "15575 Northline Road", "source": "operator_entered", "status": "operator_reviewed", "confidence": "high", "recordedAt": "2026-09-30T12:00:00.000Z" },
+          "city": { "value": "Southgate", "source": "operator_entered", "status": "operator_reviewed", "confidence": "high", "recordedAt": "2026-09-30T12:00:00.000Z" },
+          "state": { "value": "MI", "source": "operator_entered", "status": "operator_reviewed", "confidence": "high", "recordedAt": "2026-09-30T12:00:00.000Z" },
+          "zip": { "value": "48195", "source": "operator_entered", "status": "operator_reviewed", "confidence": "high", "recordedAt": "2026-09-30T12:00:00.000Z" },
+          "phone": { "value": "734-282-6465", "source": "operator_entered", "status": "operator_reviewed", "confidence": "high", "recordedAt": "2026-09-30T12:00:00.000Z" }
+        }
+      },
+      "checks": {},
+      "notes": {},
+      "evidenceConfidence": {},
+      "lastUpdated": "2026-10-02T18:00:00.000Z",
+      "reportSummary": "",
+      "selectedAIPlatform": "Gemini",
+      "aiAnswerTests": {},
+      "searchVisibilityTests": {},
+      "searchDestinationObservations": {
+        "search-brand-canonical": {
+          "Bing Search": {
+            "destination": "Bing Search",
+            "query": "Montessori Center of Downriver",
+            "verificationUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%20MI",
+            "overallResult": "manual_review_needed",
+            "observedResultTypes": [],
+            "observedAt": "2026-10-02T17:10:00.000Z",
+            "confidence": "manual_needs_confirmation",
+            "evidenceNotes": "The current Bing result region did not contain enough matching identity information.",
+            "evidenceKind": "unable_to_verify",
+            "competitorsObserved": "",
+            "recommendedAction": "",
+            "provenance": "automated_acquisition",
+            "reviewed": false,
+            "automation": {
+              "runId": "visibility-mary-current",
+              "queryMode": "brand",
+              "state": "interactive_review_required",
+              "inspectedUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%20MI",
+              "captures": [{
+                "version": 1,
+                "requestedUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%20MI",
+                "finalUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%20MI",
+                "acquiredAt": "2026-10-02T17:10:00.000Z",
+                "provider": "bing-native-fetch",
+                "method": "server_fetch",
+                "outcome": "success",
+                "confidence": "scanner_observed",
+                "blocker": "none",
+                "resultRegionInspected": true,
+                "visibleText": "Generic result region without a sufficient business match.",
+                "notes": []
+              }],
+              "evidence": "",
+              "interpreted": false,
+              "automaticObservation": false,
+              "assessment": {
+                "matches": [],
+                "confidence": "low",
+                "automaticObservation": false,
+                "visibilityResult": "review_required",
+                "operatorReviewRequired": true,
+                "resultRegionInspected": true,
+                "ambiguityReasons": ["The normal Bing result region did not contain a sufficient business identity match."],
+                "blocker": "no_match",
+                "tier3Candidate": false
+              }
+            }
+          }
+        }
+      },
+      "voicePromptTests": {},
+      "voiceAssistantObservations": [],
+      "directories": { "activeRows": [], "ignoredSuggestionIds": [] },
+      "manualFixes": [],
+      "salesReadiness": {},
+      "websiteAudit": {},
+      "visibilityRuns": [
+        {
+          "version": 2,
+          "id": "visibility-mary-prior",
+          "profileKey": "{\"businessName\":\"Montessori Center of Downriver\",\"website\":\"http://www.montessoridownriver.com/\",\"streetAddress\":\"15575 Northline Road\",\"city\":\"Southgate\",\"state\":\"MI\",\"zip\":\"48195\",\"phone\":\"734-282-6465\",\"knownListingUrl\":\"\",\"operatorNote\":\"Earlier operator note.\",\"phoneNumbers\":[],\"contactStructureNote\":\"\",\"primaryCategory\":\"Preschool\",\"secondaryCategories\":\"Montessori school\",\"industryTags\":\"school\",\"localMarket\":\"Southgate\",\"existingDirectoryUrls\":\"\",\"serviceArea\":\"\",\"primaryServices\":\"Preschool\",\"targetLocation\":\"Southgate\",\"keywords\":\"preschool\"}",
+          "profileReviewKey": "{\"schemaVersion\":1,\"values\":{\"businessName\":{\"value\":\"Montessori Center of Downriver\",\"recordedAt\":\"2026-09-28T12:00:00.000Z\"}}}",
+          "startedAt": "2026-10-01T16:00:00.000Z",
+          "endedAt": "2026-10-01T16:01:00.000Z",
+          "status": "completed",
+          "checks": [{
+            "id": "search-brand-canonical:Bing Search",
+            "area": "SearchMaps",
+            "state": "evidence_captured",
+            "destination": "Bing Search",
+            "queryId": "search-brand-canonical",
+            "query": "Montessori Center of Downriver",
+            "queryMode": "brand",
+            "url": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%20MI",
+            "captures": [{
+              "version": 1,
+              "requestedUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%20MI",
+              "finalUrl": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%20MI",
+              "acquiredAt": "2026-10-01T16:00:30.000Z",
+              "provider": "bing-native-fetch",
+              "method": "server_fetch",
+              "outcome": "success",
+              "confidence": "scanner_observed",
+              "blocker": "none",
+              "resultRegionInspected": true,
+              "visibleText": "Montessori Center of Downriver montessoridownriver.com 734-282-6465",
+              "notes": []
+            }],
+            "assessment": {
+              "matches": [{
+                "candidate": {
+                  "id": "mary-bing-result",
+                  "kind": "semantic_card",
+                  "sourceType": "organic",
+                  "resultUrl": "http://www.montessoridownriver.com/",
+                  "fields": { "name": "Montessori Center of Downriver", "website": "http://www.montessoridownriver.com/", "phone": "734-282-6465" },
+                  "evidence": []
+                },
+                "matchedFields": [
+                  { "field": "name", "expected": "Montessori Center of Downriver", "observed": "Montessori Center of Downriver" },
+                  { "field": "website", "expected": "http://www.montessoridownriver.com/", "observed": "http://www.montessoridownriver.com/" },
+                  { "field": "phone", "expected": "734-282-6465", "observed": "734-282-6465" }
+                ],
+                "conflictingFields": [],
+                "missingFields": ["address"],
+                "unreviewedProfileFields": [],
+                "confidence": "high",
+                "automaticObservation": true,
+                "ambiguityReasons": [],
+                "evidence": []
+              }],
+              "selected": {
+                "candidate": {
+                  "id": "mary-bing-result",
+                  "kind": "semantic_card",
+                  "sourceType": "organic",
+                  "resultUrl": "http://www.montessoridownriver.com/",
+                  "fields": { "name": "Montessori Center of Downriver", "website": "http://www.montessoridownriver.com/", "phone": "734-282-6465" },
+                  "evidence": []
+                },
+                "matchedFields": [
+                  { "field": "name", "expected": "Montessori Center of Downriver", "observed": "Montessori Center of Downriver" },
+                  { "field": "website", "expected": "http://www.montessoridownriver.com/", "observed": "http://www.montessoridownriver.com/" },
+                  { "field": "phone", "expected": "734-282-6465", "observed": "734-282-6465" }
+                ],
+                "conflictingFields": [],
+                "missingFields": ["address"],
+                "unreviewedProfileFields": [],
+                "confidence": "high",
+                "automaticObservation": true,
+                "ambiguityReasons": [],
+                "evidence": []
+              },
+              "confidence": "high",
+              "automaticObservation": true,
+              "visibilityResult": "found",
+              "operatorReviewRequired": false,
+              "resultRegionInspected": true,
+              "ambiguityReasons": [],
+              "blocker": "none",
+              "tier3Candidate": false,
+              "bingIdentityDecision": {
+                "version": 1,
+                "decision": "verified",
+                "matchedSignals": [
+                  { "field": "name", "expected": "Montessori Center of Downriver", "observed": "Montessori Center of Downriver" },
+                  { "field": "website", "expected": "http://www.montessoridownriver.com/", "observed": "http://www.montessoridownriver.com/" },
+                  { "field": "phone", "expected": "734-282-6465", "observed": "734-282-6465" }
+                ],
+                "conflictingSignals": [],
+                "candidateIds": ["mary-bing-result"],
+                "sourceTypes": ["organic"],
+                "rule": "two_strong_identifiers_with_name_or_domain_no_conflict"
+              }
+            },
+            "evidenceCaptured": true,
+            "interpreted": true
+          }],
+          "businessEvidence": []
+        },
+        {
+          "version": 2,
+          "id": "visibility-mary-current",
+          "profileKey": "{\"businessName\":\"Montessori Center of Downriver\",\"website\":\"http://www.montessoridownriver.com/\",\"streetAddress\":\"15575 Northline Road\",\"city\":\"Southgate\",\"state\":\"MI\",\"zip\":\"48195\",\"phone\":\"734-282-6465\",\"knownListingUrl\":\"\",\"operatorNote\":\"Current reviewed workspace note.\",\"phoneNumbers\":[],\"contactStructureNote\":\"\",\"primaryCategory\":\"Montessori school\",\"secondaryCategories\":\"Preschool, Kindergarten\",\"industryTags\":\"education\",\"localMarket\":\"Southgate, MI\",\"existingDirectoryUrls\":\"\",\"serviceArea\":\"Downriver\",\"primaryServices\":\"Montessori education\",\"targetLocation\":\"Southgate MI\",\"keywords\":\"montessori school\"}",
+          "profileReviewKey": "{\"schemaVersion\":1,\"values\":{\"businessName\":{\"value\":\"Montessori Center of Downriver\",\"recordedAt\":\"2026-09-30T12:00:00.000Z\"}}}",
+          "startedAt": "2026-10-02T17:09:00.000Z",
+          "endedAt": "2026-10-02T17:11:00.000Z",
+          "status": "completed_with_review",
+          "checks": [{
+            "id": "search-brand-canonical:Bing Search",
+            "area": "SearchMaps",
+            "state": "interactive_review_required",
+            "destination": "Bing Search",
+            "queryId": "search-brand-canonical",
+            "query": "Montessori Center of Downriver",
+            "queryMode": "brand",
+            "url": "https://www.bing.com/search?q=Montessori%20Center%20of%20Downriver%20Southgate%20MI",
+            "captures": [],
+            "assessment": {
+              "matches": [],
+              "confidence": "low",
+              "automaticObservation": false,
+              "visibilityResult": "review_required",
+              "operatorReviewRequired": true,
+              "resultRegionInspected": true,
+              "ambiguityReasons": ["The normal Bing result region did not contain a sufficient business identity match."],
+              "blocker": "no_match",
+              "tier3Candidate": false
+            },
+            "evidenceCaptured": true,
+            "interpreted": false
+          }],
+          "businessEvidence": []
+        }
+      ]
+    }
+  }
+}

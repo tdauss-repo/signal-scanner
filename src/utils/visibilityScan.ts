@@ -3,10 +3,9 @@ import { assessSearchCapture } from './searchResultExtraction'
 import { assessBusinessCandidates, reviewedProfileValue } from './entityMatcher'
 import { evaluateMachineReadability } from './machineReadability'
 import { resultTypesForDestination, verificationUrlFor } from './searchVisibility'
-import type { SearchVisibilityObservedResultType } from '../types/audit'
 import { businessDirectoryKey } from './directorySuggestions'
 import type { AcquisitionResult } from '../types/acquisition'
-import type { AuditState, BusinessProfile, SearchDestinationObservation } from '../types/audit'
+import type { AuditState, BusinessProfile, SearchDestinationObservation, SearchVisibilityObservedResultType } from '../types/audit'
 import type { WebsiteAuditResponse } from '../types/websiteAudit'
 import type { ScanArea, VisibilityCheck, VisibilityRun } from '../types/visibilityScan'
 import { buildSearchVisibilityQueries, defaultSearchDestinationObservation, primarySearchDestinations, publicPresenceUrl, searchDestinations } from './searchVisibility'
@@ -24,6 +23,9 @@ import {
   retainedBingAutomaticVerificationIsCurrent,
 } from './bingAcquisitionResilience'
 import { discoverSocialProfile } from './socialProfileDiscovery'
+import { retainedBingSourceFromVisibilityRuns, type RetainedBingSource } from './bingWorkspaceRetention'
+
+export { retainedBingSourceFromVisibilityRuns } from './bingWorkspaceRetention'
 
 export { scanProfileKey, scanStateLabel, scanAreaState, restoreVisibilityRuns } from './visibilityScanState'
 import { scanProfileKey } from './visibilityScanState'
@@ -177,7 +179,7 @@ interface AutomatedObservationMergeContext {
   profileState: AuditState['businessProfile']
   sourceProfileReviewKey?: string
   now?: number
-  retainedBingSource?: { observation: SearchDestinationObservation; sourceProfileReviewKey?: string }
+  retainedBingSource?: RetainedBingSource
 }
 const compactCapture = (capture: AcquisitionResult): AcquisitionResult => {
   const compact = { ...capture, visibleText: pageText(capture).slice(0, 6000) }
@@ -238,65 +240,6 @@ export function mergeAutomatedObservation(
     operatorVerification: previous?.operatorVerification,
   }
   return { ...merged, retainedGoogleVerification, retainedBingVerification }
-}
-
-/** Recover a still-material prior Bing success already preserved in workspace run history. */
-export function retainedBingSourceFromVisibilityRuns(
-  state: AuditState,
-  checkId: string,
-  profile: BusinessProfile,
-): AutomatedObservationMergeContext['retainedBingSource'] {
-  for (const historicalRun of [...(state.visibilityRuns || [])].reverse()) {
-    if (!matchesEvidenceFingerprint(historicalRun.profileKey, profile) ||
-      !historicalRun.profileReviewKey || !matchesEvidenceFingerprint(historicalRun.profileReviewKey, state.businessProfile)) continue
-    const historicalCheck = historicalRun.checks.find((check) => check.id === checkId && check.destination === 'Bing Search' && check.queryMode === 'brand')
-    const assessment = historicalCheck?.assessment
-    const conflictBlocker = assessment?.blocker === 'identifier_conflict' || assessment?.blocker === 'multiple_entities'
-    if (assessment && (conflictBlocker || assessment.bingIdentityDecision?.conflictingSignals.length)) return undefined
-    if (!historicalCheck || !assessment || !assessment.automaticObservation || assessment.operatorReviewRequired ||
-      assessment.bingIdentityDecision?.decision !== 'verified' || assessment.visibilityResult !== 'found' || assessment.blocker !== 'none' ||
-      !historicalCheck.captures.some((capture) => capture.outcome === 'success')) continue
-    const selected = assessment.selected
-    const evidence = assessment.matches.map((match) => `${JSON.stringify(match.candidate.fields)}\n${match.evidence.map((reference) => `${reference.sourceUrl} (${reference.locator}): ${reference.excerpt}`).join('\n')}`).join('\n').slice(0, 12000)
-    const observedResultTypes: SearchVisibilityObservedResultType[] = []
-    if (selected?.matchedFields.some((field) => field.field === 'website')) observedResultTypes.push('official_website')
-    else observedResultTypes.push('third_party_mention')
-    for (const field of selected?.matchedFields || []) {
-      if (field.field === 'name') observedResultTypes.push('business_name_correct')
-      if (field.field === 'phone') observedResultTypes.push('phone_correct')
-      if (field.field === 'website') observedResultTypes.push('website_correct')
-      if (['streetAddress', 'address'].includes(field.field)) observedResultTypes.push('address_correct')
-    }
-    const observedAt = selected?.evidence[0]?.acquiredAt || historicalCheck.captures.findLast((capture) => capture.outcome === 'success')?.acquiredAt || historicalRun.endedAt || historicalRun.startedAt
-    const query = historicalCheck.query || profile.businessName
-    const observation: SearchDestinationObservation = {
-      ...defaultSearchDestinationObservation('Bing Search', query),
-      verificationUrl: verificationUrlFor('Bing Search', query, profile, true),
-      ...(selected?.candidate.resultUrl ? { observedResultUrl: selected.candidate.resultUrl } : {}),
-      ...(selected?.candidate.fields.publicProfileUrl ? { canonicalProfileUrl: selected.candidate.fields.publicProfileUrl } : {}),
-      overallResult: 'found_match',
-      observedResultTypes: [...new Set(observedResultTypes)],
-      observedAt,
-      provenance: 'automated_acquisition',
-      confidence: 'scanner_detected_public_page',
-      evidenceNotes: evidence,
-      evidenceKind: 'external_observation',
-      reviewed: false,
-      automation: {
-        runId: historicalRun.id,
-        queryMode: 'brand',
-        state: historicalCheck.state,
-        inspectedUrl: historicalCheck.url || verificationUrlFor('Bing Search', query, profile, true),
-        captures: historicalCheck.captures,
-        evidence,
-        interpreted: true,
-        automaticObservation: true,
-        assessment,
-      },
-    }
-    return { observation, sourceProfileReviewKey: historicalRun.profileReviewKey }
-  }
-  return undefined
 }
 
 /** One runner shared by customer, Workbench and proving CLI. Every progress transition follows real work. */

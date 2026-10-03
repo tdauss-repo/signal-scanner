@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import type { AuditState, FixItem } from '../src/types/audit.ts'
-import { customerReviewKey } from '../src/utils/customerScan.ts'
+import { buildCustomerFindingRefinement, customerReviewKey, defaultCustomerFindingWording } from '../src/utils/customerScan.ts'
 import {
   activePackageScopeOverride,
   buildPackageScopeOverride,
@@ -73,13 +73,53 @@ assert.equal(review.reviewVersion, '1.0', 'the existing JSON contract remains ve
 assert.deepEqual(review.recommendedPackage.included, preparation.starterItems.map((item) => item.includedScope))
 const secureIssue = review.confirmedIssues.find((issue) => issue.id === secure.id)!
 assert.equal(secureIssue.label, 'Website Hosting Modernization & Migration')
-assert.match(secureIssue.foundLocalAction, /modern hosting environment/)
+assert.equal(secureIssue.foundLocalAction, 'Configure HTTPS for the current website.', 'Package delivery planning does not replace the Review action sentence')
 assert.deepEqual(customerVisibilityReviewAdditionalWork(review), ['Website Hosting Modernization & Migration'])
 assert(qaText.includes('Additional recommended work:') && qaText.includes('Website Hosting Modernization & Migration'))
 assert.equal(serialized.includes('Website hosting modernization and migration') && review.recommendedPackage.included.includes('Website hosting modernization and migration'), false)
 assert.equal(serialized.includes('H-Sphere'), false, 'internal scope note never exports')
 assert.equal(qaText.includes('H-Sphere'), false, 'internal scope note never enters customer QA text')
 assert.equal(serialized.includes('internalNote'), false, 'internal package metadata is not part of JSON v1.0')
+
+// Review action wording and Package included-scope labels are independent customer concepts.
+const boundaryState = makeState()
+const boundaryFindings = [local, schema, description]
+const boundaryActions: Record<string, string> = {
+  [local.id]: 'Add clear Southgate and Downriver location context to the homepage and make the school’s public address easier to find and verify.',
+  [schema.id]: 'Add clear business identity information so search engines and AI systems can connect the school’s name, location, contact details, and website.',
+  [description.id]: 'Replace the homepage search description with concise wording that accurately describes the school and its Southgate location.',
+}
+const boundaryScopes: Record<string, string> = {
+  [local.id]: 'Homepage location and local identity improvement',
+  [schema.id]: 'Search and AI business identity improvement',
+  [description.id]: 'Homepage search description cleanup',
+}
+for (const finding of boundaryFindings) {
+  const defaults = defaultCustomerFindingWording(finding, boundaryState)
+  const refinement = buildCustomerFindingRefinement(boundaryState, finding, { ...defaults, recommendedAction: boundaryActions[finding.id] })
+  assert(refinement)
+  boundaryState.customerFindingRefinements = { ...boundaryState.customerFindingRefinements, [finding.id]: refinement }
+  boundaryState.customerFindingReviews = { ...boundaryState.customerFindingReviews, [finding.id]: customerReviewKey(boundaryState, finding) }
+  const scope = buildPackageScopeOverride(boundaryState, finding, {
+    scopeClassification: 'starter',
+    packageAssignment: 'Starter Visibility Cleanup',
+    deliveryDescription: `Package-only delivery planning for ${finding.id}.`,
+    includedScope: boundaryScopes[finding.id],
+    internalNote: '',
+  })
+  assert(scope)
+  boundaryState.packageScopeOverrides = { ...boundaryState.packageScopeOverrides, [finding.id]: scope }
+}
+const boundaryReview = buildCustomerVisibilityReviewExport(boundaryState, [], boundaryFindings)
+for (const finding of boundaryFindings) {
+  assert.equal(boundaryReview.confirmedIssues.find((issue) => issue.id === finding.id)?.foundLocalAction, boundaryActions[finding.id])
+  assert(boundaryReview.recommendedPackage.included.includes(boundaryScopes[finding.id]))
+  assert.equal(serializeCustomerVisibilityReview(boundaryReview).includes(`Package-only delivery planning for ${finding.id}.`), false)
+}
+const actionEdited = structuredClone(boundaryState)
+const localDefaults = defaultCustomerFindingWording(local, actionEdited)
+actionEdited.customerFindingRefinements![local.id] = buildCustomerFindingRefinement(actionEdited, local, { ...localDefaults, recommendedAction: `${boundaryActions[local.id]} Confirm the final wording with the operator.` })!
+assert.equal(actionEdited.packageScopeOverrides?.[local.id].includedScope, boundaryScopes[local.id], 'editing Review action wording never rewrites the stored Package included-scope label')
 
 // Unapproved and dismissed findings cannot receive active delivery scope.
 const unresolvedState = makeState()

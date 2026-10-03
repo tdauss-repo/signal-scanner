@@ -125,7 +125,7 @@ const safeIssue = (fix: FixItem, item: PackagePreparationItem) => ({
   title: fix.intelligence?.customer.title || fix.issue,
   label: packageLabel(item),
   summary: fix.intelligence?.customer.found || fix.whyItMatters || 'A reviewed visibility issue was confirmed and is ready to address.',
-  foundLocalAction: item.remediationAction || fix.intelligence?.customer.recommendation || fix.fix || 'Review and correct this confirmed issue with the agreed scope.',
+  foundLocalAction: fix.intelligence?.customer.recommendation || fix.fix || 'Review and correct this confirmed issue with the agreed scope.',
 })
 
 const areaTitle: Record<CustomerVisibilityReviewAreaId, string> = {
