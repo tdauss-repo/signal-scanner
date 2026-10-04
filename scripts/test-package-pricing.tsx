@@ -3,7 +3,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { PackagePreparationPanel } from '../src/components/PackagePreparationPanel.tsx'
 import type { AuditState, FixItem, PackageCommercialPricing } from '../src/types/audit.ts'
-import { customerReviewKey, isPresentedFinding } from '../src/utils/customerScan.ts'
+import { buildCustomerFindingRefinement, customerReviewKey, defaultCustomerFindingWording, isPresentedFinding } from '../src/utils/customerScan.ts'
 import {
   buildCustomerVisibilityReviewExport,
   customerVisibilityReviewQaText,
@@ -172,6 +172,43 @@ const notedQa = customerVisibilityReviewQaText(notedReview, true)
 assert.equal(notedReview.recommendedPackage.pricingNote, 'One-time implementation price.')
 assert(notedQa.includes('One-time implementation price.'))
 assert.equal(serializeCustomerVisibilityReview(notedReview).includes('Operator-only discount consideration.'), false)
+assert.deepEqual(notedReview.recommendedPackage.included, review.recommendedPackage.included, 'changing pricingNote does not rewrite Included scope')
+assert.equal(notedReview.confirmedIssues.find((issue) => issue.id === location.id)?.foundLocalAction,
+  review.confirmedIssues.find((issue) => issue.id === location.id)?.foundLocalAction,
+  'changing pricingNote does not rewrite the Review action')
+
+const includedEdited = structuredClone(notedState)
+includedEdited.packageScopeOverrides![location.id] = buildPackageScopeOverride(includedEdited, location, {
+  ...includedEdited.packageScopeOverrides![location.id],
+  scopeClassification: 'starter',
+  packageAssignment: 'Starter Visibility Cleanup',
+  includedScope: 'Updated homepage location inclusion',
+})!
+const includedEditedReview = buildCustomerVisibilityReviewExport(includedEdited, [], fixes)
+assert(includedEditedReview.recommendedPackage.included.includes('Updated homepage location inclusion'))
+assert.equal(includedEditedReview.recommendedPackage.pricingNote, 'One-time implementation price.', 'changing Included scope does not rewrite pricingNote')
+assert.equal(includedEditedReview.confirmedIssues.find((issue) => issue.id === location.id)?.foundLocalAction,
+  notedReview.confirmedIssues.find((issue) => issue.id === location.id)?.foundLocalAction,
+  'changing Included scope does not rewrite Found Local will')
+
+const actionEdited = structuredClone(notedState)
+const actionDefaults = defaultCustomerFindingWording(location, actionEdited)
+const changedAction = 'Add clear Southgate and Downriver location context to the homepage and make the school’s public address easier to find and verify.'
+actionEdited.customerFindingRefinements = { ...actionEdited.customerFindingRefinements,
+  [location.id]: buildCustomerFindingRefinement(actionEdited, location, { ...actionDefaults, recommendedAction: changedAction })!,
+}
+actionEdited.customerFindingReviews![location.id] = customerReviewKey(actionEdited, location)
+assert.equal(actionEdited.packageScopeOverrides![location.id].includedScope, 'Homepage location and local identity improvement', 'changing Found Local will does not rewrite stored Included scope')
+assert.equal(actionEdited.packagePricing!.packages[starter.key].customerPricingNote, 'One-time implementation price.', 'changing Found Local will does not rewrite stored pricingNote')
+actionEdited.packageScopeOverrides![location.id] = buildPackageScopeOverride(actionEdited, location, {
+  ...actionEdited.packageScopeOverrides![location.id],
+  scopeClassification: 'starter',
+  packageAssignment: 'Starter Visibility Cleanup',
+})!
+const actionEditedReview = buildCustomerVisibilityReviewExport(actionEdited, [], fixes)
+assert.equal(actionEditedReview.confirmedIssues.find((issue) => issue.id === location.id)?.foundLocalAction, changedAction)
+assert(actionEditedReview.recommendedPackage.included.includes('Homepage location and local identity improvement'), 'changing Found Local will does not rewrite Included scope')
+assert.equal(actionEditedReview.recommendedPackage.pricingNote, 'One-time implementation price.', 'changing Found Local will does not rewrite pricingNote')
 
 // Editing either price deterministically updates the total.
 const starterEdited = structuredClone(state)
@@ -240,7 +277,10 @@ assert.equal(unsupported, undefined)
 
 // The operator UI exposes bounded commercial controls without customer-specific defaults.
 const html = renderToStaticMarkup(<PackagePreparationPanel state={state} fixes={fixes} />)
-for (const control of ['Package Pricing', 'One-time price', 'Recurring price', 'Monthly', 'Annual', 'Customer-facing pricing note', 'Internal pricing note', 'Save pricing', 'Initial project total: $848 one-time']) assert(html.includes(control), `${control} must appear in Package Preparation`)
+for (const control of ['Package Pricing', 'One-time price', 'Recurring price', 'Monthly', 'Annual', 'Customer-facing pricing note (optional)', 'Internal pricing note', 'Save pricing', 'Initial project total: $848 one-time']) assert(html.includes(control), `${control} must appear in Package Preparation`)
+assert(html.includes('Package inclusions come from the Included scope fields above.'), 'commercial offer points the operator to package inclusions above')
+assert(html.includes('Optional commercial or pricing context shown to the customer. Package inclusions are edited above.'), 'pricing note helper distinguishes commercial context from package inclusion copy')
+assert(html.includes('Customer-facing package inclusion'), 'Included scope explains its customer-facing package role')
 assert.equal(html.includes('Mary legacy customer'), true, 'operator-only pricing notes remain visible to the operator')
 const historicalHtml = renderToStaticMarkup(<PackagePreparationPanel state={historical} fixes={fixes} />)
 assert(historicalHtml.includes('Pricing not entered'))

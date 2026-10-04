@@ -94,7 +94,7 @@ const automaticIdentityEvidence = (observation: SearchDestinationObservation, sa
   }))
   const retainedDecision = sales.state === 'verified_recent'
     ? observation.retainedGoogleVerification?.automation.assessment?.googleIdentityDecision
-      || observation.retainedBingVerification?.automation.assessment?.bingIdentityDecision
+      || observation.retainedBingVerification?.identityDecision
     : undefined
   const decision = retainedDecision
     || observation.automation?.assessment?.googleIdentityDecision

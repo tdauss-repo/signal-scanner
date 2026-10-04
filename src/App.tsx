@@ -489,8 +489,21 @@ const loadState = (): AuditState => {
   try {
     const stored = localStorage.getItem(storageKey)
     if (!stored) return initialState
-
-    return normalizeAuditState(JSON.parse(stored) as Partial<AuditState>)
+    const normalized = normalizeAuditState(JSON.parse(stored) as Partial<AuditState>)
+    const currentScanId = localStorage.getItem(currentScanIdStorageKey)
+    const saved = localStorage.getItem(savedScansStorageKey)
+    if (!currentScanId || !saved) return normalized
+    try {
+      const matching = (JSON.parse(saved) as Partial<SavedScanRecord>[]).find((scan) => scan.id === currentScanId)
+      if (!matching?.payload) return normalized
+      return recoverRetainedBingVerificationFromWorkspace(
+        normalized,
+        Date.now(),
+        normalizeAuditState(matching.payload),
+      )
+    } catch {
+      return normalized
+    }
   } catch {
     return initialState
   }
@@ -779,7 +792,7 @@ function App() {
   }, [currentScanId])
 
   const updateState = (next: Partial<AuditState>) => {
-    setAuditState((current) => ({
+    setAuditState((current) => recoverRetainedBingVerificationFromWorkspace({
       ...current,
       ...next,
       lastUpdated: new Date().toISOString(),
@@ -793,7 +806,7 @@ function App() {
     setWorkspaceSaveNotice(null)
     setAuditState((current) => {
       const recordedAt = new Date().toISOString()
-      return {
+      return recoverRetainedBingVerificationFromWorkspace({
         ...current,
         profile,
         businessProfile: recordOperatorProfileChanges(
@@ -804,7 +817,7 @@ function App() {
         ),
         profileProjectionConflicts: undefined,
         lastUpdated: recordedAt,
-      }
+      })
     })
   }
 

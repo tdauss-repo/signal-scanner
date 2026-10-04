@@ -8,6 +8,7 @@ import type {
 } from '../types/audit'
 import type { VisibilityRun } from '../types/visibilityScan'
 import {
+  bingObservationIsAutomaticallyVerified,
   bingRefreshCanRetainRecentVerification,
   buildRetainedBingAutomaticVerification,
   retainedBingAutomaticVerificationIsCurrent,
@@ -119,26 +120,144 @@ export function retainedBingSourceFromVisibilityRuns(
   return undefined
 }
 
-/** Add the retained projection to an already-saved workspace without rescanning. */
-export function recoverRetainedBingVerificationFromWorkspace(state: AuditState, now = Date.now()): AuditState {
+const currentBingInvalidatesRetention = (observation: SearchDestinationObservation) => {
+  const assessment = observation.automation?.assessment
+  const conflictBlocker = assessment?.blocker === 'identifier_conflict' || assessment?.blocker === 'multiple_entities'
+  return observation.operatorVerification?.outcome === 'found_correction_needed' ||
+    observation.operatorVerification?.outcome === 'not_found' ||
+    Boolean(conflictBlocker || assessment?.bingIdentityDecision?.conflictingSignals.length)
+}
+
+const hasLaterBingConflict = (state: AuditState, verifiedAt: string) => {
+  const verifiedTime = Date.parse(verifiedAt)
+  return (state.visibilityRuns || []).some((run) => {
+    if (!runMatchesMaterialIdentity(run, state, state.profile)) return false
+    const runTime = Date.parse(run.endedAt || run.startedAt)
+    if (!Number.isFinite(runTime) || runTime <= verifiedTime) return false
+    return run.checks.some((check) => {
+      if (check.destination !== 'Bing Search' || check.queryMode !== 'brand') return false
+      const assessment = check.assessment
+      return assessment?.blocker === 'identifier_conflict' || assessment?.blocker === 'multiple_entities' ||
+        Boolean(assessment?.bingIdentityDecision?.conflictingSignals.length)
+    })
+  })
+}
+
+const retainedFromObservation = (
+  state: AuditState,
+  observation: SearchDestinationObservation,
+  sourceProfileReviewKey?: string,
+) => {
+  const direct = buildRetainedBingAutomaticVerification(
+    observation,
+    state.profile,
+    state.businessProfile,
+    sourceProfileReviewKey,
+  )
+  if (direct) return direct
+  const sourceRun = state.visibilityRuns?.find((run) => run.id === observation.automation?.runId)
+  if (!sourceRun || !runMatchesMaterialIdentity(sourceRun, state, state.profile)) return undefined
+  return buildRetainedBingAutomaticVerification({
+    ...observation,
+    automation: observation.automation ? {
+      ...observation.automation,
+      businessIdentityKey: brandPresenceBusinessIdentityKey(state.profile, state.businessProfile),
+    } : undefined,
+  }, state.profile, state.businessProfile, sourceProfileReviewKey)
+}
+
+/**
+ * Reconcile the bounded workspace-level Bing fact and the current observation.
+ * Visibility-run history is consulted only to migrate compatible older saves.
+ * This function is pure and performs no acquisition.
+ */
+export function recoverRetainedBingVerificationFromWorkspace(
+  state: AuditState,
+  now = Date.now(),
+  priorSavedWorkspace?: AuditState,
+): AuditState {
   let observations = state.searchDestinationObservations
   let changed = false
-  for (const [queryId, destinations] of Object.entries(state.searchDestinationObservations)) {
-    const current = destinations['Bing Search']
-    if (!current || !bingRefreshCanRetainRecentVerification(current) || current.operatorVerification?.outcome === 'found_correction_needed') continue
-    if (retainedBingAutomaticVerificationIsCurrent(current.retainedBingVerification, state.profile, state.businessProfile, now)) continue
-    const source = retainedBingSourceFromVisibilityRuns(state, `${queryId}:Bing Search`, state.profile)
-    if (!source) continue
-    const retained = buildRetainedBingAutomaticVerification(
-      source.observation,
+  let lastKnownVerified = retainedBingAutomaticVerificationIsCurrent(
+    state.bingLastKnownVerified,
+    state.profile,
+    state.businessProfile,
+    now,
+  ) ? state.bingLastKnownVerified : undefined
+  if (!lastKnownVerified && priorSavedWorkspace) {
+    const recoveredPrior = recoverRetainedBingVerificationFromWorkspace(priorSavedWorkspace, now)
+    const priorCandidate = retainedBingAutomaticVerificationIsCurrent(
+      recoveredPrior.bingLastKnownVerified,
       state.profile,
       state.businessProfile,
-      source.sourceProfileReviewKey,
-    )
-    if (!retainedBingAutomaticVerificationIsCurrent(retained, state.profile, state.businessProfile, now)) continue
-    if (!changed) observations = { ...observations }
-    observations[queryId] = { ...destinations, 'Bing Search': { ...current, retainedBingVerification: retained } }
-    changed = true
+      now,
+    ) ? recoveredPrior.bingLastKnownVerified : undefined
+    lastKnownVerified = priorCandidate && !hasLaterBingConflict(state, priorCandidate.verifiedAt)
+      ? priorCandidate : undefined
   }
-  return changed ? { ...state, searchDestinationObservations: observations } : state
+
+  for (const [queryId, destinations] of Object.entries(state.searchDestinationObservations)) {
+    const current = destinations['Bing Search']
+    if (!current || current.automation?.queryMode !== 'brand') continue
+
+    if (currentBingInvalidatesRetention(current)) {
+      lastKnownVerified = undefined
+      if (current.retainedBingVerification) {
+        if (!changed) observations = { ...observations }
+        const withoutRetained = { ...current }
+        delete withoutRetained.retainedBingVerification
+        observations[queryId] = { ...destinations, 'Bing Search': withoutRetained }
+        changed = true
+      }
+      continue
+    }
+
+    if (bingObservationIsAutomaticallyVerified(current)) {
+      const sourceRun = state.visibilityRuns?.find((run) => run.id === current.automation?.runId)
+      const retained = retainedFromObservation(state, current, sourceRun?.profileReviewKey)
+      if (retainedBingAutomaticVerificationIsCurrent(retained, state.profile, state.businessProfile, now)) {
+        lastKnownVerified = retained
+      }
+      if (current.retainedBingVerification) {
+        if (!changed) observations = { ...observations }
+        const withoutRetained = { ...current }
+        delete withoutRetained.retainedBingVerification
+        observations[queryId] = { ...destinations, 'Bing Search': withoutRetained }
+        changed = true
+      }
+      continue
+    }
+
+    if (!bingRefreshCanRetainRecentVerification(current)) continue
+    const embedded = retainedBingAutomaticVerificationIsCurrent(
+      current.retainedBingVerification,
+      state.profile,
+      state.businessProfile,
+      now,
+    ) ? current.retainedBingVerification : undefined
+    let retained = lastKnownVerified || embedded
+    if (!retained) {
+      const source = retainedBingSourceFromVisibilityRuns(state, `${queryId}:Bing Search`, state.profile)
+      retained = source ? retainedFromObservation(state, source.observation, source.sourceProfileReviewKey) : undefined
+    }
+    if (!retainedBingAutomaticVerificationIsCurrent(retained, state.profile, state.businessProfile, now)) retained = undefined
+    lastKnownVerified = retained
+    if (current.retainedBingVerification !== retained) {
+      if (!changed) observations = { ...observations }
+      const withoutRetained = { ...current }
+      delete withoutRetained.retainedBingVerification
+      observations[queryId] = {
+        ...destinations,
+        'Bing Search': retained ? { ...withoutRetained, retainedBingVerification: retained } : withoutRetained,
+      }
+      changed = true
+    }
+  }
+
+  if (state.bingLastKnownVerified !== lastKnownVerified) changed = true
+  return changed ? {
+    ...state,
+    searchDestinationObservations: observations,
+    ...(lastKnownVerified ? { bingLastKnownVerified: lastKnownVerified } : { bingLastKnownVerified: undefined }),
+  } : state
 }

@@ -76,11 +76,12 @@ const materialSearchEvidence = (
       provenance: derivedMaps.provenance,
     }
   }
-  const retained = effectiveGoogleAutomaticIdentityState(observation, { profile: state.profile, profileState: state.businessProfile }) === 'verified_recent'
-    ? observation.retainedGoogleVerification
-    : effectiveBingAutomaticIdentityState(observation, { profile: state.profile, profileState: state.businessProfile }) === 'verified_recent'
-      ? observation.retainedBingVerification : undefined
-  const assessment = retained?.automation.assessment || observation.automation?.assessment
+  const retainedGoogle = effectiveGoogleAutomaticIdentityState(observation, { profile: state.profile, profileState: state.businessProfile }) === 'verified_recent'
+    ? observation.retainedGoogleVerification : undefined
+  const retainedBing = effectiveBingAutomaticIdentityState(observation, { profile: state.profile, profileState: state.businessProfile }) === 'verified_recent'
+    ? observation.retainedBingVerification : undefined
+  const retained = retainedGoogle || retainedBing
+  const assessment = retainedGoogle?.automation.assessment || retainedBing?.assessment || observation.automation?.assessment
   const profile = reviewedBusinessProfile(state.profile, state.businessProfile)
   return {
     version: 'found-local-material-strength-v1',
@@ -104,7 +105,7 @@ const materialSearchEvidence = (
       classifiedCanonicalProfileUrl: observation.operatorVerification.classifiedCanonicalProfileUrl,
       provenance: observation.operatorVerification.provenance,
     } : undefined,
-    queryMode: retained?.automation.queryMode || observation.automation?.queryMode,
+    queryMode: retainedGoogle?.automation.queryMode || retainedBing?.queryMode || observation.automation?.queryMode,
     assessment: assessment ? {
       visibilityResult: assessment.visibilityResult,
       automaticObservation: assessment.automaticObservation,

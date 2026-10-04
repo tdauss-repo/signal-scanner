@@ -23,7 +23,7 @@ import {
   retainedBingAutomaticVerificationIsCurrent,
 } from './bingAcquisitionResilience'
 import { discoverSocialProfile } from './socialProfileDiscovery'
-import { retainedBingSourceFromVisibilityRuns, type RetainedBingSource } from './bingWorkspaceRetention'
+import { recoverRetainedBingVerificationFromWorkspace, retainedBingSourceFromVisibilityRuns, type RetainedBingSource } from './bingWorkspaceRetention'
 
 export { retainedBingSourceFromVisibilityRuns } from './bingWorkspaceRetention'
 
@@ -571,11 +571,14 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
         const sourceRun = current.visibilityRuns?.find((candidate) => candidate.id === previous?.automation?.runId)
         const retainedBingSource = item.destination === 'Bing Search' && item.queryMode === 'brand'
           ? retainedBingSourceFromVisibilityRuns(current, item.id, profile) : undefined
-        return { ...current, searchDestinationObservations: { ...current.searchDestinationObservations,
+        const next = { ...current, searchDestinationObservations: { ...current.searchDestinationObservations,
           [item.queryId!]: { ...current.searchDestinationObservations[item.queryId!], [item.destination!]: mergeAutomatedObservation(previous, observation, {
             profile, profileState: initial.businessProfile, sourceProfileReviewKey: sourceRun?.profileReviewKey,
             retainedBingSource,
           }) } } }
+        return item.destination === 'Bing Search' && item.queryMode === 'brand'
+          ? recoverRetainedBingVerificationFromWorkspace(next)
+          : next
       })
     } else if (item.destination) {
       const interpretations = captures.map((capture) => ({ capture, ...interpretPresence(capture, profile, item.destination!) }))

@@ -249,6 +249,9 @@ assert.equal(projectSalesVisibility(reopened.searchDestinationObservations['sear
 const persistedFile = JSON.parse(readFileSync(new URL('./fixtures/mary-bing-retention-workspace.json', import.meta.url), 'utf8')) as SavedScanFile
 const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 assert.match(appSource, /return recoverRetainedBingVerificationFromWorkspace\(normalized\)/, 'the real App saved-workspace normalization path applies Bing recovery')
+assert.match(appSource, /normalizeAuditState\(matching\.payload\)/, 'active-workspace hydration may use only the matching saved scan as a legacy recovery source')
+const loadStateSource = appSource.slice(appSource.indexOf('const loadState ='), appSource.indexOf('const savedScanFromWorkspace'))
+assert.doesNotMatch(loadStateSource, /acquireBing|runVisibilityScan|fetch\(/, 'workspace hydration cannot make an external Bing request')
 const persistedWorkspace = persistedFile.scan.payload
 persistedWorkspace.profile = normalizeWorkspaceProfile(persistedWorkspace.profile)
 persistedWorkspace.salesReadiness = normalizeSalesReadiness(persistedWorkspace.salesReadiness, persistedWorkspace.profile)
@@ -275,6 +278,8 @@ assert.equal(recoveredSales.state, 'verified_recent', 'persisted workspace recov
 assert.equal(recoveredBing.automation?.runId, 'visibility-mary-current', 'latest inconclusive acquisition remains the active technical record')
 assert.equal(recoveredBing.automation?.assessment?.blocker, 'no_match')
 assert.equal(recoveredBing.retainedBingVerification?.sourceRunId, 'visibility-mary-prior')
+assert.equal(recoveredWorkspace.bingLastKnownVerified?.sourceRunId, 'visibility-mary-prior', 'load migration writes a bounded workspace-level verified fact')
+assert.equal('automation' in recoveredWorkspace.bingLastKnownVerified!, false, 'bounded retention does not duplicate captures or provider payloads')
 assert.equal(salesCockpitVisibility([{ queryId: 'search-brand-canonical', observation: recoveredBing }], {
   profile: recoveredWorkspace.profile,
   profileState: recoveredWorkspace.businessProfile,
@@ -286,4 +291,87 @@ const recoveredReview = buildCustomerVisibilityReviewExport(recoveredWorkspace, 
 assert.equal(recoveredReview.needsReview.includes('Bing Search'), false)
 assert(recoveredReview.verifiedStrengths.some((item) => item.title === 'Bing Search'))
 
-console.log('Bing recent-evidence resilience PASS: no-match/unavailable retention, shared freshness, identity/conflict/operator invalidation, UI, stable strength, neutral count, persisted-workspace recovery, and customer boundary.')
+// Normal lifecycle: Run N verifies, both normal persistence layers round-trip,
+// Run N+1 saves a no-match as the latest technical fact, and a second restart
+// restores verified_recent without any acquisition dependency.
+const lifecycleSource = retainedBingSourceFromVisibilityRuns(
+  persistedWorkspace,
+  'search-brand-canonical:Bing Search',
+  persistedWorkspace.profile,
+)!
+const runNWorkspace = structuredClone(persistedWorkspace)
+runNWorkspace.visibilityRuns = [structuredClone(runNWorkspace.visibilityRuns![0])]
+runNWorkspace.searchDestinationObservations['search-brand-canonical']['Bing Search'] = lifecycleSource.observation
+delete runNWorkspace.bingLastKnownVerified
+const afterRunN = recoverRetainedBingVerificationFromWorkspace(runNWorkspace, Date.parse('2026-10-02T12:00:00.000Z'))
+assert.equal(afterRunN.bingLastKnownVerified?.verificationState, 'automatic_verified', '1: Run N persists automatic verification immediately')
+const savedRunN = JSON.stringify(afterRunN)
+const loadedRunN = recoverRetainedBingVerificationFromWorkspace(JSON.parse(savedRunN) as AuditState, Date.parse('2026-10-02T12:01:00.000Z'))
+
+const legacyActiveNoMatch = structuredClone(persistedWorkspace)
+legacyActiveNoMatch.visibilityRuns = [structuredClone(legacyActiveNoMatch.visibilityRuns!.at(-1)!)]
+delete legacyActiveNoMatch.bingLastKnownVerified
+delete legacyActiveNoMatch.searchDestinationObservations['search-brand-canonical']['Bing Search']!.retainedBingVerification
+const recoveredAcrossNormalStores = recoverRetainedBingVerificationFromWorkspace(
+  legacyActiveNoMatch,
+  Date.parse('2026-10-03T12:00:00.000Z'),
+  loadedRunN,
+)
+assert.equal(recoveredAcrossNormalStores.bingLastKnownVerified?.sourceRunId, 'visibility-mary-prior', 'matching Saved Scan Run N repairs a legacy active workspace whose latest observation replaced it')
+assert.equal(recoveredAcrossNormalStores.searchDestinationObservations['search-brand-canonical']['Bing Search']?.automation?.assessment?.blocker, 'no_match')
+const legacyActiveWithConflict = structuredClone(legacyActiveNoMatch)
+legacyActiveWithConflict.visibilityRuns = structuredClone(conflictHistory.visibilityRuns)
+const laterMaterialConflict = legacyActiveWithConflict.visibilityRuns!.find((run) => run.id === 'bing-history-conflict')!
+laterMaterialConflict.startedAt = '2026-10-02T17:00:00.000Z'
+laterMaterialConflict.endedAt = '2026-10-02T17:01:00.000Z'
+assert.equal(recoverRetainedBingVerificationFromWorkspace(
+  legacyActiveWithConflict,
+  Date.parse('2026-10-03T12:00:00.000Z'),
+  loadedRunN,
+).bingLastKnownVerified, undefined, 'a later material conflict blocks the matching-saved-workspace migration path')
+
+const afterNoMatch = structuredClone(loadedRunN)
+afterNoMatch.visibilityRuns = structuredClone(persistedWorkspace.visibilityRuns)
+afterNoMatch.searchDestinationObservations['search-brand-canonical']['Bing Search'] = structuredClone(persistedCurrent)
+const afterRunNPlusOne = recoverRetainedBingVerificationFromWorkspace(afterNoMatch, Date.parse('2026-10-03T12:00:00.000Z'))
+assert.equal(afterRunNPlusOne.searchDestinationObservations['search-brand-canonical']['Bing Search']?.automation?.assessment?.blocker, 'no_match', '3: no-match remains the latest technical evidence')
+assert.equal(afterRunNPlusOne.bingLastKnownVerified?.sourceRunId, 'visibility-mary-prior', '2: the bounded fact survives the no-match save')
+const savedRunNPlusOne = JSON.stringify(afterRunNPlusOne)
+const reloadedRunNPlusOne = recoverRetainedBingVerificationFromWorkspace(JSON.parse(savedRunNPlusOne) as AuditState, Date.parse('2026-10-03T12:01:00.000Z'))
+const lifecycleBing = reloadedRunNPlusOne.searchDestinationObservations['search-brand-canonical']['Bing Search']!
+assert.equal(projectSalesVisibility(lifecycleBing, {
+  profile: reloadedRunNPlusOne.profile,
+  profileState: reloadedRunNPlusOne.businessProfile,
+  now: Date.parse('2026-10-03T12:01:00.000Z'),
+}).state, 'verified_recent', '4: restart after no-match restores verified_recent')
+assert.equal(lifecycleBing.automation?.assessment?.blocker, 'no_match')
+assert.equal(buildCustomerVisibilityReviewExport(reloadedRunNPlusOne, [], []).needsReview.includes('Bing Search'), false, '9: retained Bing is excluded from needsReview after restart')
+assert(customerStrengthCandidates(reloadedRunNPlusOne, []).some((item) => item.id === 'search:Bing Search'), '10: retained Bing remains strength eligible after restart')
+
+const nonMaterialEdit = structuredClone(reloadedRunNPlusOne)
+nonMaterialEdit.profile.operatorNote = 'A changed workspace note must not affect Bing identity.'
+nonMaterialEdit.profile.primaryCategory = 'Montessori preschool and school'
+const afterNonMaterialEdit = recoverRetainedBingVerificationFromWorkspace(nonMaterialEdit, Date.parse('2026-10-03T12:02:00.000Z'))
+assert(afterNonMaterialEdit.bingLastKnownVerified, '6: non-material workspace metadata does not invalidate retention')
+
+const materialEdit = structuredClone(reloadedRunNPlusOne)
+materialEdit.profile.phone = '313-555-0100'
+materialEdit.businessProfile.values.phone = { value: '313-555-0100', source: 'operator_entered', status: 'operator_reviewed', confidence: 'high' }
+const afterMaterialEdit = recoverRetainedBingVerificationFromWorkspace(materialEdit, Date.parse('2026-10-03T12:02:00.000Z'))
+assert.equal(afterMaterialEdit.bingLastKnownVerified, undefined, '5: material identity change invalidates the bounded fact')
+assert.equal(projectSalesVisibility(afterMaterialEdit.searchDestinationObservations['search-brand-canonical']['Bing Search']!, {
+  profile: afterMaterialEdit.profile, profileState: afterMaterialEdit.businessProfile, now: Date.parse('2026-10-03T12:02:00.000Z'),
+}).state, 'manual_verification_needed')
+
+const operatorConflict = structuredClone(reloadedRunNPlusOne)
+operatorConflict.searchDestinationObservations['search-brand-canonical']['Bing Search']!.operatorVerification = correctedPrior.operatorVerification
+const afterOperatorConflict = recoverRetainedBingVerificationFromWorkspace(operatorConflict, Date.parse('2026-10-03T12:02:00.000Z'))
+assert.equal(afterOperatorConflict.bingLastKnownVerified, undefined, '7: explicit operator correction invalidates retained verification')
+
+const expiredWorkspace = recoverRetainedBingVerificationFromWorkspace(reloadedRunNPlusOne, Date.parse('2026-10-09T16:00:31.000Z'))
+assert.equal(expiredWorkspace.bingLastKnownVerified, undefined, '8: the bounded fact expires after seven days')
+assert.equal(projectSalesVisibility(expiredWorkspace.searchDestinationObservations['search-brand-canonical']['Bing Search']!, {
+  profile: expiredWorkspace.profile, profileState: expiredWorkspace.businessProfile, now: Date.parse('2026-10-09T16:00:31.000Z'),
+}).state, 'manual_verification_needed')
+
+console.log('Bing recent-evidence resilience PASS: no-match/unavailable retention, bounded Run N/Run N+1 save/reload lifecycle, shared freshness, identity/conflict/operator invalidation, UI, stable strength, neutral count, persisted-workspace recovery, and customer boundary.')

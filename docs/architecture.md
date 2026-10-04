@@ -100,7 +100,11 @@ Review → Verification`:
    Internal scope notes stay inside the operator workspace. Operator-controlled
    package pricing is stored separately from evidence-bound scope overrides, so
    a commercial edit never changes finding truth, approval, wording, or scope
-   reconciliation.
+   reconciliation. `Included scope` is the concise customer-facing package
+   inclusion shown under what is included. `pricingNote` is optional commercial
+   or pricing context, not an alternate place to enter inclusion bullets. The
+   Review `foundLocalAction`, Package `included[]`, and commercial `pricingNote`
+   remain independently editable and independently projected.
 5. **Customer Review** is the final operator quality gate. Its human-readable
    QA frame, copyable review text, and sanitized version 1.0 JSON are all built
    from the same customer-safe projection of reviewed identity, area-specific
@@ -389,24 +393,35 @@ Bing Brand uses the same centrally defined seven-day automatic-evidence
 freshness window and material reviewed-identity fingerprint as Google Brand.
 When a later native Bing refresh is unavailable or successfully inspects a
 normal result region but produces only `review_required` / `no_match`, the
-current refresh remains stored while a recent prior provider-acquired Bing
-identity decision may remain effective as “Verified from recent evidence.” A
-no-match result variant is inconclusive, not contradictory, and does not erase
-the earlier verified fact. Retained evidence is never represented as fresh.
-For compatible saved workspaces created before this retention projection was
-available, load-time workspace normalization may reconstruct the same bounded
-fact from a recent verified Bing assessment already present in visibility-run
-history; no new scan is required. Historical run comparison uses the same
-material reviewed name, domain, address, and phone identity rather than full
-profile or review-record fingerprints, which may differ only in category,
-notes, timestamps, or other non-identity metadata. A newer conflicting run is
-a hard barrier to that recovery.
+current refresh remains the current technical destination observation while a
+separate, bounded workspace-level last-known-verification record may remain
+effective as “Verified from recent evidence.” The retained record contains the
+verified time, material name/domain/address/phone identity key, source run,
+result/profile identity, compact material identity assessment, and an evidence
+fingerprint. It excludes raw HTML, captures, and provider payloads. A no-match
+result variant is inconclusive, not contradictory, and does not erase the
+earlier verified fact or become direct verification itself. Retained evidence
+is never represented as fresh.
+
+The bounded record is written as soon as a Bing Brand acquisition verifies
+automatically, survives normal current-workspace and Saved Scan JSON
+save/reload cycles, and is reattached only as the effective customer projection
+when the latest acquisition is eligible for retention. Workspace hydration is
+pure and makes no Bing request. For compatible older saved workspaces,
+load-time normalization may migrate the same fact from a recent verified Bing
+assessment already present in visibility-run history. Historical runs are a
+compatibility source, not the durable retention mechanism. Migration compares
+the same material reviewed name, domain, address, and phone identity rather
+than full profile or review-record fingerprints, which may differ only in
+category, notes, timestamps, or other non-identity metadata. A newer conflict
+is a hard barrier.
 
 Retention requires a prior successful automatic Bing acquisition with an
 explicit verified identity decision, an unchanged reviewed business name,
 domain, address, and phone fingerprint, and evidence within the freshness
 window. A current material identity conflict, expiry, reviewed-identity
-change, or operator correction blocks the retained positive interpretation.
+change, or explicit operator correction blocks and clears the retained positive
+interpretation.
 Operator-only verification is preserved under operator provenance and is never
 relabeled as retained automatic evidence. While valid, retained Bing evidence
 continues to support the stable Bing strength and stays outside neutral and

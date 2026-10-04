@@ -9,6 +9,7 @@ import type {
 
 import type { FindingIntelligence } from './findingIntelligence.js'
 import type { OperatorAssistedBrowserEvidence } from './operatorAssistedSearch.js'
+import type { BingIdentityDecision, SearchEntityAssessment } from './entityMatch.js'
 
 export type TrafficStatus = 'Green' | 'Yellow' | 'Red' | 'Gray'
 
@@ -145,6 +146,8 @@ export interface AuditState {
   packageScopeOverrides?: Record<string, PackageScopeOverride>
   /** Operator-controlled proposal pricing. Independent from finding evidence and approval identity. */
   packagePricing?: PackagePricingState
+  /** Bounded last-known automatic Bing fact; current acquisition remains in the destination observation. */
+  bingLastKnownVerified?: RetainedBingAutomaticVerification
   /** Last explicit finding decision, retained only for operator reconciliation after evidence refresh. */
   customerFindingDecisionSnapshots?: Record<string, CustomerFindingDecisionSnapshot>
   /** Customer-only strength inclusion and wording, bound to material positive evidence. */
@@ -528,7 +531,31 @@ export interface RetainedBrandAutomaticVerification {
 }
 
 export type RetainedGoogleAutomaticVerification = RetainedBrandAutomaticVerification
-export type RetainedBingAutomaticVerification = RetainedBrandAutomaticVerification
+
+/**
+ * Minimal durable Bing recovery state. It deliberately excludes captures,
+ * provider payloads, and HTML; visibilityRuns are only a compatibility source.
+ */
+export interface RetainedBingAutomaticVerification {
+  version: 1
+  destination: 'Bing Search'
+  provenance: 'retained_automatic_verification'
+  verificationState: 'automatic_verified'
+  businessIdentityKey: string
+  verifiedAt: string
+  sourceRunId: string
+  observedResultUrl?: string
+  canonicalProfileUrl?: string
+  observedResultTypes: SearchVisibilityObservedResultType[]
+  evidenceNotes: string
+  confidence: EvidenceConfidence
+  evidenceKind: EvidenceKind
+  queryMode: 'brand'
+  /** Compact material assessment; candidate evidence references are removed. */
+  assessment: SearchEntityAssessment
+  identityDecision: BingIdentityDecision
+  evidenceFingerprint: string
+}
 
 export interface SearchDestinationObservation extends DestinationEvidence {
   automation?: PresenceAutomation

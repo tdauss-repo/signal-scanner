@@ -89,7 +89,11 @@ export function projectSalesVisibility(
     ? undefined : candidateDerivedGoogleMapsVerification
   const retainedVerification = googleAutomaticState === 'verified_recent' ? observation.retainedGoogleVerification
     : bingAutomaticState === 'verified_recent' ? observation.retainedBingVerification : undefined
-  const effectiveAssessment = retainedVerification?.automation.assessment || assessment
+  const effectiveAssessment = googleAutomaticState === 'verified_recent'
+    ? observation.retainedGoogleVerification?.automation.assessment
+    : bingAutomaticState === 'verified_recent'
+      ? observation.retainedBingVerification?.assessment
+      : assessment
   const selectedCandidate = effectiveAssessment?.selected?.candidate || effectiveAssessment?.matches[0]?.candidate
   const operatorVerification = currentBrandPresenceVerification(observation, context.profile, context.profileState)
   const staleOperatorVerification = brandPresenceVerificationIsStale(observation, context.profile, context.profileState)
