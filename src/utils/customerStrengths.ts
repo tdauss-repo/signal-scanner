@@ -3,8 +3,7 @@ import type { EntityMatch } from '../types/entityMatch'
 import { reviewedBusinessProfile } from './businessProfileState'
 import { customerBusinessNoun, localBusinessModel } from './businessContext'
 import { evidenceFingerprint } from './evidenceFingerprint'
-import { effectiveGoogleAutomaticIdentityState } from './googleAcquisitionResilience'
-import { effectiveBingAutomaticIdentityState } from './bingAcquisitionResilience'
+import { effectiveBrandPresenceAutomaticIdentityState } from './brandPresenceWorkspaceRetention'
 import { salesCockpitVisibility } from './salesVisibilityProjection'
 import type { SalesVisibilityProjection } from './salesVisibilityProjection'
 
@@ -76,12 +75,9 @@ const materialSearchEvidence = (
       provenance: derivedMaps.provenance,
     }
   }
-  const retainedGoogle = effectiveGoogleAutomaticIdentityState(observation, { profile: state.profile, profileState: state.businessProfile }) === 'verified_recent'
-    ? observation.retainedGoogleVerification : undefined
-  const retainedBing = effectiveBingAutomaticIdentityState(observation, { profile: state.profile, profileState: state.businessProfile }) === 'verified_recent'
-    ? observation.retainedBingVerification : undefined
-  const retained = retainedGoogle || retainedBing
-  const assessment = retainedGoogle?.automation.assessment || retainedBing?.assessment || observation.automation?.assessment
+  const retained = effectiveBrandPresenceAutomaticIdentityState(observation, { profile: state.profile, profileState: state.businessProfile }) === 'verified_recent'
+    ? observation.retainedBrandVerification : undefined
+  const assessment = retained?.assessment || observation.automation?.assessment
   const profile = reviewedBusinessProfile(state.profile, state.businessProfile)
   return {
     version: 'found-local-material-strength-v1',
@@ -105,7 +101,7 @@ const materialSearchEvidence = (
       classifiedCanonicalProfileUrl: observation.operatorVerification.classifiedCanonicalProfileUrl,
       provenance: observation.operatorVerification.provenance,
     } : undefined,
-    queryMode: retainedGoogle?.automation.queryMode || retainedBing?.queryMode || observation.automation?.queryMode,
+    queryMode: retained?.queryMode || observation.automation?.queryMode,
     assessment: assessment ? {
       visibilityResult: assessment.visibilityResult,
       automaticObservation: assessment.automaticObservation,

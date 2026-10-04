@@ -130,7 +130,7 @@ function BrandPresenceEvidenceDetail({ value, sales }: { value: SearchDestinatio
       {summary.observedAt ? <div><dt>Observed</dt><dd>{formatEvidenceTimestamp(summary.observedAt)} (local time)</dd></div> : null}
       {summary.lastVerifiedAt ? <div><dt>Last verified</dt><dd>{formatEvidenceTimestamp(summary.lastVerifiedAt)} (local time)</dd></div> : null}
       <div><dt>Source</dt><dd>{summary.source}</dd></div>
-      {summary.automationState ? <div><dt>{sales.state === 'verified_recent' ? value.destination === 'Bing Search' ? 'Latest refresh' : 'Current refresh' : 'Automation state'}</dt><dd>{summary.automationState}</dd></div> : null}
+      {summary.automationState ? <div><dt>{sales.state === 'verified_recent' ? 'Latest refresh' : 'Automation state'}</dt><dd>{summary.automationState}</dd></div> : null}
       {summary.appleMapsSearch ? <div><dt>Apple Maps search</dt><dd>{summary.appleMapsSearch}</dd></div> : null}
       {summary.structuredPlace ? <div><dt>Structured place</dt><dd>{summary.structuredPlace}</dd></div> : null}
       {summary.identityEvidence?.map((item) => <div key={`${item.label}-${item.result}`}><dt>{item.label}</dt><dd>{item.result}</dd></div>)}

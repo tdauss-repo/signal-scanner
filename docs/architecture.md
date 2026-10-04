@@ -389,8 +389,9 @@ Successful Brand Presence identity verification is separate from local-intent
 discovery performance. Candidate details, matcher decisions, provider names,
 blockers, and acquisition metadata remain outside customer JSON.
 
-Bing Brand uses the same centrally defined seven-day automatic-evidence
-freshness window and material reviewed-identity fingerprint as Google Brand.
+Bing Brand uses the shared retained Brand Presence state and the centrally
+defined seven-day automatic-evidence freshness window and material reviewed-
+identity fingerprint.
 When a later native Bing refresh is unavailable or successfully inspects a
 normal result region but produces only `review_required` / `no_match`, the
 current refresh remains the current technical destination observation while a
@@ -403,13 +404,14 @@ result variant is inconclusive, not contradictory, and does not erase the
 earlier verified fact or become direct verification itself. Retained evidence
 is never represented as fresh.
 
-The bounded record is written as soon as a Bing Brand acquisition verifies
+The shared bounded record is written as soon as a Bing Brand acquisition verifies
 automatically, survives normal current-workspace and Saved Scan JSON
 save/reload cycles, and is reattached only as the effective customer projection
 when the latest acquisition is eligible for retention. Workspace hydration is
 pure and makes no Bing request. For compatible older saved workspaces,
-load-time normalization may migrate the same fact from a recent verified Bing
-assessment already present in visibility-run history. Historical runs are a
+load-time normalization may migrate the former Bing-specific record or the same
+fact from a recent verified Bing assessment already present in visibility-run
+history. Historical runs are a
 compatibility source, not the durable retention mechanism. Migration compares
 the same material reviewed name, domain, address, and phone identity rather
 than full profile or review-record fingerprints, which may differ only in
@@ -535,6 +537,13 @@ outcome can establish absence. A verified result may support the independent
 DuckDuckGo strength through the existing include/hide/refine workflow, while
 provider, matcher, candidate, and diagnostic metadata remain outside customer
 JSON.
+
+DuckDuckGo automatic verification participates in the shared seven-day
+retained lifecycle. A later unavailable, no-match, or otherwise inconclusive
+bounded HTML acquisition remains the current technical observation but does not
+erase a recent trustworthy automatic verification. Material identity change,
+same-entity conflict, explicit operator correction, and expiry remain hard
+barriers.
 
 ### Yelp Brand Presence verification
 
@@ -713,6 +722,52 @@ not part of the operator summary or customer export. The safe
 does not launch local Chromium, and prints bounded attempt, count, and field
 availability summaries rather than raw provider data.
 
+### Shared retained Brand Presence verification
+
+Google Search, direct Google Maps, Bing Search, and DuckDuckGo use one bounded
+workspace lifecycle for automatically verified Brand Presence identity. The
+latest acquisition and the last known trustworthy verification are separate
+facts. `searchDestinationObservations` always keeps the latest technical
+capture and assessment, including `unavailable`, `no_match`, or candidate
+ambiguity. `brandPresenceLastKnownVerified` keeps at most one compact automatic
+verification per supported destination. Each record contains its destination,
+verified time and source run, direct-automatic method, normalized reviewed
+business-identity key, compact matched entity/result material, customer-
+strength material fields, and an integrity fingerprint. It never contains raw
+HTML, captures, full provider payloads, or unnecessary request diagnostics.
+
+The shared record is effective for seven days, inclusive, and only while the
+reviewed business name, official domain, normalized address, and phone remain
+unchanged. Notes, category wording, services, timestamps, and unrelated
+workspace metadata are non-material. Normal save, close, and reload is pure:
+hydration reconciles the bounded record with the latest observation and makes
+no destination request. A later inconclusive acquisition remains visible as
+the current technical result while customer and Review projections may say
+“Verified from recent evidence.” Expiry returns the destination to the latest
+acquisition state.
+
+Candidate-set ambiguity is not automatically a material conflict. Generic
+SERPs, no match, several possible businesses, insufficient structured fields,
+and provider/access failures are inconclusive and may use a valid recent fact.
+A hard conflict requires a material mismatch tied to the selected reviewed or
+same canonical business entity—for example a different official domain,
+address, or phone—or explicit evidence that the entity is not the reviewed
+business. A current explicit operator correction or Not found decision is also
+a hard barrier. These barriers clear or suppress retained positivity; they do
+not weaken the matcher or make an ambiguous acquisition freshly verified.
+
+Legacy workspaces migrate conservatively from compatible verified visibility-
+run history, the earlier embedded Google retained record, or the Bing-specific
+`bingLastKnownVerified` / embedded Bing record. Only successful automatic
+verification with matching material identity is eligible. Once reconciled,
+the compact shared map is persisted and legacy fields are omitted. Run history
+remains a migration source, not the durable mechanism.
+
+Review summaries, public-presence counts, customer strength eligibility, and
+Customer Visibility Review `needsReview` use the effective destination state.
+Provider names, fingerprints, retained-state internals, and raw captures remain
+outside customer JSON.
+
 ### Google Brand acquisition resilience
 
 Google Brand acquisition uses the existing provider path in this order:
@@ -731,14 +786,10 @@ Browser `google_sorry` or other challenge is never repeated in the same scan.
 Attempt stages and elapsed times are retained as sanitized diagnostics. The
 same clean verification query is used for both SERP attempts.
 
-When the current refresh remains unavailable, the workspace may retain a prior
-Google Search automatic verification for seven days. Retention requires a
-successful prior acquisition, an explicit verified identity decision, the same
-material reviewed identity (normalized business name, primary domain, address,
-and phone), and no intervening conflicting Google assessment. Operator-only,
-ambiguous, expired, or conflicting evidence cannot become retained automatic
-evidence. New scans stamp the material identity key directly; compatible older
-runs may use their reviewed-profile fingerprint conservatively.
+When the current refresh is unavailable or inconclusive, Google Search uses the
+shared seven-day retained-verification lifecycle. A multiple-candidate result
+still cannot verify freshly, but it does not erase an earlier verification
+unless the evidence establishes a true material identity conflict.
 
 The current failed automation and the retained successful verification remain
 separate records. Operator UI labels the effective result “Verified from recent
@@ -772,13 +823,16 @@ derived result as a successful direct Maps acquisition. Tracking-only Maps URL
 parameters, timestamps, run IDs, and provider request metadata are excluded
 from material reconciliation.
 
-Fresh direct Maps verification has first precedence. A current direct Maps
-identity conflict or explicit current operator correction blocks a derived
-positive result. When direct Maps acquisition is unavailable, qualifying Search
-evidence produces “Verified automatically”; qualifying retained Search evidence
-produces “Verified from recent evidence” and preserves the failed current
-refresh as a separate fact. Expiry, reviewed business identity changes, or a
-later conflict remove the derived eligibility and restore assisted verification.
+Maps precedence is fresh direct verification, recent retained direct
+verification, valid derived Google Search verification, then neutral. A current
+direct Maps identity conflict or explicit current operator correction blocks
+both retained and derived positivity. A direct unavailable or inconclusive
+refresh does not destroy a still-current direct or derived verification.
+Qualifying fresh Search evidence produces “Verified automatically”; qualifying
+retained Search evidence produces “Verified from recent evidence” and preserves
+the current Maps and Search refreshes as separate facts. Expiry, reviewed
+business identity changes, or a later true conflict remove eligibility and
+restore assisted verification.
 
 Derived Maps verification proves only that a matching Maps entity is present
 and identity-consistent. It does not prove profile ownership, claimed status,

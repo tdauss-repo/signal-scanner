@@ -73,7 +73,7 @@ import { entityAction, normalizeSalesReadiness, questionAction, sortSalesActions
 import { buildPackageScopeOverride, type PackageScopeInput } from './utils/packagePreparation'
 import { buildCustomerStrengthPresentation, type CustomerStrengthCandidate, type CustomerStrengthInput } from './utils/customerStrengths'
 import { normalizePackagePricingState } from './utils/packagePricing'
-import { recoverRetainedBingVerificationFromWorkspace } from './utils/bingWorkspaceRetention'
+import { recoverRetainedBrandPresenceFromWorkspace } from './utils/brandPresenceWorkspaceRetention'
 
 const storageKey = 'local-signal-scanner-state'
 const activeViewStorageKey = 'business-scanner-active-view'
@@ -482,7 +482,7 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
       salesReadiness: normalizeSalesReadiness(parsed.salesReadiness, profile),
       packagePricing: normalizePackagePricingState(parsed.packagePricing),
     }
-    return recoverRetainedBingVerificationFromWorkspace(normalized)
+    return recoverRetainedBrandPresenceFromWorkspace(normalized)
 }
 
 const loadState = (): AuditState => {
@@ -496,7 +496,7 @@ const loadState = (): AuditState => {
     try {
       const matching = (JSON.parse(saved) as Partial<SavedScanRecord>[]).find((scan) => scan.id === currentScanId)
       if (!matching?.payload) return normalized
-      return recoverRetainedBingVerificationFromWorkspace(
+      return recoverRetainedBrandPresenceFromWorkspace(
         normalized,
         Date.now(),
         normalizeAuditState(matching.payload),
@@ -792,7 +792,7 @@ function App() {
   }, [currentScanId])
 
   const updateState = (next: Partial<AuditState>) => {
-    setAuditState((current) => recoverRetainedBingVerificationFromWorkspace({
+    setAuditState((current) => recoverRetainedBrandPresenceFromWorkspace({
       ...current,
       ...next,
       lastUpdated: new Date().toISOString(),
@@ -806,7 +806,7 @@ function App() {
     setWorkspaceSaveNotice(null)
     setAuditState((current) => {
       const recordedAt = new Date().toISOString()
-      return recoverRetainedBingVerificationFromWorkspace({
+      return recoverRetainedBrandPresenceFromWorkspace({
         ...current,
         profile,
         businessProfile: recordOperatorProfileChanges(

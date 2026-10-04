@@ -105,8 +105,8 @@ const currentNoMatch = observation(noMatchAssessment(), currentAt, 'bing-current
 const retained = mergeAutomatedObservation(prior, currentNoMatch, { profile, profileState, sourceProfileReviewKey, now })
 assert.equal(retained.automation?.runId, 'bing-current-no-match', '12: current inconclusive acquisition remains the parent record')
 assert.equal(retained.automation?.assessment?.blocker, 'no_match')
-assert.equal(retained.retainedBingVerification?.sourceRunId, 'bing-prior', '1: recent automatic verification remains separately retained')
-assert.equal(retained.retainedBingVerification?.verifiedAt, oneDayAgo)
+assert.equal(retained.retainedBrandVerification?.sourceRunId, 'bing-prior', '1: recent automatic verification remains separately retained')
+assert.equal(retained.retainedBrandVerification?.verifiedAt, oneDayAgo)
 
 const retainedSales = projectSalesVisibility(retained, { profile, profileState, now })
 assert.equal(retainedSales.state, 'verified_recent', '3: retained Bing state is recent rather than fresh')
@@ -127,7 +127,7 @@ assert.equal(brandPresenceEvidenceSummary(retainedUnavailable, projectSalesVisib
 
 const expiredPrior = observation(verifiedAssessment(), eightDaysAgo, 'bing-expired', capture('success', eightDaysAgo))
 const expired = mergeAutomatedObservation(expiredPrior, currentNoMatch, { profile, profileState, sourceProfileReviewKey, now })
-assert.equal(expired.retainedBingVerification, undefined, '4: evidence older than the shared seven-day window is rejected')
+assert.equal(expired.retainedBrandVerification, undefined, '4: evidence older than the shared seven-day window is rejected')
 assert.equal(projectSalesVisibility(expired, { profile, profileState, now }).state, 'manual_verification_needed')
 const boundaryAt = new Date(now - BRAND_PRESENCE_EVIDENCE_FRESHNESS_MS).toISOString()
 const boundary = mergeAutomatedObservation(observation(verifiedAssessment(), boundaryAt, 'bing-boundary', capture('success', boundaryAt)), currentNoMatch, { profile, profileState, sourceProfileReviewKey, now })
@@ -136,14 +136,14 @@ assert.equal(projectSalesVisibility(boundary, { profile, profileState, now }).st
 const changedProfile = normalizeWorkspaceProfile({ ...profile, phone: '313-555-0100', website: 'https://new-montessori.example/', streetAddress: '999 Other Road' })
 const changedState = reviewed(changedProfile)
 const changed = mergeAutomatedObservation(prior, currentNoMatch, { profile: changedProfile, profileState: changedState, sourceProfileReviewKey, now })
-assert.equal(changed.retainedBingVerification, undefined, '5: material reviewed identity change invalidates retention')
+assert.equal(changed.retainedBrandVerification, undefined, '5: material reviewed identity change invalidates retention')
 
 const conflictAssessment = assessBusinessCandidates([candidate('conflict', {
   name: profile.businessName, website: profile.website, phone: '313-555-0100',
 })], profile, profileState, 'brand', { automaticIdentityPolicy: 'bing_search' })
 const currentConflict = observation(conflictAssessment, currentAt, 'bing-current-conflict', capture('success', currentAt))
 const conflictMerged = mergeAutomatedObservation(prior, currentConflict, { profile, profileState, sourceProfileReviewKey, now })
-assert.equal(conflictMerged.retainedBingVerification, undefined, '6: a current material conflict clears prior positivity')
+assert.equal(conflictMerged.retainedBrandVerification, undefined, '6: a current material conflict clears prior positivity')
 assert.equal(projectSalesVisibility(conflictMerged, { profile, profileState, now }).state, 'conflicting_evidence')
 
 const correction = buildBrandPresenceVerification(prior, profile, profileState, {
@@ -152,7 +152,7 @@ const correction = buildBrandPresenceVerification(prior, profile, profileState, 
 assert.equal(correction.ok, true)
 const correctedPrior = { ...prior, operatorVerification: correction.ok ? correction.verification : undefined }
 const corrected = mergeAutomatedObservation(correctedPrior, currentNoMatch, { profile, profileState, sourceProfileReviewKey, now })
-assert.equal(corrected.retainedBingVerification, undefined, '7: operator correction prevents retained automatic positivity')
+assert.equal(corrected.retainedBrandVerification, undefined, '7: operator correction prevents retained automatic positivity')
 assert.equal(projectSalesVisibility(corrected, { profile, profileState, now }).state, 'reconfirmation_needed', 'the preserved correction follows existing material-evidence reconfirmation semantics')
 
 const operatorBase = observation(noMatchAssessment(), oneDayAgo, 'bing-operator-only', capture('success', oneDayAgo))
@@ -160,7 +160,7 @@ const operatorResult = buildBrandPresenceVerification(operatorBase, profile, pro
 assert.equal(operatorResult.ok, true)
 const operatorOnly = { ...operatorBase, operatorVerification: operatorResult.ok ? operatorResult.verification : undefined }
 const operatorMerged = mergeAutomatedObservation(operatorOnly, currentNoMatch, { profile, profileState, sourceProfileReviewKey, now })
-assert.equal(operatorMerged.retainedBingVerification, undefined, '8: operator-only evidence is never relabeled retained automatic evidence')
+assert.equal(operatorMerged.retainedBrandVerification, undefined, '8: operator-only evidence is never relabeled retained automatic evidence')
 assert.equal(projectSalesVisibility(operatorMerged, { profile, profileState, now }).state, 'verified_by_operator', 'operator-only evidence retains its own provenance and semantics')
 
 const unresolved = (destination: SearchDestination): SearchDestinationObservation => ({
@@ -194,9 +194,8 @@ const historicalState = structuredClone(state)
 historicalState.searchDestinationObservations['search-brand-canonical']['Bing Search'] = currentNoMatch
 const historicalSource = retainedBingSourceFromVisibilityRuns(historicalState, 'search-brand-canonical:Bing Search', profile)
 assert(historicalSource, 'workspace run history exposes the earlier verified Bing assessment after an already-completed no-match overwrite')
-const recoveredFromHistory = mergeAutomatedObservation(currentNoMatch, currentNoMatch, {
-  profile, profileState, sourceProfileReviewKey, retainedBingSource: historicalSource, now,
-})
+const recoveredFromHistory = recoverRetainedBingVerificationFromWorkspace(historicalState, now)
+  .searchDestinationObservations['search-brand-canonical']['Bing Search']!
 assert.equal(projectSalesVisibility(recoveredFromHistory, { profile, profileState, now }).state, 'verified_recent', 'the next refresh can recover the still-current prior success from existing workspace history')
 const conflictHistory = structuredClone(historicalState)
 conflictHistory.visibilityRuns!.splice(1, 0, {
@@ -221,7 +220,7 @@ const review = buildCustomerVisibilityReviewExport(state, [], [])
 assert.equal(review.needsReview.includes('Bing Search'), false, '11: retained Bing stays out of Still being verified')
 assert(review.verifiedStrengths.some((item) => item.title === 'Bing Search'))
 const customerJson = serializeCustomerVisibilityReview(review)
-for (const internal of ['retainedBingVerification', 'no_match', 'bing-native-fetch', 'bingIdentityDecision', 'sourceRunId']) {
+for (const internal of ['retainedBrandVerification', 'no_match', 'bing-native-fetch', 'bingIdentityDecision', 'sourceRunId']) {
   assert.equal(customerJson.includes(internal), false, `13: ${internal} stays outside customer JSON`)
 }
 
@@ -248,7 +247,7 @@ assert.equal(projectSalesVisibility(reopened.searchDestinationObservations['sear
 // profile metadata and a no-longer-equal full Business Profile fingerprint.
 const persistedFile = JSON.parse(readFileSync(new URL('./fixtures/mary-bing-retention-workspace.json', import.meta.url), 'utf8')) as SavedScanFile
 const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
-assert.match(appSource, /return recoverRetainedBingVerificationFromWorkspace\(normalized\)/, 'the real App saved-workspace normalization path applies Bing recovery')
+assert.match(appSource, /return recoverRetainedBrandPresenceFromWorkspace\(normalized\)/, 'the real App saved-workspace normalization path applies shared Brand Presence recovery')
 assert.match(appSource, /normalizeAuditState\(matching\.payload\)/, 'active-workspace hydration may use only the matching saved scan as a legacy recovery source')
 const loadStateSource = appSource.slice(appSource.indexOf('const loadState ='), appSource.indexOf('const savedScanFromWorkspace'))
 assert.doesNotMatch(loadStateSource, /acquireBing|runVisibilityScan|fetch\(/, 'workspace hydration cannot make an external Bing request')
@@ -277,9 +276,9 @@ const recoveredSales = projectSalesVisibility(recoveredBing, {
 assert.equal(recoveredSales.state, 'verified_recent', 'persisted workspace recovers Bing without another scan')
 assert.equal(recoveredBing.automation?.runId, 'visibility-mary-current', 'latest inconclusive acquisition remains the active technical record')
 assert.equal(recoveredBing.automation?.assessment?.blocker, 'no_match')
-assert.equal(recoveredBing.retainedBingVerification?.sourceRunId, 'visibility-mary-prior')
-assert.equal(recoveredWorkspace.bingLastKnownVerified?.sourceRunId, 'visibility-mary-prior', 'load migration writes a bounded workspace-level verified fact')
-assert.equal('automation' in recoveredWorkspace.bingLastKnownVerified!, false, 'bounded retention does not duplicate captures or provider payloads')
+assert.equal(recoveredBing.retainedBrandVerification?.sourceRunId, 'visibility-mary-prior')
+assert.equal(recoveredWorkspace.brandPresenceLastKnownVerified?.bing_search?.sourceRunId, 'visibility-mary-prior', 'load migration writes a bounded workspace-level verified fact')
+assert.equal('automation' in recoveredWorkspace.brandPresenceLastKnownVerified!.bing_search!, false, 'bounded retention does not duplicate captures or provider payloads')
 assert.equal(salesCockpitVisibility([{ queryId: 'search-brand-canonical', observation: recoveredBing }], {
   profile: recoveredWorkspace.profile,
   profileState: recoveredWorkspace.businessProfile,
@@ -303,21 +302,23 @@ const runNWorkspace = structuredClone(persistedWorkspace)
 runNWorkspace.visibilityRuns = [structuredClone(runNWorkspace.visibilityRuns![0])]
 runNWorkspace.searchDestinationObservations['search-brand-canonical']['Bing Search'] = lifecycleSource.observation
 delete runNWorkspace.bingLastKnownVerified
+delete runNWorkspace.brandPresenceLastKnownVerified
 const afterRunN = recoverRetainedBingVerificationFromWorkspace(runNWorkspace, Date.parse('2026-10-02T12:00:00.000Z'))
-assert.equal(afterRunN.bingLastKnownVerified?.verificationState, 'automatic_verified', '1: Run N persists automatic verification immediately')
+assert.equal(afterRunN.brandPresenceLastKnownVerified?.bing_search?.verificationState, 'automatic_verified', '1: Run N persists automatic verification immediately')
 const savedRunN = JSON.stringify(afterRunN)
 const loadedRunN = recoverRetainedBingVerificationFromWorkspace(JSON.parse(savedRunN) as AuditState, Date.parse('2026-10-02T12:01:00.000Z'))
 
 const legacyActiveNoMatch = structuredClone(persistedWorkspace)
 legacyActiveNoMatch.visibilityRuns = [structuredClone(legacyActiveNoMatch.visibilityRuns!.at(-1)!)]
 delete legacyActiveNoMatch.bingLastKnownVerified
-delete legacyActiveNoMatch.searchDestinationObservations['search-brand-canonical']['Bing Search']!.retainedBingVerification
+delete legacyActiveNoMatch.brandPresenceLastKnownVerified
+delete legacyActiveNoMatch.searchDestinationObservations['search-brand-canonical']['Bing Search']!.retainedBrandVerification
 const recoveredAcrossNormalStores = recoverRetainedBingVerificationFromWorkspace(
   legacyActiveNoMatch,
   Date.parse('2026-10-03T12:00:00.000Z'),
   loadedRunN,
 )
-assert.equal(recoveredAcrossNormalStores.bingLastKnownVerified?.sourceRunId, 'visibility-mary-prior', 'matching Saved Scan Run N repairs a legacy active workspace whose latest observation replaced it')
+assert.equal(recoveredAcrossNormalStores.brandPresenceLastKnownVerified?.bing_search?.sourceRunId, 'visibility-mary-prior', 'matching Saved Scan Run N repairs a legacy active workspace whose latest observation replaced it')
 assert.equal(recoveredAcrossNormalStores.searchDestinationObservations['search-brand-canonical']['Bing Search']?.automation?.assessment?.blocker, 'no_match')
 const legacyActiveWithConflict = structuredClone(legacyActiveNoMatch)
 legacyActiveWithConflict.visibilityRuns = structuredClone(conflictHistory.visibilityRuns)
@@ -328,14 +329,14 @@ assert.equal(recoverRetainedBingVerificationFromWorkspace(
   legacyActiveWithConflict,
   Date.parse('2026-10-03T12:00:00.000Z'),
   loadedRunN,
-).bingLastKnownVerified, undefined, 'a later material conflict blocks the matching-saved-workspace migration path')
+).brandPresenceLastKnownVerified?.bing_search, undefined, 'a later material conflict blocks the matching-saved-workspace migration path')
 
 const afterNoMatch = structuredClone(loadedRunN)
 afterNoMatch.visibilityRuns = structuredClone(persistedWorkspace.visibilityRuns)
 afterNoMatch.searchDestinationObservations['search-brand-canonical']['Bing Search'] = structuredClone(persistedCurrent)
 const afterRunNPlusOne = recoverRetainedBingVerificationFromWorkspace(afterNoMatch, Date.parse('2026-10-03T12:00:00.000Z'))
 assert.equal(afterRunNPlusOne.searchDestinationObservations['search-brand-canonical']['Bing Search']?.automation?.assessment?.blocker, 'no_match', '3: no-match remains the latest technical evidence')
-assert.equal(afterRunNPlusOne.bingLastKnownVerified?.sourceRunId, 'visibility-mary-prior', '2: the bounded fact survives the no-match save')
+assert.equal(afterRunNPlusOne.brandPresenceLastKnownVerified?.bing_search?.sourceRunId, 'visibility-mary-prior', '2: the bounded fact survives the no-match save')
 const savedRunNPlusOne = JSON.stringify(afterRunNPlusOne)
 const reloadedRunNPlusOne = recoverRetainedBingVerificationFromWorkspace(JSON.parse(savedRunNPlusOne) as AuditState, Date.parse('2026-10-03T12:01:00.000Z'))
 const lifecycleBing = reloadedRunNPlusOne.searchDestinationObservations['search-brand-canonical']['Bing Search']!
@@ -352,13 +353,13 @@ const nonMaterialEdit = structuredClone(reloadedRunNPlusOne)
 nonMaterialEdit.profile.operatorNote = 'A changed workspace note must not affect Bing identity.'
 nonMaterialEdit.profile.primaryCategory = 'Montessori preschool and school'
 const afterNonMaterialEdit = recoverRetainedBingVerificationFromWorkspace(nonMaterialEdit, Date.parse('2026-10-03T12:02:00.000Z'))
-assert(afterNonMaterialEdit.bingLastKnownVerified, '6: non-material workspace metadata does not invalidate retention')
+assert(afterNonMaterialEdit.brandPresenceLastKnownVerified?.bing_search, '6: non-material workspace metadata does not invalidate retention')
 
 const materialEdit = structuredClone(reloadedRunNPlusOne)
 materialEdit.profile.phone = '313-555-0100'
 materialEdit.businessProfile.values.phone = { value: '313-555-0100', source: 'operator_entered', status: 'operator_reviewed', confidence: 'high' }
 const afterMaterialEdit = recoverRetainedBingVerificationFromWorkspace(materialEdit, Date.parse('2026-10-03T12:02:00.000Z'))
-assert.equal(afterMaterialEdit.bingLastKnownVerified, undefined, '5: material identity change invalidates the bounded fact')
+assert.equal(afterMaterialEdit.brandPresenceLastKnownVerified?.bing_search, undefined, '5: material identity change invalidates the bounded fact')
 assert.equal(projectSalesVisibility(afterMaterialEdit.searchDestinationObservations['search-brand-canonical']['Bing Search']!, {
   profile: afterMaterialEdit.profile, profileState: afterMaterialEdit.businessProfile, now: Date.parse('2026-10-03T12:02:00.000Z'),
 }).state, 'manual_verification_needed')
@@ -366,10 +367,10 @@ assert.equal(projectSalesVisibility(afterMaterialEdit.searchDestinationObservati
 const operatorConflict = structuredClone(reloadedRunNPlusOne)
 operatorConflict.searchDestinationObservations['search-brand-canonical']['Bing Search']!.operatorVerification = correctedPrior.operatorVerification
 const afterOperatorConflict = recoverRetainedBingVerificationFromWorkspace(operatorConflict, Date.parse('2026-10-03T12:02:00.000Z'))
-assert.equal(afterOperatorConflict.bingLastKnownVerified, undefined, '7: explicit operator correction invalidates retained verification')
+assert.equal(afterOperatorConflict.brandPresenceLastKnownVerified?.bing_search, undefined, '7: explicit operator correction invalidates retained verification')
 
 const expiredWorkspace = recoverRetainedBingVerificationFromWorkspace(reloadedRunNPlusOne, Date.parse('2026-10-09T16:00:31.000Z'))
-assert.equal(expiredWorkspace.bingLastKnownVerified, undefined, '8: the bounded fact expires after seven days')
+assert.equal(expiredWorkspace.brandPresenceLastKnownVerified?.bing_search, undefined, '8: the bounded fact expires after seven days')
 assert.equal(projectSalesVisibility(expiredWorkspace.searchDestinationObservations['search-brand-canonical']['Bing Search']!, {
   profile: expiredWorkspace.profile, profileState: expiredWorkspace.businessProfile, now: Date.parse('2026-10-09T16:00:31.000Z'),
 }).state, 'manual_verification_needed')

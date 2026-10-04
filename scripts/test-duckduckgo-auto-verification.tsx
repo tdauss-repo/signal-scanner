@@ -188,6 +188,7 @@ const scanRun = await runVisibilityScan(scanned, {
   },
 }, (update) => { scanned = update(scanned) })
 const duckCheck = scanRun.checks.find((item) => item.destination === 'DuckDuckGo' && item.queryMode === 'brand')!
+assert.equal(scanRun.failure, undefined, scanRun.failure)
 assert.equal(duckBrandCalls, 1)
 assert.equal(genericDuckCalls > 0, true, 'non-Brand DuckDuckGo queries retain their separate acquisition path')
 assert.deepEqual(duckCheck.captures.map((item) => [item.provider, item.method]), [['duckduckgo-native-fetch', 'server_fetch']])

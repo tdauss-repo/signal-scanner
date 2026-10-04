@@ -146,7 +146,9 @@ export interface AuditState {
   packageScopeOverrides?: Record<string, PackageScopeOverride>
   /** Operator-controlled proposal pricing. Independent from finding evidence and approval identity. */
   packagePricing?: PackagePricingState
-  /** Bounded last-known automatic Bing fact; current acquisition remains in the destination observation. */
+  /** Bounded automatic facts; current acquisitions remain in destination observations. */
+  brandPresenceLastKnownVerified?: Partial<Record<BrandPresenceRetainedKey, RetainedBrandPresenceVerification>>
+  /** Legacy Bing-only field. Read for migration and omitted from new normalized saves. */
   bingLastKnownVerified?: RetainedBingAutomaticVerification
   /** Last explicit finding decision, retained only for operator reconciliation after evidence refresh. */
   customerFindingDecisionSnapshots?: Record<string, CustomerFindingDecisionSnapshot>
@@ -533,14 +535,23 @@ export interface RetainedBrandAutomaticVerification {
 export type RetainedGoogleAutomaticVerification = RetainedBrandAutomaticVerification
 
 /**
- * Minimal durable Bing recovery state. It deliberately excludes captures,
- * provider payloads, and HTML; visibilityRuns are only a compatibility source.
+ * Destinations with established automatic reviewed-identity verification and
+ * therefore eligible for the shared bounded last-known-verified lifecycle.
  */
-export interface RetainedBingAutomaticVerification {
+export type RetainedBrandPresenceDestination = 'Google Search' | 'Google Maps' | 'Bing Search' | 'DuckDuckGo'
+export type BrandPresenceRetainedKey = 'google_search' | 'google_maps' | 'bing_search' | 'duckduckgo'
+
+/**
+ * Minimal durable automatic-verification fact. It deliberately excludes
+ * captures, provider payloads, and HTML; visibilityRuns and legacy embedded
+ * fields are migration sources only.
+ */
+export interface RetainedBrandPresenceVerification {
   version: 1
-  destination: 'Bing Search'
+  destination: RetainedBrandPresenceDestination
   provenance: 'retained_automatic_verification'
   verificationState: 'automatic_verified'
+  verificationMethod: 'direct_automatic'
   businessIdentityKey: string
   verifiedAt: string
   sourceRunId: string
@@ -557,11 +568,17 @@ export interface RetainedBingAutomaticVerification {
   evidenceFingerprint: string
 }
 
+export type RetainedBingAutomaticVerification = RetainedBrandPresenceVerification & { destination: 'Bing Search' }
+
 export interface SearchDestinationObservation extends DestinationEvidence {
   automation?: PresenceAutomation
   operatorAssisted?: OperatorAssistedBrowserEvidence
   operatorVerification?: BrandPresenceOperatorVerification
+  /** Effective recent fact attached during pure workspace reconciliation. */
+  retainedBrandVerification?: RetainedBrandPresenceVerification
+  /** Legacy Google observation field, read only for migration. */
   retainedGoogleVerification?: RetainedGoogleAutomaticVerification
+  /** Legacy Bing observation field, read only for migration. */
   retainedBingVerification?: RetainedBingAutomaticVerification
   destination: SearchDestination
   query: string

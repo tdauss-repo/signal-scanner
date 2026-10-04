@@ -168,8 +168,8 @@ const sourceProfileReviewKey = evidenceFingerprint(profileState)
 const retained = mergeAutomatedObservation(prior, failedObservation(), { profile, profileState, sourceProfileReviewKey, now })
 assert.equal(retained.automation?.assessment?.visibilityResult, 'unavailable', 'current failed refresh remains the current acquisition fact')
 assert.equal(retained.automation?.captures[0].blocker, 'google_sorry')
-assert.equal(retained.retainedGoogleVerification?.automation.assessment?.googleIdentityDecision?.decision, 'verified', 'prior successful evidence remains separately retained')
-assert.equal(retained.retainedGoogleVerification?.verifiedAt, oneDayAgo)
+assert.equal(retained.retainedBrandVerification?.assessment.googleIdentityDecision?.decision, 'verified', 'prior successful evidence remains separately retained')
+assert.equal(retained.retainedBrandVerification?.verifiedAt, oneDayAgo)
 const retainedSales = projectSalesVisibility(retained, { profile, profileState, now })
 assert.equal(retainedSales.state, 'verified_recent')
 assert.equal(retainedSales.headline, 'Verified from recent evidence')
@@ -184,13 +184,13 @@ assert.equal(retainedSummary.reason, 'Provider access was restricted.')
 const fresh = automaticObservation(new Date(now).toISOString())
 fresh.automation = { ...fresh.automation!, runId: 'retry-success-current' }
 const freshMerged = mergeAutomatedObservation(prior, fresh, { profile, profileState, sourceProfileReviewKey, now })
-assert.equal(freshMerged.retainedGoogleVerification, undefined, 'fresh retry success wins without invoking retained evidence')
+assert.equal(freshMerged.retainedBrandVerification, undefined, 'fresh retry success wins without invoking retained evidence')
 assert.equal(projectSalesVisibility(freshMerged, { profile, profileState, now }).state, 'verified_correct')
 
 const atBoundary = automaticObservation(new Date(now - GOOGLE_BRAND_EVIDENCE_FRESHNESS_MS).toISOString())
 assert.equal(projectSalesVisibility(mergeAutomatedObservation(atBoundary, failedObservation(), { profile, profileState, sourceProfileReviewKey, now }), { profile, profileState, now }).state, 'verified_recent', 'the documented seven-day boundary is inclusive')
 const expired = mergeAutomatedObservation(automaticObservation(tenDaysAgo), failedObservation(), { profile, profileState, sourceProfileReviewKey, now })
-assert.equal(expired.retainedGoogleVerification, undefined)
+assert.equal(expired.retainedBrandVerification, undefined)
 assert.equal(projectSalesVisibility(expired, { profile, profileState, now }).state, 'manual_verification_needed')
 
 const changedProfile = normalizeWorkspaceProfile({ ...profile, phone: '313-555-0100', website: 'https://new-montessori.example/', streetAddress: '999 Other Road' })
@@ -198,7 +198,7 @@ const changedProfileState = reviewed(changedProfile)
 const changedIdentity = mergeAutomatedObservation(prior, failedObservation(), {
   profile: changedProfile, profileState: changedProfileState, sourceProfileReviewKey, now,
 })
-assert.equal(changedIdentity.retainedGoogleVerification, undefined, 'material reviewed identity change invalidates prior evidence')
+assert.equal(changedIdentity.retainedBrandVerification, undefined, 'material reviewed identity change invalidates prior evidence')
 assert.equal(projectSalesVisibility(changedIdentity, { profile: changedProfile, profileState: changedProfileState, now }).operatorReviewRequired, true)
 
 const conflictPrevious: SearchDestinationObservation = {
@@ -217,7 +217,7 @@ const conflictPrevious: SearchDestinationObservation = {
   },
 }
 const afterConflict = mergeAutomatedObservation(conflictPrevious, failedObservation(), { profile, profileState, sourceProfileReviewKey, now })
-assert.equal(afterConflict.retainedGoogleVerification, undefined, 'a later automated conflict prevents positive evidence reuse')
+assert.equal(afterConflict.retainedBrandVerification, undefined, 'a later automated conflict prevents positive evidence reuse')
 assert.equal(projectSalesVisibility(conflictPrevious, { profile, profileState, now }).state, 'conflicting_evidence')
 
 const operatorOnlyBase = failedObservation()
@@ -225,7 +225,7 @@ const operatorBuilt = buildBrandPresenceVerification(operatorOnlyBase, profile, 
 assert.equal(operatorBuilt.ok, true)
 const operatorOnly = { ...operatorOnlyBase, operatorVerification: operatorBuilt.ok ? operatorBuilt.verification : undefined }
 const operatorMerged = mergeAutomatedObservation(operatorOnly, failedObservation(), { profile, profileState, sourceProfileReviewKey, now })
-assert.equal(operatorMerged.retainedGoogleVerification, undefined)
+assert.equal(operatorMerged.retainedBrandVerification, undefined)
 assert.equal(projectSalesVisibility(operatorMerged, { profile, profileState, now }).state, 'verified_by_operator', 'operator-only evidence keeps its own provenance and semantics')
 
 const unresolved = (destination: SearchDestination): SearchDestinationObservation => ({
@@ -260,7 +260,7 @@ const review = buildCustomerVisibilityReviewExport(state, [], [])
 assert.equal(review.needsReview.includes('Google Search'), false)
 assert(review.verifiedStrengths.some((item) => item.title === 'Google Search'))
 const customerJson = serializeCustomerVisibilityReview(review)
-for (const internal of ['retainedGoogleVerification', 'google_sorry', 'embedded_5xx', 'providerAttempts', 'fixture:']) assert.equal(customerJson.includes(internal), false)
+for (const internal of ['retainedBrandVerification', 'google_sorry', 'embedded_5xx', 'providerAttempts', 'fixture:']) assert.equal(customerJson.includes(internal), false)
 
 const markup = renderToStaticMarkup(<SearchVisibilityPanel profile={profile} profileState={profileState} legacyTests={{}}
   observations={{ 'search-brand-canonical': { 'Google Search': retained } }} onChange={() => undefined} onAddToActionPlan={() => undefined} />)
@@ -269,7 +269,7 @@ const mapsStart = markup.indexOf('<summary>Google Maps —', googleStart)
 assert(googleStart >= 0)
 const googleMarkup = markup.slice(googleStart, mapsStart)
 assert(googleMarkup.includes('Last verified'))
-assert(googleMarkup.includes('Current refresh</dt><dd>Unavailable'))
+assert(googleMarkup.includes('Latest refresh</dt><dd>Unavailable'))
 assert(googleMarkup.includes('No operator action required.'))
 assert.equal(googleMarkup.includes('aria-label="Google Search assisted verification"'), false)
 

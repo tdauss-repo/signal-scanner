@@ -51,6 +51,7 @@ export const createIsolatedBusinessWorkspace = (
   customerFindingRefinements: undefined,
   packageScopeOverrides: undefined,
   packagePricing: undefined,
+  brandPresenceLastKnownVerified: undefined,
   bingLastKnownVerified: undefined,
   customerFindingDecisionSnapshots: undefined,
   customerStrengthPresentations: undefined,

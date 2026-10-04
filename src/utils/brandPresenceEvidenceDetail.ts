@@ -93,8 +93,7 @@ const automaticIdentityEvidence = (observation: SearchDestinationObservation, sa
     result: signal.field === 'name' ? 'Matches' : `Matches ${signal.observed}`,
   }))
   const retainedDecision = sales.state === 'verified_recent'
-    ? observation.retainedGoogleVerification?.automation.assessment?.googleIdentityDecision
-      || observation.retainedBingVerification?.identityDecision
+    ? observation.retainedBrandVerification?.identityDecision
     : undefined
   const decision = retainedDecision
     || observation.automation?.assessment?.googleIdentityDecision
@@ -135,7 +134,7 @@ export function brandPresenceEvidenceSummary(
 ): BrandPresenceEvidenceSummary {
   const failed = unavailable(observation)
   const retained = sales.state === 'verified_recent'
-    ? observation.retainedGoogleVerification || observation.retainedBingVerification : undefined
+    ? observation.retainedBrandVerification : undefined
   const derived = sales.derivedGoogleMapsVerification
   const appleSearchCapture = acceptedAppleSearchCapture(observation)
   const appleSearchCompleted = Boolean(appleSearchCapture?.outcome === 'success' && appleSearchCapture.resultRegionInspected)
@@ -170,7 +169,7 @@ export function brandPresenceEvidenceSummary(
             : metaDiscovery?.source === 'search_evidence' ? 'Verified search evidence'
               : metaDiscovery?.source === 'reviewed_business_profile' ? 'Reviewed business profile metadata'
           : observation.destination,
-    ...(sales.state === 'verified_recent' && observation.destination === 'Bing Search' && observation.automation?.assessment?.blocker === 'no_match'
+    ...(sales.state === 'verified_recent' && observation.automation?.assessment?.blocker === 'no_match'
       ? { automationState: 'Inconclusive' }
       : derived?.freshness === 'fresh' ? { automationState: 'Completed' }
       : appleSearchCompleted ? { automationState: 'Completed' }
@@ -219,8 +218,7 @@ export function brandPresenceTechnicalEvidence(observation: SearchDestinationObs
     observedResultUrl: observation.observedResultUrl,
     canonicalProfileUrl: observation.canonicalProfileUrl,
     automation: observation.automation,
-    retainedGoogleVerification: observation.retainedGoogleVerification,
-    retainedBingVerification: observation.retainedBingVerification,
+    retainedBrandVerification: observation.retainedBrandVerification,
     derivedGoogleMapsVerification: sales?.derivedGoogleMapsVerification,
     operatorAssisted: observation.operatorAssisted,
     operatorVerification: observation.operatorVerification,

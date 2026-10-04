@@ -8,6 +8,7 @@ import {
 } from './googleAcquisitionResilience'
 import { normalizedEntityField } from './entityMatcher'
 import { canonicalProfileUrlForDestination } from './searchVisibility'
+import { assessmentHasTrueMaterialIdentityConflict } from './brandPresenceWorkspaceRetention'
 
 export interface DerivedGoogleMapsVerification {
   version: 1
@@ -99,10 +100,10 @@ const derivationSource = (
     return { assessment: automation.assessment, freshness: 'fresh', verifiedAt, sourceRunId: automation.runId, businessIdentityKey: identityKey }
   }
   if (state === 'verified_recent') {
-    const retained = observation.retainedGoogleVerification
-    if (!retained?.automation.assessment || retained.businessIdentityKey !== identityKey) return undefined
+    const retained = observation.retainedBrandVerification
+    if (!retained?.assessment || retained.businessIdentityKey !== identityKey) return undefined
     return {
-      assessment: retained.automation.assessment,
+      assessment: retained.assessment,
       freshness: 'recent',
       verifiedAt: retained.verifiedAt,
       sourceRunId: retained.sourceRunId,
@@ -164,6 +165,5 @@ export function directGoogleMapsEvidenceConflicts(observation: SearchDestination
   if (observation.overallResult === 'found_conflicting_information' && observation.reviewed) return true
   const assessment = observation.automation?.assessment
   if (!assessment || assessment.visibilityResult === 'unavailable') return false
-  return assessment.blocker === 'identifier_conflict' || assessment.blocker === 'multiple_entities' ||
-    assessment.matches.some((match) => match.conflictingFields.some((signal) => materialConflictFields.has(signal.field)))
+  return assessmentHasTrueMaterialIdentityConflict(assessment)
 }
