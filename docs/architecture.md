@@ -345,7 +345,7 @@ with `apple_maps_acquisition_not_configured` and
 `facebook_acquisition_not_configured`, and
 `instagram_acquisition_not_configured`.
 
-Bing Brand Presence uses one bounded native server request to the clean
+Bing Brand Presence starts with one bounded native server request to the clean
 `bing.com/search?q=...` verification query. The request does not execute
 scripts, follow an unreviewed redirect, launch a browser, maintain a profile,
 or bypass an access restriction. A normal Bing result region is normalized by
@@ -363,6 +363,29 @@ bounded Bing local/entity scopes in addition to JSON-LD and organic result
 rows, retaining asserted name, website, phone, address, category, Maps URL, and
 entity identity fields without fabricating absent values. Organic extraction
 remains independent and additive.
+
+Bing may select a different public result surface for that stateless server
+request than for an interactive desktop browser carrying browser/session and
+locality context. The observed Montessori server response was a normal generic
+SERP and contained no hidden matching local entity in the bounded result
+markup; the existing local-card parser was therefore not the failing boundary.
+The scanner does not copy personal cookies, spoof geolocation, or add browser
+automation to force the interactive variant.
+
+One extra Bing request is permitted, never more than one. If the primary HTML
+exposes exactly one HTTPS Bing-owned `/maps` target with a surfaced query or
+entity identifier, and the primary local card is not already usable, that
+target may be followed and its explicit local-entity fields normalized. An
+external, insecure, ambiguous, restricted, or redirected target is not
+followed or used. Otherwise, only when a successfully inspected primary SERP
+produces the explicit Brand `no_match` decision, the scanner may issue one
+deterministic retry using the exact reviewed business name plus the reviewed
+official domain. That extra independent identity term reduces generic-topic
+SERPs without guessing a listing URL or changing identity truth. A retry is
+marked so it cannot trigger a secondary follow; a primary secondary follow
+prevents a retry. Access failures, conflicts, insufficient identity, and other
+states do not cause query spraying. Both captures remain technical evidence,
+and the unchanged strong matcher alone decides verification.
 
 A successfully inspected Bing Brand result region with no matching business
 candidate is `review_required` with blocker `no_match`; it is neutral and is
@@ -432,7 +455,7 @@ metadata remain operator-only.
 
 ### Apple Maps Brand Presence verification
 
-Apple Maps Brand Presence uses one bounded public HTTP request to the clean
+Without server credentials, Apple Maps Brand Presence uses one bounded public acquisition sequence from the clean
 `maps.apple.com/?q=...` reviewed-identity query. It runs in a dedicated native
 runtime lane, does not execute scripts, launch a browser, use authenticated or
 private endpoints, retain session state, or bypass an access restriction. The
@@ -465,6 +488,39 @@ Public `place-id`, `name`, and `address` parameters are normalized as a local-
 place candidate; `coordinate` is retained only in raw technical redirect
 evidence and is excluded from the canonical profile and material fingerprint.
 Place identity alone is provenance, not business-identity proof.
+
+Apple's public search shell does not consistently expose a result Place ID or
+structured place record before its application executes. The scanner inspects
+redirect `Location`, canonical/Open Graph URLs, JSON-LD, public JSON bootstrap
+state, preload/link targets, and explicit `/place` links, but it does not treat
+Apple corporate application metadata as the searched business. When no public
+Place ID or place URL is actually surfaced, none is guessed and the shell
+remains neutral. When a legitimate public `/place?place-id=...` target is
+surfaced by the server response, the existing single Apple-owned follow/parse
+boundary applies.
+
+The official Apple Maps Server API is the preferred optional structured path.
+When `APPLE_MAPS_SERVER_TOKEN` (or the equivalent
+`APPLE_MAPS_SERVER_ACCESS_TOKEN`) is present in server process configuration,
+the runtime first makes one bounded `GET https://maps-api.apple.com/v1/search`
+request using the reviewed name/locality query, `limitToCountries=US`,
+`resultTypeFilter=Poi`, and `lang=en-US`. Returned `Place` fields—name,
+formatted/structured address, telephone, URLs, category, and Place ID when
+asserted—are normalized and passed to the same strong Apple identity matcher.
+The bearer token is never included in capture data, browser code, local
+workspace state, or customer output. Missing credentials, authorization
+failure, an empty/malformed result, or a fast official-service failure falls
+back to the existing public Maps URL path and remains neutral when that path is
+only a shell.
+
+Production token provisioning remains a server-operations responsibility.
+Apple requires an Apple Developer Maps identifier and private key to sign the
+server-scoped JWT and obtain/refresh a Maps access token; the private key must
+remain in a server secret manager and is deliberately not accepted from or
+stored in Scanner workspace data. A deployment may inject a refreshed access
+token through the environment variables above. This repository does not ship
+an Apple private key, sign tokens in the browser, or require Apple credentials
+for normal Scanner operation.
 
 The final public place response is optional enrichment. JSON-LD, embedded
 public JSON, canonical metadata, and explicit place metadata may add asserted

@@ -118,6 +118,25 @@ assert.equal(canonicalPlace.calls, 2, 'a place URL discovered in search HTML is 
 assert.equal(canonicalAssessment.automaticObservation, true)
 assert.equal(canonicalAssessment.selected?.candidate.fields.placeIdentity, 'fixture-apple-place')
 assert.equal(canonicalAssessment.selected?.candidate.fields.publicProfileUrl, maryPlaceUrl)
+
+const idOnlyPlaceUrl = 'https://maps.apple.com/place?place-id=fixture-id-only'
+let idOnlyCalls = 0
+const idOnlyFollow = await acquireAppleMaps(searchUrl, {
+  verifyDns: async () => undefined,
+  transport: async () => {
+    idOnlyCalls += 1
+    if (idOnlyCalls === 1) return redirect(appleSearchUrl(query))
+    if (idOnlyCalls === 2) return page(appleSearchUrl(query), `<html><main><a href="${idOnlyPlaceUrl}">Open place</a></main></html>`)
+    if (idOnlyCalls === 3) return page(idOnlyPlaceUrl, `<script type="application/json">${JSON.stringify({ place: {
+      '@type': 'LocalBusiness', name: profile.businessName, formattedAddress: '15575 Northline Rd, Southgate, MI 48195, United States',
+      phoneNumber: profile.phone, website: profile.website, placeId: 'fixture-id-only', placeUrl: idOnlyPlaceUrl,
+    } })}</script>`)
+    throw new Error('unexpected extra Apple Maps request')
+  },
+})
+assert.equal(idOnlyCalls, 3, 'an id-only place link surfaced by public search permits exactly one Apple-owned place request')
+assert.equal(idOnlyFollow.finalUrl, idOnlyPlaceUrl)
+assert.equal(assessSearchCapture(idOnlyFollow, profile, profileState, 'Apple Maps', 'brand').automaticObservation, true)
 const verifiedObservation = normalizeSearchDestinationObservation({
   ...defaultSearchDestinationObservation('Apple Maps', query), overallResult: 'found_match', provenance: 'automated_acquisition',
   observedAt, observedResultUrl: canonicalAssessment.selected?.candidate.resultUrl,

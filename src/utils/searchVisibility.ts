@@ -16,6 +16,7 @@ import type {
 import { bingSearch, duckDuckGoSearch, googleMapsSearch, googleSearch, yelpSearch } from './links'
 import { canonicalMetaProfileUrl } from './metaPublicEvidence'
 import { normalizeEvidenceTimestamp } from './evidenceTime'
+import { reviewedProfileValue } from './entityMatcher'
 
 const splitList = (value: string) => value.split(/[,;\n]/).map((item) => item.trim()).filter(Boolean)
 const normalized = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
@@ -154,6 +155,21 @@ export const brandVerificationQuery = (profile: BusinessProfile) => {
     || profile.targetLocation.trim()
     || profile.localMarket.trim()
   return [profile.businessName.trim(), location].filter(Boolean).join(' ')
+}
+
+/**
+ * One deterministic Bing-only retry: exact reviewed name plus reviewed official
+ * domain. It adds an independent identity term without guessing a listing URL,
+ * location, category, or business attribute.
+ */
+export const bingIdentityRetryUrl = (profile: BusinessProfile, profileState: BusinessProfileState) => {
+  const name = reviewedProfileValue(profile, profileState, 'businessName').trim()
+  const website = reviewedProfileValue(profile, profileState, 'website').trim()
+  if (!name || !website) return undefined
+  try {
+    const domain = new URL(/^https?:\/\//i.test(website) ? website : `https://${website}`).hostname.replace(/^www\./i, '').toLowerCase()
+    return domain ? bingSearch(`"${name}" ${domain}`) : undefined
+  } catch { return undefined }
 }
 
 export const yelpBrandLocation = (profile: BusinessProfile) => {

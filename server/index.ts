@@ -53,7 +53,7 @@ app.post('/api/acquire-google-maps', async (request, response) => {
 
 app.post('/api/acquire-bing-search', async (request, response) => {
   try {
-    response.json(await acquireBingSearchRuntime(String(request.body.url || '')))
+    response.json(await acquireBingSearchRuntime(String(request.body.url || ''), { identityRetry: request.body.identityRetry === true }))
   } catch (error) {
     response.status(400).json({ error: error instanceof Error ? error.message : 'Bing acquisition unavailable.' })
   }

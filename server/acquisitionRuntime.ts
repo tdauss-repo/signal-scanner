@@ -163,12 +163,12 @@ export async function acquireGoogleMapsRuntime(value: string) {
   })
 }
 
-export async function acquireBingSearchRuntime(value: string) {
+export async function acquireBingSearchRuntime(value: string, options: { identityRetry?: boolean } = {}) {
   const url = runtimeAllowedUrl(value)
   if (url.hostname.replace(/^www\./, '') !== 'bing.com' || url.pathname !== '/search' || !url.searchParams.get('q')?.trim()) {
     throw new Error('Bing acquisition requires a Bing Search query URL.')
   }
-  return runInAcquisitionLane('bing_native', async () => ({ capture: await acquireBingSearch(url.href) }))
+  return runInAcquisitionLane('bing_native', async () => ({ capture: await acquireBingSearch(url.href, { allowSecondaryResolution: !options.identityRetry }) }))
 }
 
 export async function acquireAppleMapsRuntime(value: string) {
@@ -176,7 +176,9 @@ export async function acquireAppleMapsRuntime(value: string) {
   if (url.hostname.replace(/^www\./, '') !== 'maps.apple.com' || (!url.searchParams.get('q')?.trim() && !/\/place(?:[/?#]|$)/i.test(url.pathname))) {
     throw new Error('Apple Maps acquisition requires a public Apple Maps search or place URL.')
   }
-  return runInAcquisitionLane('apple_maps_native', async () => ({ capture: await acquireAppleMaps(url.href) }))
+  return runInAcquisitionLane('apple_maps_native', async () => ({ capture: await acquireAppleMaps(url.href, {
+    serverToken: process.env.APPLE_MAPS_SERVER_TOKEN || process.env.APPLE_MAPS_SERVER_ACCESS_TOKEN,
+  }) }))
 }
 
 export async function acquireDuckDuckGoSearchRuntime(value: string) {

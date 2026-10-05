@@ -34,6 +34,7 @@ import { recoverRetainedBingVerificationFromWorkspace } from '../src/utils/bingW
 Object.assign(globalThis, { React })
 
 const now = Date.parse('2026-09-29T16:00:00.000Z')
+Date.now = () => now
 const oneDayAgo = new Date(now - 24 * 60 * 60 * 1000).toISOString()
 const eightDaysAgo = new Date(now - 8 * 24 * 60 * 60 * 1000).toISOString()
 const currentAt = new Date(now).toISOString()
@@ -266,7 +267,9 @@ assert.equal(matchesEvidenceFingerprint(persistedWorkspace.visibilityRuns![0].pr
 assert.equal(matchesEvidenceFingerprint(persistedWorkspace.visibilityRuns![0].profileReviewKey, persistedWorkspace.businessProfile), false, 'persisted prior run differs in non-material Business Profile metadata')
 assert(retainedBingSourceFromVisibilityRuns(persistedWorkspace, 'search-brand-canonical:Bing Search', persistedWorkspace.profile), 'material identity lookup recovers the prior verified run')
 
-const recoveredWorkspace = recoverRetainedBingVerificationFromWorkspace(persistedWorkspace, Date.parse('2026-10-03T12:00:00.000Z'))
+const persistedNow = Date.parse('2026-10-03T12:00:00.000Z')
+Date.now = () => persistedNow
+const recoveredWorkspace = recoverRetainedBingVerificationFromWorkspace(persistedWorkspace, persistedNow)
 const recoveredBing = recoveredWorkspace.searchDestinationObservations['search-brand-canonical']['Bing Search']!
 const recoveredSales = projectSalesVisibility(recoveredBing, {
   profile: recoveredWorkspace.profile,

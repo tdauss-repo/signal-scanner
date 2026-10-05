@@ -53,6 +53,16 @@ export interface AcquisitionResult {
   /** Public destination represented by a provider-normalized capture. */
   checkedDestination?: SearchDestination
   providerAttempts?: Array<{ provider: string; stage?: 'serp_initial' | 'serp_retry' | 'browser_fallback'; outcome: 'success' | 'unavailable'; blocker: string; elapsedMs: number; statusCode?: number }>
+  /** Sanitized record of a single destination-owned detail request surfaced by the primary response. */
+  secondaryResolution?: {
+    owner: 'bing'
+    used: boolean
+    requestedUrl?: string
+    finalUrl?: string
+    statusCode?: number
+    outcome: 'not_used' | 'success' | 'restricted' | 'unavailable'
+    blocker?: string
+  }
   /** Sanitized record of Yelp's optional one-hop public business-profile enrichment. */
   profileFollow?: {
     used: boolean

@@ -10,10 +10,19 @@ export interface AppleMapsTransportResult {
   location?: string
 }
 
+export interface AppleMapsServerApiTransportResult {
+  status: number
+  finalUrl: string
+  body: string
+}
+
 export interface AppleMapsAcquisitionOptions {
   verifyDns?: (url: URL) => Promise<void>
   transport?: (url: URL, signal: AbortSignal) => Promise<AppleMapsTransportResult>
   timeoutMs?: number
+  /** Server-only Apple Maps access token; never copied into captures or workspace state. */
+  serverToken?: string
+  serverApiTransport?: (url: URL, token: string, signal: AbortSignal) => Promise<AppleMapsServerApiTransportResult>
 }
 
 const appleMapsHost = (value: string) => value.replace(/^www\./, '').toLowerCase() === 'maps.apple.com'
@@ -84,8 +93,12 @@ const htmlAttribute = (html: string, tagPattern: RegExp, attribute: string) => {
   const tag = html.match(tagPattern)?.[0] || ''
   return decodedAttribute(tag.match(new RegExp(`\\b${attribute}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i'))?.slice(1).find(Boolean) || '')
 }
-const reference = (sourceUrl: string, acquiredAt: string, locator: string, excerpt: string): EvidenceReference => ({
-  sourceUrl, acquiredAt, provider: 'apple-maps-native-fetch', method: 'server_fetch', locator, excerpt: excerpt.slice(0, 2500),
+const surfacedApplePlaceTargets = (html: string, base: string) => [...html.matchAll(/<(?:a|link)\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>/gi)]
+  .slice(0, 200)
+  .map((match) => approvedApplePlaceTarget(decodedAttribute(match[1] || match[2] || ''), base))
+  .filter((value, index, all): value is URL => Boolean(value) && all.findIndex((candidate) => candidate?.href === value?.href) === index)
+const reference = (sourceUrl: string, acquiredAt: string, locator: string, excerpt: string, provider = 'apple-maps-native-fetch'): EvidenceReference => ({
+  sourceUrl, acquiredAt, provider, method: 'server_fetch', locator, excerpt: excerpt.slice(0, 2500),
 })
 
 /** A server-issued public /place target is structured acquisition evidence even when its SPA body is sparse. */
@@ -112,9 +125,9 @@ const addressFields = (value: unknown) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   const address = value as Record<string, unknown>
   const fields: Partial<Record<EntityField, string>> = {}
-  const streetAddress = clean(address.streetAddress || address.addressLine || (Array.isArray(address.addressLines) ? address.addressLines.join(' ') : ''), 300)
-  const locality = clean(address.addressLocality || address.city, 120)
-  const region = clean(address.addressRegion || address.state, 80)
+  const streetAddress = clean(address.streetAddress || address.fullThoroughfare || address.addressLine || (Array.isArray(address.addressLines) ? address.addressLines.join(' ') : ''), 300)
+  const locality = clean(address.addressLocality || address.locality || address.city, 120)
+  const region = clean(address.addressRegion || address.administrativeAreaCode || address.administrativeArea || address.state, 80)
   const postalCode = clean(address.postalCode || address.postCode || address.zip, 40)
   const formatted = clean(address.formattedAddress || address.fullAddress, 500)
   if (streetAddress) fields.streetAddress = streetAddress
@@ -123,6 +136,63 @@ const addressFields = (value: unknown) => {
   if (postalCode) fields.postalCode = postalCode
   if (formatted) fields.address = formatted
   return fields
+}
+
+const officialApplePlaceUrl = (placeIdentity: string) => {
+  if (!placeIdentity) return ''
+  const url = new URL('https://maps.apple.com/place')
+  url.searchParams.set('place-id', placeIdentity)
+  return url.href
+}
+
+/** Normalize only fields asserted by Apple's authenticated Maps Server API. */
+export function normalizeAppleMapsServerCandidates(body: string, sourceUrl: string, acquiredAt: string): BusinessResultCandidate[] {
+  let payload: unknown
+  try { payload = JSON.parse(body) } catch { return [] }
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return []
+  const results = Array.isArray((payload as Record<string, unknown>).results) ? (payload as { results: unknown[] }).results : []
+  return results.slice(0, 25).flatMap((value, index) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return []
+    const place = value as Record<string, unknown>
+    const name = clean(place.name, 300)
+    const placeIdentity = clean(place.id, 1000)
+    if (!name) return []
+    const fields: BusinessResultCandidate['fields'] = { name }
+    const structured = addressFields(place.structuredAddress)
+    Object.assign(fields, structured)
+    const formattedAddressLines = Array.isArray(place.formattedAddressLines)
+      ? place.formattedAddressLines.map((line) => clean(line, 300)).filter(Boolean) : []
+    if (formattedAddressLines.length) fields.address = formattedAddressLines.join(', ')
+    const phone = clean(place.telephone, 80)
+    if (phone) fields.phone = phone
+    const websites = (Array.isArray(place.urls) ? place.urls : [place.url, place.website])
+      .map((url) => safeUrl(url, sourceUrl))
+      .filter((url) => url && !appleMapsHost(new URL(url).hostname))
+    if (websites[0]) fields.website = websites[0]
+    const category = clean(place.poiCategory || place.category, 200)
+    if (category) fields.category = category
+    const profileUrl = officialApplePlaceUrl(placeIdentity)
+    if (placeIdentity) fields.placeIdentity = placeIdentity
+    if (profileUrl) fields.publicProfileUrl = profileUrl
+    if (!(fields.address || fields.streetAddress || fields.phone || fields.website || fields.placeIdentity)) return []
+    return [{
+      id: `apple-maps-server-place-${index + 1}`,
+      kind: 'structured_entity' as const,
+      sourceType: 'local_place' as const,
+      ...(profileUrl ? { resultUrl: profileUrl } : {}),
+      fields,
+      evidence: [reference(sourceUrl, acquiredAt, `maps-server-api.results[${index}]`, JSON.stringify(place), 'apple-maps-server-api')],
+    }]
+  })
+}
+
+export const appleMapsServerSearchUrl = (query: string) => {
+  const url = new URL('https://maps-api.apple.com/v1/search')
+  url.searchParams.set('q', query)
+  url.searchParams.set('limitToCountries', 'US')
+  url.searchParams.set('resultTypeFilter', 'Poi')
+  url.searchParams.set('lang', 'en-US')
+  return url
 }
 
 function structuredJsonBlocks(html: string) {
@@ -209,11 +279,7 @@ export function normalizeAppleMapsCandidates(html: string, finalUrl: string, acq
     const placeIdentity = url.searchParams.get('place-id') || url.searchParams.get('mapitemguid') || url.searchParams.get('id') || ''
     append({ name, address, placeId: placeIdentity, placeUrl: canonical }, 'canonical-place-url')
   }
-  const explicitPlaceUrls = [...html.matchAll(/<(?:a|link)\b[^>]*\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>/gi)]
-    .slice(0, 200)
-    .map((match) => decodedAttribute(match[1] || match[2] || ''))
-    .map((value) => applePlaceUrl(value, finalUrl))
-    .filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index)
+  const explicitPlaceUrls = surfacedApplePlaceTargets(html, finalUrl).map((url) => applePlaceUrl(url.href, finalUrl)).filter(Boolean)
   for (const [index, placeUrl] of explicitPlaceUrls.entries()) {
     const candidate = normalizeAppleMapsRedirectCandidate(placeUrl, acquiredAt, `public-place-link[${index}]`)
     if (!candidate) continue
@@ -263,6 +329,14 @@ const defaultTransport = async (url: URL, signal: AbortSignal): Promise<AppleMap
   const { response, body } = await fetchPage(url, 'GET', appleMapsRequestHeaders, signal, 1_000_000, 'manual')
   return { status: response.status, finalUrl: response.url || url.href, body, location: response.headers.get('location') || undefined }
 }
+const defaultServerApiTransport = async (url: URL, token: string, signal: AbortSignal): Promise<AppleMapsServerApiTransportResult> => {
+  const { response, body } = await fetchPage(url, 'GET', {
+    accept: 'application/json',
+    'accept-language': 'en-US,en;q=0.9',
+    authorization: `Bearer ${token}`,
+  }, signal, 1_000_000, 'manual')
+  return { status: response.status, finalUrl: response.url || url.href, body }
+}
 
 const blockedPage = (status: number, html: string) => [401, 403, 429].includes(status) ||
   /<title[^>]*>[^<]*(?:access denied|forbidden|verify you are human|captcha)/i.test(html)
@@ -295,9 +369,36 @@ export async function acquireAppleMaps(value: string, options: AppleMapsAcquisit
     if (url.protocol !== 'https:' || !appleMapsHost(url.hostname) || (!supportedSearchRequest && !supportedPlaceRequest)) {
       throw new Error('Apple Maps acquisition requires a public Apple Maps search or place URL.')
     }
+    const signal = AbortSignal.timeout(options.timeoutMs ?? 12_000)
+    const serverToken = options.serverToken?.trim()
+    if (serverToken && supportedSearchRequest) {
+      const serverUrl = appleMapsServerSearchUrl(requestedQuery)
+      try {
+        await (options.verifyDns || checkPublicDns)(serverUrl)
+        const serverResult = await (options.serverApiTransport || defaultServerApiTransport)(serverUrl, serverToken, signal)
+        const serverFinal = publicUrl(serverResult.finalUrl || serverUrl.href)
+        if (serverFinal.protocol === 'https:' && serverFinal.hostname.toLowerCase() === 'maps-api.apple.com' && serverFinal.pathname === '/v1/search' && serverResult.status >= 200 && serverResult.status < 300) {
+          const candidates = normalizeAppleMapsServerCandidates(serverResult.body, serverFinal.href, acquiredAt)
+          if (candidates.length) return {
+            ...base,
+            provider: 'apple-maps-server-api',
+            finalUrl: serverFinal.href,
+            acquiredAt: new Date().toISOString(),
+            statusCode: serverResult.status,
+            outcome: 'success',
+            confidence: 'captured',
+            normalizedSearchCandidates: candidates,
+            resultRegionInspected: true,
+            blocker: 'none',
+            notes: ['Apple Maps official Server API returned bounded structured place results.'],
+          }
+        }
+      } catch {
+        // Optional structured acquisition failed closed into the existing public URL path.
+      }
+    }
     await (options.verifyDns || checkPublicDns)(url)
     const transport = options.transport || defaultTransport
-    const signal = AbortSignal.timeout(options.timeoutMs ?? 12_000)
     const initial = await transport(url, signal)
     const initialStatusCode = initial.status
     let result = initial
@@ -333,7 +434,7 @@ export async function acquireAppleMaps(value: string, options: AppleMapsAcquisit
       final = returnedFinal
     }
 
-    const common = { initialStatusCode, statusCode: result.status, ...(redirectUrl ? { redirectUrl } : {}), finalUrl: final.href, redirectAccepted }
+    let common = { initialStatusCode, statusCode: result.status, ...(redirectUrl ? { redirectUrl } : {}), finalUrl: final.href, redirectAccepted }
     if (!appleMapsHost(final.hostname) || final.protocol !== 'https:') return { ...base, ...common, finalRequestState: 'unavailable', outcome: 'unavailable', blocker: 'redirect_not_allowed', error: 'Apple Maps resolved outside the approved public host.', notes: ['The external target was not acquired. This is not evidence that the business is absent.'] }
     if (blockedPage(result.status, result.body)) return { ...base, ...common, finalRequestState: 'restricted', outcome: 'blocked', blocker: 'access_blocked', normalizedSearchCandidates: redirectCandidate ? [redirectCandidate] : undefined, error: 'Apple Maps restricted the bounded public request.', notes: ['No access restriction was bypassed. This is not evidence that the business is absent.'] }
     if (result.status < 200 || result.status >= 300) {
@@ -341,11 +442,39 @@ export async function acquireAppleMaps(value: string, options: AppleMapsAcquisit
       return { ...base, ...common, finalRequestState: 'unavailable', outcome: 'unavailable', blocker: result.status >= 500 ? 'http_5xx' : 'http_error', error: `Apple Maps returned HTTP ${result.status}.`, notes: ['The request did not produce usable public evidence. This is not evidence that the business is absent.'] }
     }
     const enrichment = normalizeAppleMapsCandidates(result.body, final.href, acquiredAt)
-    const candidates = redirectCandidate ? mergeApplePlaceEvidence(redirectCandidate, enrichment) : enrichment
-    finalRequestState = enrichment.length ? 'success' : 'shell'
+    let candidates = redirectCandidate ? mergeApplePlaceEvidence(redirectCandidate, enrichment) : enrichment
+    const usableIdentity = candidates.some((candidate) => candidate.fields.name && (candidate.fields.address || candidate.fields.streetAddress || candidate.fields.phone || candidate.fields.website))
+    const surfacedPlaceTargets = supportedSearchRequest && !usableIdentity ? surfacedApplePlaceTargets(result.body, final.href) : []
+    let surfacedPlaceFollowed = false
+    if (surfacedPlaceTargets.length === 1) {
+      const placeTarget = surfacedPlaceTargets[0]
+      try {
+        await (options.verifyDns || checkPublicDns)(placeTarget)
+        const placeResult = await transport(placeTarget, signal)
+        const placeFinal = publicUrl(placeResult.finalUrl || placeTarget.href)
+        if (!appleRedirectStatuses.has(placeResult.status) && placeResult.status >= 200 && placeResult.status < 300 && approvedApplePlaceTarget(placeFinal.href, placeTarget.href)) {
+          const placeSeed = normalizeAppleMapsRedirectCandidate(placeTarget.href, acquiredAt, 'search-surfaced-place-url')
+          const placeEnrichment = normalizeAppleMapsCandidates(placeResult.body, placeFinal.href, acquiredAt)
+          const placeCandidates = placeSeed ? mergeApplePlaceEvidence(placeSeed, placeEnrichment) : placeEnrichment
+          if (placeCandidates.length) {
+            candidates = placeCandidates
+            final = placeFinal
+            result = placeResult
+            finalRequestState = placeEnrichment.length ? 'success' : 'shell'
+            surfacedPlaceFollowed = true
+            common = { ...common, statusCode: result.status, finalUrl: final.href }
+          }
+        }
+      } catch {
+        // The public search evidence remains authoritative; no additional follow is attempted.
+      }
+    }
+    if (finalRequestState === 'not_requested') finalRequestState = enrichment.length ? 'success' : 'shell'
     if (!candidates.length && redirectRoute === 'search') return { ...base, ...common, acquiredAt: new Date().toISOString(), finalRequestState, outcome: 'success', confidence: 'captured', resultRegionInspected: true, blocker: 'none', notes: ['Apple Maps completed the public business search, but the response exposed no supported structured place record. Assisted verification remains available.'] }
     if (!candidates.length) return { ...base, ...common, finalRequestState, outcome: 'unavailable', blocker: 'missing_result_region', error: 'Apple Maps returned no supported public place structure.', notes: ['The public response did not expose a structured place record. Assisted verification remains available.'] }
-    return { ...base, ...common, acquiredAt: new Date().toISOString(), finalRequestState, outcome: 'success', confidence: 'captured', html: result.body, normalizedSearchCandidates: candidates, resultRegionInspected: true, blocker: 'none', notes: [redirectCandidate ? 'Public Apple Maps place resolution captured; final public metadata was evaluated as optional enrichment.' : 'Bounded public Apple Maps place evidence captured.'] }
+    return { ...base, ...common, acquiredAt: new Date().toISOString(), finalRequestState, outcome: 'success', confidence: 'captured', html: result.body, normalizedSearchCandidates: candidates, resultRegionInspected: true, blocker: 'none', notes: [surfacedPlaceFollowed
+      ? 'One public Apple Maps place target surfaced by the search response was resolved and normalized.'
+      : redirectCandidate ? 'Public Apple Maps place resolution captured; final public metadata was evaluated as optional enrichment.' : 'Bounded public Apple Maps place evidence captured.'] }
   } catch (error) {
     const blocker = failureBlocker(error)
     return { ...base, blocker, error: error instanceof Error ? error.message : String(error), notes: ['Apple Maps native acquisition could not complete. This is not evidence that the business is absent.'] }

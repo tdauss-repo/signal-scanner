@@ -2,7 +2,7 @@ import { evidenceFingerprint, matchesEvidenceFingerprint } from './evidenceFinge
 import { assessSearchCapture } from './searchResultExtraction'
 import { assessBusinessCandidates, reviewedProfileValue } from './entityMatcher'
 import { evaluateMachineReadability } from './machineReadability'
-import { resultTypesForDestination, verificationUrlFor } from './searchVisibility'
+import { bingIdentityRetryUrl, resultTypesForDestination, verificationUrlFor } from './searchVisibility'
 import { businessDirectoryKey } from './directorySuggestions'
 import type { AcquisitionResult } from '../types/acquisition'
 import type { AuditState, BusinessProfile, SearchDestinationObservation, SearchVisibilityObservedResultType } from '../types/audit'
@@ -38,7 +38,7 @@ export interface ScanDependencies {
   /** Dedicated Google Maps provider with the same unconfigured fallback contract. */
   acquireGoogleMaps?(url: string): Promise<AcquisitionResult | undefined>
   /** Dedicated native Bing Brand Search provider. Other Bing query modes retain their existing path. */
-  acquireBingSearch?(url: string): Promise<AcquisitionResult | undefined>
+  acquireBingSearch?(url: string, options?: { identityRetry?: boolean }): Promise<AcquisitionResult | undefined>
   /** Dedicated bounded public Apple Maps Brand provider. */
   acquireAppleMaps?(url: string): Promise<AcquisitionResult | undefined>
   /** Dedicated bounded public DuckDuckGo Brand Search provider. */
@@ -61,7 +61,7 @@ export interface ApplicationVisibilityScanDependencies extends ScanDependencies 
   automationVersion: 2
   acquireGoogle(url: string): Promise<AcquisitionResult | undefined>
   acquireGoogleMaps(url: string): Promise<AcquisitionResult | undefined>
-  acquireBingSearch(url: string): Promise<AcquisitionResult | undefined>
+  acquireBingSearch(url: string, options?: { identityRetry?: boolean }): Promise<AcquisitionResult | undefined>
   acquireAppleMaps(url: string): Promise<AcquisitionResult | undefined>
   acquireDuckDuckGoSearch(url: string): Promise<AcquisitionResult | undefined>
   acquireYelpSearch(url: string): Promise<AcquisitionResult | undefined>
@@ -93,8 +93,8 @@ const acquireGoogleMapsFromApi: NonNullable<ScanDependencies['acquireGoogleMaps'
   if (!response.ok) throw new Error(body.error || 'Google Maps acquisition request failed.')
   return body.capture
 }
-const acquireBingSearchFromApi: NonNullable<ScanDependencies['acquireBingSearch']> = async (url) => {
-  const response = await fetch('/api/acquire-bing-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(20_000) })
+const acquireBingSearchFromApi: NonNullable<ScanDependencies['acquireBingSearch']> = async (url, options) => {
+  const response = await fetch('/api/acquire-bing-search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, ...(options?.identityRetry ? { identityRetry: true } : {}) }), signal: AbortSignal.timeout(20_000) })
   const body = await response.json()
   if (!response.ok) throw new Error(body.error || 'Bing acquisition request failed.')
   return body.capture
@@ -385,6 +385,19 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
           dedicatedProviderHandled = true
           item.captures = captures.map(compactCapture)
           publish()
+          if (item.destination === 'Bing Search' && item.queryMode === 'brand' && capture.outcome === 'success' && capture.resultRegionInspected && !capture.secondaryResolution?.used) {
+            const primaryAssessment = assessSearchCapture(capture, profile, initial.businessProfile, 'Bing Search', 'brand')
+            const retryUrl = primaryAssessment.blocker === 'no_match' ? bingIdentityRetryUrl(profile, initial.businessProfile) : undefined
+            if (retryUrl && retryUrl !== dedicatedUrl) {
+              const retry = await awaitBounded(() => dependencies.acquireBingSearch!(retryUrl, { identityRetry: true }), 'Bing Search identity-rich retry', operationTimeoutMs)
+              if (!alive()) return run
+              if (retry) {
+                captures.push({ ...retry, notes: [...retry.notes, 'One bounded Bing identity-rich retry used the exact reviewed business name and official domain after a normal primary SERP produced no business match.'] })
+                item.captures = captures.map(compactCapture)
+                publish()
+              }
+            }
+          }
           if (item.destination === 'Google Maps' && item.queryMode === 'brand' && !(capture.outcome === 'success' && capture.resultRegionInspected)) {
             const name = reviewedProfileValue(profile, initial.businessProfile, 'businessName')
             const city = reviewedProfileValue(profile, initial.businessProfile, 'city')

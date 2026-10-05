@@ -40,6 +40,9 @@ assert.equal(requestedUrl.searchParams.get('mkt'), 'en-US', 'US-English market i
 assert.deepEqual(bingSearchMarketContext, { country: 'us', language: 'en-us', market: 'en-US' })
 assert.match(bingSearchRequestHeaders['user-agent'], /Mozilla\/5\.0.*Chrome/i, 'native acquisition uses an ordinary stable desktop request identity')
 assert.equal(bingSearchRequestHeaders['accept-language'], 'en-US,en;q=0.9')
+assert.equal('cookie' in bingSearchRequestHeaders, false, 'no browser or personal session cookie is copied')
+assert.equal('sec-ch-ua' in bingSearchRequestHeaders, false, 'no transient browser client hints are fabricated')
+assert.equal('accept-encoding' in bingSearchRequestHeaders, false, 'compression negotiation remains with the bounded fetch transport')
 assert.equal(capture.requestedUrl, queryUrl, 'operator verification URL remains clean and distinct from request context')
 assert.equal(capture.statusCode, 200)
 assert.equal(capture.resultRegionInspected, true)
@@ -64,6 +67,33 @@ assert.equal(assessment.bingIdentityDecision?.decision, 'verified', 'the visible
 assert.equal(assessment.automaticObservation, true)
 assert.equal(assessment.operatorReviewRequired, false)
 assert.deepEqual(new Set(assessment.bingIdentityDecision?.matchedSignals.map((signal) => signal.field)), new Set(['name', 'website', 'phone', 'address']))
+
+const bingPlaceUrl = 'https://www.bing.com/maps?q=Montessori+Center+of+Downriver&osid=fixture-place'
+const partialLocalHtml = `<html><body><main id="b_results"><aside id="b_context"><section class="b_entityTP" data-entityid="fixture-place"><h2 class="b_entityTitle">Montessori Center of Downriver</h2><a aria-label="Map" href="${bingPlaceUrl.replace(/&/g, '&amp;')}">Map</a></section></aside></main></body></html>`
+const secondaryHtml = `<html><body><main><section class="b_entityTP" data-entityid="fixture-place"><h1 class="b_entityTitle">Montessori Center of Downriver</h1><div aria-label="Address: 15575 Northline Rd, Southgate, MI 48195"></div><a aria-label="Phone: (734) 282-6465" href="tel:+17342826465">Call</a><a aria-label="Website" href="https://montessoridownriver.com/">Website</a><a aria-label="Map" href="${bingPlaceUrl.replace(/&/g, '&amp;')}">Map</a></section></main></body></html>`
+const followedUrls: string[] = []
+const resolved = await acquireBingSearch(queryUrl, {
+  verifyDns: async () => undefined,
+  transport: async (url) => {
+    followedUrls.push(url.href)
+    return { status: 200, finalUrl: url.href, body: followedUrls.length === 1 ? partialLocalHtml : secondaryHtml }
+  },
+})
+assert.equal(followedUrls.length, 2, 'a partial local card permits one bounded Bing-owned detail request')
+assert.equal(followedUrls[1], bingPlaceUrl)
+assert.equal(resolved.secondaryResolution?.outcome, 'success')
+assert.equal(assessSearchCapture(resolved, profile, profileState, 'Bing Search', 'brand').automaticObservation, true, 'secondary Bing-owned identity fields reach the unchanged strong matcher')
+
+let retryOnlyCalls = 0
+await acquireBingSearch(queryUrl, {
+  verifyDns: async () => undefined,
+  allowSecondaryResolution: false,
+  transport: async (url) => {
+    retryOnlyCalls += 1
+    return { status: 200, finalUrl: url.href, body: partialLocalHtml }
+  },
+})
+assert.equal(retryOnlyCalls, 1, 'an identity-rich retry cannot trigger a third Bing request')
 
 const genericHtml = '<html><body><main><ol id="b_results"><li class="b_algo"><h2><a href="https://example.org/montessori">Montessori education</a></h2><p>General educational content.</p></li></ol></main></body></html>'
 const noMatch = assessSearchCapture({
