@@ -17,20 +17,21 @@ const profileState: BusinessProfileState = { schemaVersion: 1, values: Object.fr
   value: profile[field], source: 'fixture review', confidence: 'high', status: 'operator_reviewed', recordedAt: acquiredAt,
 }])) as BusinessProfileState['values'] }
 const place = {
-  id: 'I-MONTESSORI-DOWNRIVER',
-  name: 'Montessori Center of Downriver',
+  id: 'I5420B8793429BEE8',
+  name: 'Montessori Center Of Downriver',
   formattedAddressLines: ['15575 Northline Rd', 'Southgate, MI 48195', 'United States'],
   structuredAddress: { fullThoroughfare: '15575 Northline Rd', locality: 'Southgate', administrativeAreaCode: 'MI', postCode: '48195' },
   telephone: '+17342826465',
   urls: ['https://montessoridownriver.com/'],
-  poiCategory: 'School',
+  poiCategory: 'Montessori School',
+  coordinate: { latitude: 42.212820, longitude: -83.211933 },
 }
 const apiBody = JSON.stringify({ results: [place] })
 
 const normalized = normalizeAppleMapsServerCandidates(apiBody, appleMapsServerSearchUrl(query).href, acquiredAt)
 assert.equal(normalized.length, 1)
 assert.deepEqual(normalized[0].fields, {
-  name: profile.businessName,
+  name: place.name,
   streetAddress: '15575 Northline Rd',
   locality: 'Southgate',
   region: 'MI',
@@ -38,9 +39,9 @@ assert.deepEqual(normalized[0].fields, {
   address: '15575 Northline Rd, Southgate, MI 48195, United States',
   phone: '+17342826465',
   website: 'https://montessoridownriver.com/',
-  category: 'School',
-  placeIdentity: 'I-MONTESSORI-DOWNRIVER',
-  publicProfileUrl: 'https://maps.apple.com/place?place-id=I-MONTESSORI-DOWNRIVER',
+  category: 'Montessori School',
+  placeIdentity: 'I5420B8793429BEE8',
+  publicProfileUrl: 'https://maps.apple.com/place?place-id=I5420B8793429BEE8',
 })
 
 let serverCalls = 0
@@ -67,6 +68,13 @@ assert.equal(publicCalls, 0, 'usable official structured results are preferred o
 assert.equal(receivedToken, 'fixture-secret-token')
 assert.equal(configured.provider, 'apple-maps-server-api')
 assert.equal(configured.outcome, 'success')
+assert.deepEqual(configured.appleMapsResolution, {
+  publicPlaceResolutionAttempted: false,
+  serverApiConfigured: true,
+  serverApiAttempted: true,
+  anonymousSearchAttempted: false,
+  returnedCandidateCount: 1,
+})
 assert.equal(JSON.stringify(configured).includes('fixture-secret-token'), false, 'Apple credentials never enter persisted capture data')
 const verified = assessSearchCapture(configured, profile, profileState, 'Apple Maps', 'brand')
 assert.equal(verified.automaticObservation, true, 'official structured name and identity fields satisfy the unchanged strong matcher')

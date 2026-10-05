@@ -71,6 +71,7 @@
     "test:apple-maps-redirect-evidence": "node --import tsx scripts/test-apple-maps-redirect-evidence.ts",
     "test:apple-maps-search-redirect": "node --import tsx scripts/test-apple-maps-search-redirect.ts",
     "test:apple-maps-server-api": "node --import tsx scripts/test-apple-maps-server-api.ts",
+    "test:apple-maps-place-discovery": "node --import tsx scripts/test-apple-maps-place-discovery.ts",
     "test:duckduckgo-auto-verification": "node --import tsx scripts/test-duckduckgo-auto-verification.tsx",
     "test:yelp-production-wiring": "node --import tsx scripts/test-yelp-production-wiring.ts",
     "test:yelp-auto-verification": "node --import tsx scripts/test-yelp-auto-verification.tsx",

@@ -81,6 +81,28 @@ export interface AcquisitionResult {
     /** Present on newly discovered profiles; optional for saved-workspace compatibility. */
     evidenceKey?: string
   }
+  /** Explicit Apple public place identity discovered in trustworthy automated evidence. */
+  applePlaceDiscovery?: {
+    source: 'first_party_website' | 'verified_search_evidence' | 'verified_public_evidence'
+    canonicalUrl: string
+    placeId: string
+    name?: string
+    address?: string
+    coordinate?: string
+    providerIdentifier?: string
+    sourceUrl?: string
+    sourceDestination?: string
+    observedName?: string
+    evidenceKey: string
+  }
+  /** Sanitized Apple acquisition diagnostics. Tokens and authorization data are excluded. */
+  appleMapsResolution?: {
+    publicPlaceResolutionAttempted: boolean
+    serverApiConfigured: boolean
+    serverApiAttempted: boolean
+    anonymousSearchAttempted: boolean
+    returnedCandidateCount: number
+  }
   notes: string[]
   confidence: 'captured' | 'operator_supplied' | 'unavailable'
   error?: string

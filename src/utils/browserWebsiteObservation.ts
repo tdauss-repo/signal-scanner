@@ -237,7 +237,7 @@ const socialProfileLinksFor = (links: BrowserObservedLink[]) =>
     links
       .map((link) => link.url)
       .filter((url) =>
-        /facebook\.com|instagram\.com|linkedin\.com|youtube\.com|tiktok\.com|pinterest\.com|x\.com|twitter\.com/i.test(
+        /facebook\.com|instagram\.com|linkedin\.com|youtube\.com|tiktok\.com|pinterest\.com|x\.com|twitter\.com|maps\.apple\.com\/place/i.test(
           url,
         ),
       ),

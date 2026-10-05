@@ -22,6 +22,7 @@ import {
   retainedBrandPresenceVerificationIsCurrent,
 } from './brandPresenceWorkspaceRetention'
 import { discoverSocialProfile } from './socialProfileDiscovery'
+import { discoverAppleMapsPlace } from './appleMapsPlaceDiscovery'
 
 export { retainedBingSourceFromVisibilityRuns } from './bingWorkspaceRetention'
 
@@ -337,6 +338,9 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
     const metaDiscovery = metaPlatform
       ? discoverSocialProfile(metaPlatform, reviewedProfileValue(profile, initial.businessProfile, 'businessName'), latestSuccessfulWebsite, state.searchDestinationObservations, reviewedInstagramUrls)
       : undefined
+    const applePlaceDiscovery = acquisitionRoute === 'apple_maps_native'
+      ? discoverAppleMapsPlace(profile, initial.businessProfile, latestSuccessfulWebsite, state.searchDestinationObservations)
+      : undefined
     // A caller that spreads application dependencies and replaces only `acquire`
     // is supplying a complete fixture/CLI provider and must not inherit a live API call.
     const googleProvider = dependencies.acquireGoogle === applicationScanDependencies.acquireGoogle
@@ -361,7 +365,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
               : acquisitionRoute === 'yelp_native_search' ? yelpProvider
                 : acquisitionRoute === 'facebook_native_page' ? facebookProvider
                   : acquisitionRoute === 'instagram_native_profile' ? instagramProvider : undefined
-    const dedicatedUrl = metaPlatform ? metaDiscovery?.profileUrl : item.url
+    const dedicatedUrl = metaPlatform ? metaDiscovery?.profileUrl : applePlaceDiscovery?.canonicalUrl || item.url
     if (metaPlatform && !metaDiscovery) {
       const platformSlug = metaPlatform.toLowerCase()
       captures.push({
@@ -379,12 +383,25 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
         if (!alive()) return run
         if (metaPlatform) dedicatedProviderHandled = true
         if (capture) {
-          captures.push(metaPlatform && metaDiscovery
+          const capturedWithDiscovery = metaPlatform && metaDiscovery
             ? { ...capture, profileDiscovery: metaDiscovery }
-            : capture)
+            : applePlaceDiscovery ? { ...capture, applePlaceDiscovery } : capture
+          captures.push(capturedWithDiscovery)
           dedicatedProviderHandled = true
           item.captures = captures.map(compactCapture)
           publish()
+          if (item.destination === 'Apple Maps' && item.queryMode === 'brand' && applePlaceDiscovery) {
+            const explicitAssessment = assessSearchCapture(capturedWithDiscovery, profile, initial.businessProfile, 'Apple Maps', 'brand')
+            if (!explicitAssessment.automaticObservation && explicitAssessment.blocker !== 'identifier_conflict' && item.url !== dedicatedUrl) {
+              const fallback = await awaitBounded(() => dedicatedProvider(item.url!), 'Apple Maps Server API or anonymous search fallback', operationTimeoutMs)
+              if (!alive()) return run
+              if (fallback) {
+                captures.push({ ...fallback, applePlaceDiscovery, notes: [...fallback.notes, 'The explicit Apple Place request was insufficient; the configured Server API or anonymous public search fallback was then evaluated.'] })
+                item.captures = captures.map(compactCapture)
+                publish()
+              }
+            }
+          }
           if (item.destination === 'Bing Search' && item.queryMode === 'brand' && capture.outcome === 'success' && capture.resultRegionInspected && !capture.secondaryResolution?.used) {
             const primaryAssessment = assessSearchCapture(capture, profile, initial.businessProfile, 'Bing Search', 'brand')
             const retryUrl = primaryAssessment.blocker === 'no_match' ? bingIdentityRetryUrl(profile, initial.businessProfile) : undefined
@@ -427,7 +444,8 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
                   : item.destination === 'Facebook' ? 'facebook-native-request'
                     : item.destination === 'Instagram' ? 'instagram-native-request' : 'bing-native-request'
         captures.push({ version: 1, requestedUrl: dedicatedUrl || item.url!, acquiredAt: new Date().toISOString(), method: 'server_fetch', provider, outcome: 'failed', confidence: 'unavailable', notes: [`${item.destination || 'Destination'} provider request failed. This is not evidence that the business is absent.`], blocker, error: String(error),
-          ...(metaDiscovery ? { profileDiscovery: metaDiscovery } : {}) })
+          ...(metaDiscovery ? { profileDiscovery: metaDiscovery } : {}),
+          ...(applePlaceDiscovery ? { applePlaceDiscovery } : {}) })
         dedicatedProviderHandled = true
       }
     }

@@ -1,7 +1,10 @@
 import type { AcquisitionResult } from '../src/types/acquisition.ts'
 import type { BusinessResultCandidate, EntityField, EvidenceReference } from '../src/types/entityMatch.ts'
+import { canonicalApplePlaceUrl } from '../src/utils/appleMapsPlace.ts'
 import { checkPublicDns, publicUrl } from './acquisition.ts'
 import { fetchPage } from './pageTransport.ts'
+
+export { canonicalApplePlaceUrl } from '../src/utils/appleMapsPlace.ts'
 
 export interface AppleMapsTransportResult {
   status: number
@@ -69,23 +72,6 @@ const approvedAppleRedirectTarget = (value: unknown, base: string, requestedQuer
   if (place) return { url: place, route: 'place' as const }
   const search = approvedAppleSearchTarget(value, base, requestedQuery)
   return search ? { url: search, route: 'search' as const } : undefined
-}
-/** Stable public profile URL: place routing and public identity, without presentation-only coordinates. */
-export const canonicalApplePlaceUrl = (value: unknown, base: string) => {
-  const url = approvedApplePlaceTarget(value, base)
-  if (!url) return ''
-  const placeIdentity = url.searchParams.get('place-id') || url.searchParams.get('mapitemguid') || url.searchParams.get('id') || ''
-  if (!placeIdentity) {
-    url.searchParams.delete('coordinate')
-    return url.href
-  }
-  const canonical = new URL(`${url.origin}${url.pathname}`)
-  canonical.searchParams.set('place-id', placeIdentity)
-  for (const key of ['name', 'address']) {
-    const field = url.searchParams.get(key)
-    if (field) canonical.searchParams.set(key, field)
-  }
-  return canonical.href
 }
 const applePlaceUrl = canonicalApplePlaceUrl
 const decodedAttribute = (value: string) => value.replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
@@ -348,7 +334,7 @@ const failureBlocker = (error: unknown) => {
 }
 
 /** One bounded public Apple Maps page/share request; no scripts or private APIs. */
-export async function acquireAppleMaps(value: string, options: AppleMapsAcquisitionOptions = {}): Promise<AcquisitionResult> {
+async function acquireAppleMapsRequest(value: string, options: AppleMapsAcquisitionOptions = {}): Promise<AcquisitionResult> {
   const acquiredAt = new Date().toISOString()
   const base: AcquisitionResult = {
     version: 1, requestedUrl: value, acquiredAt, provider: 'apple-maps-native-fetch', checkedDestination: 'Apple Maps',
@@ -478,5 +464,39 @@ export async function acquireAppleMaps(value: string, options: AppleMapsAcquisit
   } catch (error) {
     const blocker = failureBlocker(error)
     return { ...base, blocker, error: error instanceof Error ? error.message : String(error), notes: ['Apple Maps native acquisition could not complete. This is not evidence that the business is absent.'] }
+  }
+}
+
+/**
+ * Adds bounded, credential-free diagnostics around the native acquisition.
+ * The bearer token is consumed only by acquireAppleMapsRequest and is never
+ * copied into this metadata or any persisted capture.
+ */
+export async function acquireAppleMaps(value: string, options: AppleMapsAcquisitionOptions = {}): Promise<AcquisitionResult> {
+  let supportedPlaceRequest = false
+  let supportedSearchRequest = false
+  try {
+    const url = publicUrl(value)
+    supportedPlaceRequest = Boolean(approvedApplePlaceTarget(url.href, url.href))
+    supportedSearchRequest = Boolean(
+      (url.pathname === '/' && url.searchParams.getAll('q').length === 1 && url.searchParams.get('q')?.trim()) ||
+      (url.pathname === '/search' && url.searchParams.getAll('query').length === 1 && url.searchParams.get('query')?.trim()),
+    )
+  } catch {
+    // The core request returns the existing sanitized invalid-request result.
+  }
+  const serverApiConfigured = Boolean(options.serverToken?.trim())
+  const capture = await acquireAppleMapsRequest(value, options)
+  let finalIsPlace = false
+  try { finalIsPlace = new URL(capture.finalUrl || capture.redirectUrl || '').pathname === '/place' } catch { /* empty */ }
+  return {
+    ...capture,
+    appleMapsResolution: {
+      publicPlaceResolutionAttempted: supportedPlaceRequest || finalIsPlace || capture.notes.some((note) => /place target|place resolution/i.test(note)),
+      serverApiConfigured,
+      serverApiAttempted: serverApiConfigured && supportedSearchRequest,
+      anonymousSearchAttempted: supportedSearchRequest && capture.provider !== 'apple-maps-server-api',
+      returnedCandidateCount: capture.normalizedSearchCandidates?.length || 0,
+    },
   }
 }

@@ -455,13 +455,33 @@ metadata remain operator-only.
 
 ### Apple Maps Brand Presence verification
 
-Without server credentials, Apple Maps Brand Presence uses one bounded public acquisition sequence from the clean
-`maps.apple.com/?q=...` reviewed-identity query. It runs in a dedicated native
-runtime lane, does not execute scripts, launch a browser, use authenticated or
-private endpoints, retain session state, or bypass an access restriction. The
-production acquisition URL and operator verification URL use the same
-`brandVerificationQuery()` contract: reviewed business name plus reviewed city
-and state.
+Apple Maps Brand Presence uses this deterministic acquisition order:
+
+1. an explicit canonical Apple Place URL already surfaced by trustworthy
+   automated evidence;
+2. one official Apple Maps Server API search when server credentials exist;
+3. the anonymous public `maps.apple.com/?q=...` reviewed-identity search; and
+4. a neutral, review-required result when none exposes sufficient identity.
+
+It runs in a dedicated native runtime lane, does not execute scripts, launch a
+browser, retain session state, guess a Place ID, or bypass an access
+restriction. The production anonymous-search URL and operator verification URL
+use the same `brandVerificationQuery()` contract: reviewed business name plus
+reviewed city and state.
+
+Explicit-place discovery is limited to `https://maps.apple.com/place` URLs
+with an asserted `place-id` (or an already-supported equivalent identity
+parameter) found in a successfully acquired first-party website or an
+automatically verified search/listing observation. Current direct verification
+or a still-valid shared retained verification may establish the source's
+trustworthiness; unverified candidates and operator-synthesized URLs do not.
+The bounded discovery record stores its source, source destination/URL when
+available, canonical Place URL, Place ID, explicitly asserted name, address,
+coordinate/provider metadata, and a material evidence fingerprint. It never
+constructs an Apple URL from a business name, coordinate, or manually copied
+identifier. Canonical identity retains Place ID plus asserted name/address;
+presentation-only coordinate and provider parameters remain provenance and do
+not enter the canonical profile or material identity fingerprint.
 
 Apple Maps public place resolution permits exactly one 301, 302, 303, 307, or
 308 redirect when its `Location` is HTTPS, remains on `maps.apple.com`, and is
@@ -472,7 +492,7 @@ identity query after bounded case and whitespace normalization. A missing,
 external, insecure, unrelated-query, arbitrary-route, or second redirect stops
 neutral.
 
-The permitted public sequence is search query → one approved `/search`
+The anonymous public sequence is search query → one approved `/search`
 redirect → structured public place evidence or an explicit canonical `/place`
 URL in the returned page. The `/search` redirect itself is not evidence that a
 listing exists. The search response is inspected only for bounded JSON-LD,
@@ -483,7 +503,8 @@ page is only an application shell, acquisition is completed but insufficient:
 the destination remains neutral and requires review rather than being labeled
 unavailable.
 
-A server-provided public `/place` target is acquired structured place evidence.
+A discovered or server-provided public `/place` target receives at most one
+bounded Apple-owned request and is acquired as structured place evidence.
 Public `place-id`, `name`, and `address` parameters are normalized as a local-
 place candidate; `coordinate` is retained only in raw technical redirect
 evidence and is excluded from the canonical profile and material fingerprint.
@@ -499,19 +520,25 @@ remains neutral. When a legitimate public `/place?place-id=...` target is
 surfaced by the server response, the existing single Apple-owned follow/parse
 boundary applies.
 
-The official Apple Maps Server API is the preferred optional structured path.
+The official Apple Maps Server API is the second acquisition stage after an
+explicit discovered Place URL and the preferred structured path when no
+explicit Place URL verifies.
 When `APPLE_MAPS_SERVER_TOKEN` (or the equivalent
 `APPLE_MAPS_SERVER_ACCESS_TOKEN`) is present in server process configuration,
-the runtime first makes one bounded `GET https://maps-api.apple.com/v1/search`
+the runtime makes one bounded `GET https://maps-api.apple.com/v1/search`
 request using the reviewed name/locality query, `limitToCountries=US`,
 `resultTypeFilter=Poi`, and `lang=en-US`. Returned `Place` fields—name,
 formatted/structured address, telephone, URLs, category, and Place ID when
 asserted—are normalized and passed to the same strong Apple identity matcher.
 The bearer token is never included in capture data, browser code, local
-workspace state, or customer output. Missing credentials, authorization
-failure, an empty/malformed result, or a fast official-service failure falls
-back to the existing public Maps URL path and remains neutral when that path is
-only a shell.
+workspace state, or customer output. Missing credentials skip this stage.
+Authorization failure, an empty/malformed result, or a fast official-service
+failure falls back to the existing anonymous public Maps URL path and remains
+neutral when that path is only a shell. Sanitized diagnostics report discovery
+source, explicit Place/ID presence, public-place and Server API attempt state,
+configured/unconfigured state, returned candidate count, matched identity
+fields, and final automatic decision; tokens and authorization data are never
+logged.
 
 Production token provisioning remains a server-operations responsibility.
 Apple requires an Apple Developer Maps identifier and private key to sign the
@@ -548,6 +575,12 @@ destination strength through the existing include/hide/refine workflow. This
 proves listing presence and identity consistency only—not ownership, ranking,
 completeness, or optimization quality. Provider, place-identity, matcher, and
 raw acquisition details remain outside customer JSON.
+
+Fresh Apple verification retains its canonical Place ID/profile on the normal
+destination observation and in compact matcher evidence. Apple Maps is not
+added to the shared seven-day retained-verification destinations by this
+change; a later inconclusive Apple check therefore keeps the current Apple
+behavior until that lifecycle is separately authorized.
 
 HTTP/network failure, access restriction, and a response without supported
 public place structure remain distinct neutral outcomes. When the bounded

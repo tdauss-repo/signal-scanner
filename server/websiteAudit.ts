@@ -779,7 +779,7 @@ export const auditWebsite = async (
   )
   const contactLinks = contactLinkEvidence.map((link) => link.url)
   const socialProfileLinks = links.filter((link) =>
-    /facebook\.com|instagram\.com|linkedin\.com|youtube\.com|tiktok\.com|pinterest\.com|x\.com|twitter\.com/i.test(
+    /facebook\.com|instagram\.com|linkedin\.com|youtube\.com|tiktok\.com|pinterest\.com|x\.com|twitter\.com|maps\.apple\.com\/place/i.test(
       link,
     ),
   )
