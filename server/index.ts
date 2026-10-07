@@ -53,7 +53,12 @@ app.post('/api/acquire-google-maps', async (request, response) => {
 
 app.post('/api/acquire-bing-search', async (request, response) => {
   try {
-    response.json(await acquireBingSearchRuntime(String(request.body.url || ''), { identityRetry: request.body.identityRetry === true }))
+    const source = request.body.reviewedIdentity && typeof request.body.reviewedIdentity === 'object' ? request.body.reviewedIdentity : {}
+    const value = (field: string) => typeof source[field] === 'string' ? source[field].slice(0, 1000) : undefined
+    response.json(await acquireBingSearchRuntime(String(request.body.url || ''), { reviewedIdentity: {
+      businessName: value('businessName') || '', website: value('website'), streetAddress: value('streetAddress'),
+      city: value('city'), state: value('state'), zip: value('zip'), phone: value('phone'), primaryCategory: value('primaryCategory'),
+    } }))
   } catch (error) {
     response.status(400).json({ error: error instanceof Error ? error.message : 'Bing acquisition unavailable.' })
   }

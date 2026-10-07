@@ -345,14 +345,13 @@ with `apple_maps_acquisition_not_configured` and
 `facebook_acquisition_not_configured`, and
 `instagram_acquisition_not_configured`.
 
-Bing Brand Presence starts with one bounded native server request to the clean
-`bing.com/search?q=...` verification query. The request does not execute
-scripts, follow an unreviewed redirect, launch a browser, maintain a profile,
-or bypass an access restriction. A normal Bing result region is normalized by
-the shared structured, semantic, and result-link extractors; transport, HTTP,
-access, and missing-result-region failures retain distinct internal blockers
-and remain neutral. Assisted verification is the fallback when this bounded
-acquisition is unavailable or insufficient.
+Bing Brand Presence is a provider-specific adapter. It starts with one bounded
+native server request to the clean `bing.com/search?q=...` verification query.
+The request does not execute scripts, follow an unreviewed redirect, launch a
+browser, maintain a profile, or bypass an access restriction. A normal Bing
+result region is normalized into the common candidate contract; transport,
+HTTP, access, and missing-result-region failures retain distinct internal
+blockers and remain neutral.
 
 The native request preserves the clean reviewed-identity query while adding a
 stable US-English public-result context (`cc=us`, `setlang=en-us`, and
@@ -372,20 +371,27 @@ markup; the existing local-card parser was therefore not the failing boundary.
 The scanner does not copy personal cookies, spoof geolocation, or add browser
 automation to force the interactive variant.
 
-One extra Bing request is permitted, never more than one. If the primary HTML
-exposes exactly one HTTPS Bing-owned `/maps` target with a surfaced query or
-entity identifier, and the primary local card is not already usable, that
-target may be followed and its explicit local-entity fields normalized. An
-external, insecure, ambiguous, restricted, or redirected target is not
-followed or used. Otherwise, only when a successfully inspected primary SERP
-produces the explicit Brand `no_match` decision, the scanner may issue one
-deterministic retry using the exact reviewed business name plus the reviewed
-official domain. That extra independent identity term reduces generic-topic
-SERPs without guessing a listing URL or changing identity truth. A retry is
-marked so it cannot trigger a secondary follow; a primary secondary follow
-prevents a retry. Access failures, conflicts, insufficient identity, and other
-states do not cause query spraying. Both captures remain technical evidence,
-and the unchanged strong matcher alone decides verification.
+When the primary Search response is a normal result region but does not expose
+a strongly aligned local identity, the adapter makes one Bing-owned consumer
+Maps business search using Microsoft's documented route:
+`https://www.bing.com/maps/default.aspx?ss=yp.<reviewed-query>`. The adapter
+does not issue another ordinary Search query. It accepts only explicit Bing
+local/business HTML or bounded structured page/bootstrap records and
+normalizes their asserted name, official website, phone, address, category,
+Maps URL, and entity identifier. A Bing entity identifier alone is not
+verification evidence.
+
+If that Maps response is still insufficient and exposes exactly one approved
+HTTPS Bing-owned Maps/entity detail URL carrying a public entity or location
+identity, the adapter may make one final detail request. It never invents that
+URL, follows an external or ambiguous target, performs arbitrary crawling, or
+makes more than this Search → Maps → optional detail chain. Restricted,
+empty, conflicting, and insufficient responses remain neutral. The provider
+adapter uses reviewed identity only to stop the bounded chain when a candidate
+is clearly aligned; the unchanged shared strong matcher remains the sole
+verification decision. There is no browser automation or intended manual
+fallback, and no other provider's acquisition behavior is changed by this
+chain.
 
 A successfully inspected Bing Brand result region with no matching business
 candidate is `review_required` with blocker `no_match`; it is neutral and is

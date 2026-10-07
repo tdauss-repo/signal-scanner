@@ -69,6 +69,7 @@ assert.equal(assessment.operatorReviewRequired, false)
 assert.deepEqual(new Set(assessment.bingIdentityDecision?.matchedSignals.map((signal) => signal.field)), new Set(['name', 'website', 'phone', 'address']))
 
 const bingPlaceUrl = 'https://www.bing.com/maps?q=Montessori+Center+of+Downriver&osid=fixture-place'
+const genericHtml = '<html><body><main><ol id="b_results"><li class="b_algo"><h2><a href="https://example.org/montessori">Montessori education</a></h2><p>General educational content.</p></li></ol></main></body></html>'
 const partialLocalHtml = `<html><body><main id="b_results"><aside id="b_context"><section class="b_entityTP" data-entityid="fixture-place"><h2 class="b_entityTitle">Montessori Center of Downriver</h2><a aria-label="Map" href="${bingPlaceUrl.replace(/&/g, '&amp;')}">Map</a></section></aside></main></body></html>`
 const secondaryHtml = `<html><body><main><section class="b_entityTP" data-entityid="fixture-place"><h1 class="b_entityTitle">Montessori Center of Downriver</h1><div aria-label="Address: 15575 Northline Rd, Southgate, MI 48195"></div><a aria-label="Phone: (734) 282-6465" href="tel:+17342826465">Call</a><a aria-label="Website" href="https://montessoridownriver.com/">Website</a><a aria-label="Map" href="${bingPlaceUrl.replace(/&/g, '&amp;')}">Map</a></section></main></body></html>`
 const followedUrls: string[] = []
@@ -76,11 +77,12 @@ const resolved = await acquireBingSearch(queryUrl, {
   verifyDns: async () => undefined,
   transport: async (url) => {
     followedUrls.push(url.href)
-    return { status: 200, finalUrl: url.href, body: followedUrls.length === 1 ? partialLocalHtml : secondaryHtml }
+    return { status: 200, finalUrl: url.href, body: followedUrls.length === 1 ? genericHtml : followedUrls.length === 2 ? partialLocalHtml : secondaryHtml }
   },
 })
-assert.equal(followedUrls.length, 2, 'a partial local card permits one bounded Bing-owned detail request')
-assert.equal(followedUrls[1], bingPlaceUrl)
+assert.equal(followedUrls.length, 3, 'generic Search permits one Maps search and one surfaced Bing-owned detail request')
+assert.equal(followedUrls[1], 'https://www.bing.com/maps/default.aspx?ss=yp.Montessori+Center+of+Downriver+Southgate+MI')
+assert.equal(followedUrls[2], bingPlaceUrl)
 assert.equal(resolved.secondaryResolution?.outcome, 'success')
 assert.equal(assessSearchCapture(resolved, profile, profileState, 'Bing Search', 'brand').automaticObservation, true, 'secondary Bing-owned identity fields reach the unchanged strong matcher')
 
@@ -93,9 +95,8 @@ await acquireBingSearch(queryUrl, {
     return { status: 200, finalUrl: url.href, body: partialLocalHtml }
   },
 })
-assert.equal(retryOnlyCalls, 1, 'an identity-rich retry cannot trigger a third Bing request')
+assert.equal(retryOnlyCalls, 1, 'disabling Bing secondary resolution leaves the primary as the only request')
 
-const genericHtml = '<html><body><main><ol id="b_results"><li class="b_algo"><h2><a href="https://example.org/montessori">Montessori education</a></h2><p>General educational content.</p></li></ol></main></body></html>'
 const noMatch = assessSearchCapture({
   version: 1, requestedUrl: queryUrl, finalUrl: requestedUrl.href, acquiredAt, provider: 'bing-native-fetch', method: 'server_fetch',
   outcome: 'success', confidence: 'captured', resultRegionInspected: true, blocker: 'none', notes: [], html: genericHtml,

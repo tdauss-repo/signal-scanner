@@ -8,7 +8,7 @@ import { acquireYelpSearch } from './yelpSearch.ts'
 import { acquireFacebookPage } from './facebookPage.ts'
 import { acquireInstagramProfile } from './instagramProfile.ts'
 import { canonicalMetaProfileUrl } from '../src/utils/metaPublicEvidence.ts'
-import type { AcquisitionProvider, AcquisitionResult } from '../src/types/acquisition.ts'
+import type { AcquisitionProvider, AcquisitionResult, BingReviewedIdentityInput } from '../src/types/acquisition.ts'
 
 const destinationHosts = ['www.google.com', 'www.bing.com', 'maps.apple.com', 'duckduckgo.com', 'www.yelp.com', 'www.facebook.com', 'www.instagram.com']
 export function runtimeAllowedUrl(value: string, extraHosts = process.env.FOUND_LOCAL_PUBLIC_DIRECTORY_HOSTS || '') {
@@ -163,12 +163,12 @@ export async function acquireGoogleMapsRuntime(value: string) {
   })
 }
 
-export async function acquireBingSearchRuntime(value: string, options: { identityRetry?: boolean } = {}) {
+export async function acquireBingSearchRuntime(value: string, options: { reviewedIdentity?: BingReviewedIdentityInput } = {}) {
   const url = runtimeAllowedUrl(value)
   if (url.hostname.replace(/^www\./, '') !== 'bing.com' || url.pathname !== '/search' || !url.searchParams.get('q')?.trim()) {
     throw new Error('Bing acquisition requires a Bing Search query URL.')
   }
-  return runInAcquisitionLane('bing_native', async () => ({ capture: await acquireBingSearch(url.href, { allowSecondaryResolution: !options.identityRetry }) }))
+  return runInAcquisitionLane('bing_native', async () => ({ capture: await acquireBingSearch(url.href, { reviewedIdentity: options.reviewedIdentity }) }))
 }
 
 export async function acquireAppleMapsRuntime(value: string) {

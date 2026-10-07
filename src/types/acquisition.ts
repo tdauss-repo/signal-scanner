@@ -18,6 +18,16 @@ export interface RenderedResultEvidence {
   resultRegionInspected: boolean
   candidates: RenderedResultCandidate[]
 }
+export interface BingReviewedIdentityInput {
+  businessName: string
+  website?: string
+  streetAddress?: string
+  city?: string
+  state?: string
+  zip?: string
+  phone?: string
+  primaryCategory?: string
+}
 export interface AcquisitionResult {
   version: 1
   requestedUrl: string
@@ -62,6 +72,18 @@ export interface AcquisitionResult {
     statusCode?: number
     outcome: 'not_used' | 'success' | 'restricted' | 'unavailable'
     blocker?: string
+  }
+  /** Sanitized trace of Bing's provider-isolated Search → Maps → detail chain. */
+  bingLocalResolution?: {
+    steps: Array<{
+      stage: 'search_primary' | 'maps_search' | 'maps_detail'
+      requestedUrl: string
+      finalUrl?: string
+      statusCode?: number
+      outcome: 'success' | 'restricted' | 'unavailable'
+      candidateCount: number
+      blocker?: string
+    }>
   }
   /** Sanitized record of Yelp's optional one-hop public business-profile enrichment. */
   profileFollow?: {

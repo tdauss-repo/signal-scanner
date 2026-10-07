@@ -194,7 +194,7 @@ assert.equal(scannedBing?.automation?.assessment?.bingIdentityDecision?.decision
 assert.equal(scannedBing?.overallResult, 'found_match', 'the scan persists the normalized automatic Bing result')
 
 let retriedState = structuredClone({ ...state, searchDestinationObservations: {} })
-const bingRequests: Array<{ url: string; identityRetry: boolean }> = []
+const bingRequests: Array<{ url: string; reviewedName: string }> = []
 const genericSerp: AcquisitionResult = {
   ...capture,
   html: '<html><body><main><ol id="b_results"><li class="b_algo"><h2><a href="https://en.wikipedia.org/wiki/Montessori_education">Montessori education</a></h2><p>General Montessori information.</p></li></ol></main></body></html>',
@@ -204,19 +204,25 @@ await runVisibilityScan(retriedState, {
   automationVersion: 2,
   website: async () => websiteAudit,
   acquireBingSearch: async (url, options) => {
-    bingRequests.push({ url, identityRetry: options?.identityRetry === true })
-    return bingRequests.length === 1
-      ? { ...genericSerp, requestedUrl: url, finalUrl: url }
-      : { ...capture, requestedUrl: url, finalUrl: url }
+    bingRequests.push({ url, reviewedName: options?.reviewedIdentity?.businessName || '' })
+    return {
+      ...genericSerp,
+      requestedUrl: url,
+      finalUrl: url,
+      normalizedSearchCandidates: capture.normalizedSearchCandidates,
+      bingLocalResolution: { steps: [
+        { stage: 'search_primary', requestedUrl: url, finalUrl: url, statusCode: 200, outcome: 'success', candidateCount: 0, blocker: 'no_match' },
+        { stage: 'maps_search', requestedUrl: 'https://www.bing.com/maps/default.aspx?ss=yp.Montessori+Center+of+Downriver+Southgate+MI', finalUrl: 'https://www.bing.com/maps/', statusCode: 200, outcome: 'success', candidateCount: 1 },
+      ] },
+    }
   },
   acquire: async (url, method) => ({ version: 1, requestedUrl: url, acquiredAt: observedAt, provider: 'fixture-unavailable', method, outcome: 'failed', confidence: 'unavailable', blocker: 'network_failure', notes: [] }),
 }, (update) => { retriedState = update(retriedState) })
-assert.equal(bingRequests.length, 2, 'a normal primary no-match permits exactly one Bing retry')
-assert.equal(bingRequests[0].identityRetry, false)
-assert.equal(bingRequests[1].identityRetry, true)
-assert.equal(new URL(bingRequests[1].url).searchParams.get('q'), '"Montessori Center of Downriver" montessoridownriver.com', 'the retry uses only the exact reviewed name and official domain')
+assert.equal(bingRequests.length, 1, 'the provider-isolated Bing chain is one Scanner acquisition')
+assert.equal(bingRequests[0].reviewedName, profile.businessName, 'the Bing adapter receives reviewed identity for bounded stop decisions')
+assert.equal(new URL(bingRequests[0].url).searchParams.get('q'), 'Montessori Center of Downriver Southgate MI')
 const retriedBing = retriedState.searchDestinationObservations['search-brand-canonical']?.['Bing Search']
-assert.equal(retriedBing?.automation?.captures.length, 2)
+assert.equal(retriedBing?.automation?.captures.length, 1)
 assert.equal(retriedBing?.automation?.assessment?.bingIdentityDecision?.decision, 'verified')
 assert.equal(retriedBing?.overallResult, 'found_match')
 assert.equal(retriedBing?.automation?.state, 'evidence_captured', 'automatic strong evidence removes manual Bing verification')
