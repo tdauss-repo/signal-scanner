@@ -642,6 +642,9 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
   }
   run.endedAt = new Date().toISOString()
   run.status = run.checks.some((item) => ['failed', 'interactive_review_required', 'not_checked'].includes(item.state)) ? 'completed_with_review' : 'completed'
+  const candidateFindings = website.evidenceCaptured ? workspaceFindings(state)
+    .filter((fix) => ['website', 'ai_geo_readiness'].includes(fix.sourceArea || '') &&
+      !/^(website-h1|website-heading)$/.test(fix.id) && !state.manualFixes.some((manual) => manual.id === fix.id)) : []
   run.summary = {
     attempted: run.checks.filter((item) => item.startedAt).length,
     successful: run.checks.filter((item) => item.evidenceCaptured).length,
@@ -651,7 +654,8 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
     acquisitionFailures: run.checks.reduce((sum, item) => sum + item.captures.filter((capture) => ['failed', 'blocked', 'unavailable'].includes(capture.outcome)).length + (item.id === website.id && item.state === 'failed' ? 1 : 0), 0),
     manualInterventionsRequired: run.checks.filter((item) => ['interactive_review_required', 'failed', 'not_checked'].includes(item.state)).length,
     providerEscalations: run.checks.filter((item) => item.captures.some((capture) => capture.method === 'rendered_browser')).length,
-    candidateFindings: website.evidenceCaptured ? workspaceFindings(state).filter((fix) => ['website', 'ai_geo_readiness'].includes(fix.sourceArea || '') && !/^(website-h1|website-heading)$/.test(fix.id) && !state.manualFixes.some((manual) => manual.id === fix.id)).length : 0,
+    candidateFindings: candidateFindings.length,
+    candidateFindingIds: candidateFindings.map((finding) => finding.id),
     // Presentation review is not customer permission to implement; that lifecycle is not recorded yet.
     customerApprovedFindings: 0,
   }
@@ -685,6 +689,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
       manualInterventionsRequired: run.checks.filter((item) => ['interactive_review_required', 'failed', 'not_checked'].includes(item.state)).length,
       providerEscalations: run.checks.filter((item) => item.captures.some((capture) => capture.method === 'rendered_browser')).length,
       candidateFindings: 0,
+      candidateFindingIds: [],
       customerApprovedFindings: 0,
     }
     publish()

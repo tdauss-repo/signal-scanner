@@ -68,6 +68,8 @@
     "test:bing-local-provider-chain": "node --import tsx scripts/test-bing-local-provider-chain.ts",
     "test:bing-recent-evidence-resilience": "node --import tsx scripts/test-bing-recent-evidence-resilience.tsx",
     "test:brand-presence-retained-lifecycle": "node --import tsx scripts/test-brand-presence-retained-lifecycle.tsx",
+    "test:workspace-save-open": "node --import tsx scripts/test-workspace-save-open.ts",
+    "test:current-run-finding-count": "node --import tsx scripts/test-current-run-finding-count.ts",
     "test:apple-maps-auto-verification": "node --import tsx scripts/test-apple-maps-auto-verification.tsx",
     "test:apple-maps-production-wiring": "node --import tsx scripts/test-apple-maps-production-wiring.ts",
     "test:apple-maps-redirect-evidence": "node --import tsx scripts/test-apple-maps-redirect-evidence.ts",

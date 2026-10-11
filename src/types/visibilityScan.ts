@@ -61,6 +61,8 @@ export interface VisibilityRun {
     acquisitionFailures: number
     providerEscalations: number
     candidateFindings: number
+    /** Finding identities supported by this run's completed evidence. */
+    candidateFindingIds?: string[]
     customerApprovedFindings: number
   }
 }

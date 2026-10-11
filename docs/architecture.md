@@ -45,7 +45,8 @@ The product follows a bounded handoff architecture:
    - Does not receive raw provider, matcher, capture, or operator-only data
 
 4. Storage
-   - Preserves saved scans and operator state
+   - Uses explicit local Workspace JSON as the authoritative operator-controlled snapshot
+   - Treats browser LocalStorage as best-effort convenience/cache, not a reliable durable save
    - Keeps internal evidence separate from customer presentation data
 
 ## Suggested Frontend Structure
@@ -62,7 +63,15 @@ Review → Verification`:
 
 1. **Business** presents one consolidated reviewed-business form. Seed and
    reviewed-profile provenance remain internal compatibility concepts, while a
-   compact Change business control owns saved workspaces and Full Scan JSON.
+   compact Change business control owns legacy browser-cached workspaces. `Save
+   Business` confirms reviewed profile fields only; it does not silently save a
+   scan. `Save Workspace` downloads the complete normalized operator snapshot,
+   and `Open Workspace` validates, migrates, and restores that local JSON without
+   uploading it or running acquisition. The snapshot includes the business,
+   latest run and technical evidence, finding decisions and refinements, package
+   scope and pricing, retained verification, and Customer Review state. Browser
+   auto-save continues as a convenience; quota failure leaves memory intact and
+   directs the operator to `Save Workspace` before closing or refreshing.
    Business name, website, and primary category are required to begin. Reviewed
    profile facts are authoritative for customer projection; a new workspace
    clears prior evidence, decisions, and customer wording.
@@ -70,7 +79,14 @@ Review → Verification`:
    health. Each run records an explicit running/completed/completed-with-review/
    failed lifecycle, individual operations and the overall run are time-bounded,
    and unfinished checks are terminalized before Review becomes available.
-   Acquisition failure remains neutral.
+   Acquisition failure remains neutral. A newly started run immediately owns an
+   empty current-candidate projection, so findings from an earlier run are not
+   labeled as rediscovered while acquisition is in progress. On completion the
+   run records the exact candidate finding IDs supported by its evidence. Scan
+   and Review counts use that set; prior decisions remain in history for the
+   existing reconciliation rules: an unchanged finding keeps its prior decision,
+   materially changed evidence requires reconfirmation, and an unsupported old
+   finding remains historical rather than counting as a current-run finding.
 3. **Review** combines the evidence summary, business-information gaps,
    verified-strength inclusion and optional customer wording, candidate
    findings, optional customer-wording refinement, and explicit

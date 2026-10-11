@@ -1,5 +1,5 @@
 import type { AuditItem, AuditState, FixItem } from '../types/audit'
-import { summarizeCustomerScan, type VisibilitySnapshotOverall } from './customerScan'
+import { currentRunFindings, summarizeCustomerScan, type VisibilitySnapshotOverall } from './customerScan'
 import { derivePackagePreparation, type PackagePreparationItem } from './packagePreparation'
 import { reviewedBusinessProfile } from './businessProfileState'
 import { effectiveCustomerStrengths } from './customerStrengths'
@@ -134,10 +134,11 @@ const areaTitle: Record<CustomerVisibilityReviewAreaId, string> = {
 
 /** Builds a presentation-only export from reviewed, explicitly approved findings. */
 export function buildCustomerVisibilityReviewExport(state: AuditState, items: AuditItem[], fixes: FixItem[]): CustomerVisibilityReviewExport {
-  const summary = summarizeCustomerScan(state, items, fixes)
+  const currentFixes = currentRunFindings(state, fixes)
+  const summary = summarizeCustomerScan(state, items, currentFixes)
   // `findings` is the existing presentation-approval gate. The sales cockpit's
   // candidate list remains useful in-product, but does not bypass approval here.
-  const packagePreparation = derivePackagePreparation(state, fixes)
+  const packagePreparation = derivePackagePreparation(state, currentFixes)
   const confirmedFixes = packagePreparation.approvedFindings
   const packageItems = new Map(packagePreparation.items.map((item) => [item.findingId, item]))
   const confirmedIssues = confirmedFixes.map((fix) => safeIssue(fix, packageItems.get(fix.id)!))
@@ -160,7 +161,7 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
   const strengths = effectiveCustomerStrengths(state, items)
   const included = packagePreparation.starterItems.map((item) => item.includedScope)
   const hasStarterPackage = packagePreparation.recommendedPackage !== null
-  const packageOffers = deriveEffectivePackageOffers(state, fixes)
+  const packageOffers = deriveEffectivePackageOffers(state, currentFixes)
   const starterOffer = packageOffers.find((offer) => offer.scopeClassification === 'starter')
   const additionalRecommendedWork = packageOffers
     .filter((offer) => offer.scopeClassification === 'separate')

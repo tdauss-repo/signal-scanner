@@ -24,4 +24,4 @@ export function writeStorageJson(storage: Pick<Storage, 'setItem'>, key: string,
 }
 
 export const workspaceStorageFailureMessage = (detail?: string) =>
-  `Found Local could not save this workspace in browser storage. The current page and captured evidence have been preserved. Export Full Scan JSON or remove an older saved workspace before retrying.${detail ? ` (${detail})` : ''}`
+  `Browser storage is full. Your current work remains open, but automatic saving is unavailable. Save this workspace to a local JSON file before closing or refreshing.${detail ? ` (${detail})` : ''}`

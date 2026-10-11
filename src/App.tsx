@@ -28,7 +28,7 @@ import { createIsolatedBusinessWorkspace } from './utils/workspaceIsolation'
 import { buildAuditItems } from './data/auditCatalog'
 import { applyCurrentCatalogMetadata, migrateSystemGeneratedFix } from './utils/catalogMetadata'
 import { defaultProfile } from './data/demoProfile'
-import type { AIAnswerObservation, AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem, PackageCommercialPricing, SavedScanFile, SavedScanRecord, SearchDestinationObservation, SearchVisibilityQuery, VoiceAssistantObservation, VoicePromptTestState } from './types/audit'
+import type { AIAnswerObservation, AIAnswerPlatform, AIAnswerTestState, AuditItem, AuditState, BusinessProfile, CheckStatus, EvidenceConfidence, FixItem, PackageCommercialPricing, SavedScanRecord, SearchDestinationObservation, SearchVisibilityQuery, VoiceAssistantObservation, VoicePromptTestState } from './types/audit'
 import type { ManualWebsiteObservation } from './types/websiteAudit'
 import { aiAnswerPlatforms, numericOverallScoreAreas, overallVisibilityCheckedCount, overallVisibilityScore, scoreItems, trafficStatusForScore } from './utils/scoring'
 import { analyzeBrowserWebsiteObservation, analyzeManualWebsiteObservation, mergeBrowserMappingWithServerPrecedence } from './utils/websiteAutoAudit'
@@ -74,6 +74,7 @@ import { buildPackageScopeOverride, type PackageScopeInput } from './utils/packa
 import { buildCustomerStrengthPresentation, type CustomerStrengthCandidate, type CustomerStrengthInput } from './utils/customerStrengths'
 import { normalizePackagePricingState } from './utils/packagePricing'
 import { recoverRetainedBrandPresenceFromWorkspace } from './utils/brandPresenceWorkspaceRetention'
+import { parseWorkspaceFile, serializeWorkspaceFile, workspaceFilename, workspaceRecordFromState } from './utils/workspaceFile'
 
 const storageKey = 'local-signal-scanner-state'
 const activeViewStorageKey = 'business-scanner-active-view'
@@ -88,16 +89,6 @@ const createId = (prefix: string) =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? `${prefix}-${crypto.randomUUID()}`
     : `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-
-const slugify = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '') || 'untitled-business'
-
-const dateSlug = (value: string) =>
-  new Date(value).toISOString().slice(0, 10)
 
 const cloneAuditState = (state: AuditState): AuditState =>
   JSON.parse(JSON.stringify(state)) as AuditState
@@ -509,32 +500,23 @@ const loadState = (): AuditState => {
   }
 }
 
+// Compatibility boundary for browser-cached workspace records. Explicit file
+// saves use the same workspaceRecordFromState contract below.
 const savedScanFromWorkspace = (
   auditState: AuditState,
   existing?: SavedScanRecord,
 ): SavedScanRecord => {
   const now = new Date().toISOString()
-  const retainedWorkspace = recoverRetainedBrandPresenceFromWorkspace(
+  const retained = recoverRetainedBrandPresenceFromWorkspace(
     auditState,
     Date.parse(now),
     existing?.payload,
   )
-  const payload = cloneAuditState({
-    ...retainedWorkspace,
-    lastUpdated: now,
+  return workspaceRecordFromState(retained, {
+    existing,
+    id: createId('scan'),
+    now,
   })
-
-  return {
-    id: existing?.id ?? createId('scan'),
-    businessName: payload.profile.businessName || 'Untitled business',
-    website: payload.profile.website,
-    localMarket: payload.profile.localMarket || payload.profile.targetLocation,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-    scanDate: payload.lastUpdated,
-    notes: existing?.notes ?? '',
-    payload,
-  }
 }
 
 const normalizeSavedScan = (scan: Partial<SavedScanRecord>): SavedScanRecord => {
@@ -571,36 +553,6 @@ const loadSavedScans = (): SavedScanRecord[] => {
 const loadCurrentScanId = () =>
   localStorage.getItem(currentScanIdStorageKey) ?? ''
 
-const buildSavedScanFile = (scan: SavedScanRecord): SavedScanFile => ({
-  app: 'Found Local Business Scanner Tool',
-  fileType: 'found-local-scan',
-  version: 1,
-  exportedAt: new Date().toISOString(),
-  scan,
-})
-
-const parseImportedScanFile = (text: string): SavedScanRecord | null => {
-  try {
-    const parsed = JSON.parse(text) as Partial<SavedScanFile> | Partial<SavedScanRecord>
-    if (
-      'fileType' in parsed &&
-      parsed.fileType === 'found-local-scan' &&
-      parsed.scan
-    ) {
-      return normalizeSavedScan({
-        ...parsed.scan,
-        id: createId('scan'),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      })
-    }
-  } catch {
-    return null
-  }
-
-  return null
-}
-
 function App() {
   // Always open the internal operator overview, regardless of the persisted Workbench tab.
   const [workbenchOpen, setWorkbenchOpen] = useState(false)
@@ -615,6 +567,8 @@ function App() {
   const [savedScans, setSavedScans] = useState<SavedScanRecord[]>(loadSavedScans)
   const [currentScanId, setCurrentScanId] = useState(loadCurrentScanId)
   const [workspaceSaveNotice, setWorkspaceSaveNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null)
+  const [browserStorageError, setBrowserStorageError] = useState('')
+  const [lastWorkspaceFileKey, setLastWorkspaceFileKey] = useState('')
 
   const auditItems = useMemo(
     () =>
@@ -779,13 +733,19 @@ function App() {
     ? JSON.stringify(normalizeAuditState(currentSavedScan.payload)) !==
       JSON.stringify(auditState)
     : true
+  const workspaceFileKey = useMemo(() => JSON.stringify(auditState), [auditState])
+  const hasUnsavedWorkspaceChanges = !lastWorkspaceFileKey || lastWorkspaceFileKey !== workspaceFileKey
 
   useEffect(() => {
-    writeStorageJson(localStorage, storageKey, recoverRetainedBrandPresenceFromWorkspace(
+    const result = writeStorageJson(localStorage, storageKey, recoverRetainedBrandPresenceFromWorkspace(
       auditState,
       Date.now(),
       currentSavedScan?.payload,
     ))
+    const noticeUpdate = window.setTimeout(() => {
+      setBrowserStorageError(result.ok ? '' : workspaceStorageFailureMessage(result.error))
+    }, 0)
+    return () => window.clearTimeout(noticeUpdate)
   }, [auditState, currentSavedScan])
 
   useEffect(() => {
@@ -1178,18 +1138,18 @@ function App() {
     updateState({ selectedAIPlatform: platform })
   }
 
-  const downloadScanJson = (scan: SavedScanRecord) => {
-    const file = buildSavedScanFile(scan)
-    const blob = new Blob([JSON.stringify(file, null, 2)], {
+  const downloadWorkspaceRecord = (scan: SavedScanRecord) => {
+    const blob = new Blob([serializeWorkspaceFile(scan)], {
       type: 'application/json',
     })
     const anchor = document.createElement('a')
-    anchor.href = URL.createObjectURL(blob)
-    anchor.download = `found-local-scan-${slugify(scan.businessName)}-${dateSlug(
-      scan.scanDate,
-    )}.json`
+    const objectUrl = URL.createObjectURL(blob)
+    anchor.href = objectUrl
+    anchor.download = workspaceFilename(scan)
+    document.body.appendChild(anchor)
     anchor.click()
-    URL.revokeObjectURL(anchor.href)
+    anchor.remove()
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
   }
 
   const saveScanRecord = (record: SavedScanRecord) => {
@@ -1219,6 +1179,57 @@ function App() {
     const notes = window.prompt('Optional notes for this saved scan:', '') ?? ''
     const record = savedScanFromWorkspace(auditState)
     saveScanRecord({ ...record, notes })
+  }
+
+  const saveBusinessProfile = () => {
+    setWorkspaceSaveNotice({
+      kind: 'success',
+      text: 'Business profile saved in the current workspace. Use Save Workspace to create a restorable local file.',
+    })
+  }
+
+  const saveWorkspaceFile = () => {
+    const now = new Date().toISOString()
+    const record = workspaceRecordFromState(auditState, {
+      existing: currentSavedScan,
+      id: currentScanId || createId('workspace'),
+      now,
+    })
+    downloadWorkspaceRecord(record)
+    setAuditState(record.payload)
+    setLastWorkspaceFileKey(JSON.stringify(record.payload))
+    setWorkspaceSaveNotice({ kind: 'success', text: `Workspace saved locally as ${workspaceFilename(record)}.` })
+  }
+
+  const openWorkspaceFile = (file: File) => {
+    const reader = new FileReader()
+    reader.onerror = () => setWorkspaceSaveNotice({ kind: 'error', text: 'Found Local could not read the selected workspace file.' })
+    reader.onload = () => {
+      const parsed = parseWorkspaceFile(String(reader.result ?? ''))
+      if (!parsed.ok) {
+        setWorkspaceSaveNotice({ kind: 'error', text: parsed.error })
+        return
+      }
+      let restored: AuditState
+      try {
+        const imported = normalizeSavedScan(parsed.scan)
+        restored = normalizeAuditState(imported.payload)
+      } catch {
+        setWorkspaceSaveNotice({ kind: 'error', text: 'The selected Found Local workspace is incomplete or contains unsupported data.' })
+        return
+      }
+      websiteRequestGeneration.current += 1
+      setWebsiteAuditLoading(false)
+      setBrowserEvidenceJson('')
+      setBrowserEvidenceImportError('')
+      setWebsiteAuditError('')
+      setCurrentScanId('')
+      setCustomerView('Business')
+      setAuditState(restored)
+      setLastWorkspaceFileKey(JSON.stringify(restored))
+      setWorkspaceSaveNotice({ kind: 'success', text: `Opened workspace for ${restored.profile.businessName || 'Untitled business'}.` })
+    }
+    reader.readAsText(file)
   }
 
   const saveBeforeReplacingWorkspace = () => {
@@ -1298,17 +1309,18 @@ function App() {
 
   const exportSavedScan = (id: string) => {
     const scan = savedScans.find((item) => item.id === id)
-    if (scan) downloadScanJson(scan)
+    if (scan) downloadWorkspaceRecord(scan)
   }
 
   const importSavedScan = (file: File) => {
     const reader = new FileReader()
     reader.onload = () => {
-      const imported = parseImportedScanFile(String(reader.result ?? ''))
-      if (!imported) {
-        window.alert('This does not look like a Found Local scan JSON file.')
+      const parsed = parseWorkspaceFile(String(reader.result ?? ''))
+      if (!parsed.ok) {
+        window.alert(parsed.error)
         return
       }
+      const imported = normalizeSavedScan({ ...parsed.scan, id: createId('scan'), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
       setSavedScans((current) => [imported, ...current])
       window.alert(
         `Imported "${imported.businessName}". It was added to Saved Scans but was not loaded into the current workspace.`,
@@ -2119,11 +2131,14 @@ function App() {
       onSaveStrength={saveCustomerStrength}
       onSavePackageScope={savePackageScope}
       onSavePackagePricing={savePackagePricing}
+      onSaveWorkspace={saveWorkspaceFile}
+      onOpenWorkspace={openWorkspaceFile}
+      workspaceDirty={hasUnsavedWorkspaceChanges}
+      browserStorageError={browserStorageError}
       currentScanId={currentScanId}
-      dirty={hasUnsavedChanges}
       scans={savedScans}
       onProfileChange={updateProfileFromOperator}
-      onSaveCurrent={saveCurrentScan}
+      onSaveCurrent={saveBusinessProfile}
       saveNotice={workspaceSaveNotice}
       onSaveAsNew={saveAsNewScan}
       onLoad={loadSavedScan}

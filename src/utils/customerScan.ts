@@ -365,6 +365,16 @@ export interface CustomerArea {
 const unreviewed: CustomerAreaStatus = 'Not reviewed / Not checked'
 const needsReview = ['not_checked', 'manual_review_needed', 'unable_to_verify']
 
+/** Current candidates come from the latest run's completed evidence. Older
+ * exports without candidate identities retain their legacy workspace behavior. */
+export function currentRunFindings(state: AuditState, fixes: FixItem[]) {
+  const latestRun = state.visibilityRuns?.filter((run) => matchesEvidenceFingerprint(run.profileKey, state.profile)).at(-1)
+  if (!latestRun) return fixes
+  if (visibilityRunStatus(latestRun) === 'running') return []
+  const ids = latestRun.summary?.candidateFindingIds
+  return ids ? fixes.filter((fix) => ids.includes(fix.id)) : fixes
+}
+
 /** Pure projection of the active workspace. Never reads saved scans or changes acquisition/review state. */
 export function summarizeCustomerScan(state: AuditState, items: AuditItem[], fixes: FixItem[], loading = false, scanError = false) {
   const website = items.filter((item) => item.area === 'website')
@@ -396,11 +406,12 @@ export function summarizeCustomerScan(state: AuditState, items: AuditItem[], fix
   const businessReviewed = entity.length + questions.length
   const confirmations = entity.filter((item) => ['Owner confirmation needed', 'Unable to verify'].includes(item.result)).length +
     questions.filter((item) => ['Owner confirmation needed', 'Unable to verify'].includes(item.status)).length
+  const currentFixes = currentRunFindings(state, fixes)
   const findings = sortSalesActions([...new Map(
-    fixes.filter((fix) => isPresentedFinding(state, fix)).map((fix) => [fix.id, { ...fix, reviewed: true }]),
+    currentFixes.filter((fix) => isPresentedFinding(state, fix)).map((fix) => [fix.id, { ...fix, reviewed: true }]),
   ).values()])
   const confirmedIssues = sortSalesActions([...new Map(
-    fixes.filter(canReviewFinding).map((fix) => [fix.id, fix]),
+    currentFixes.filter(canReviewFinding).map((fix) => [fix.id, fix]),
   ).values()])
   const knownFixes = confirmedIssues.filter((fix) => ['starter', 'owner_action'].includes(effectivePackageFit(fix)))
   const cockpitVisibility = salesCockpitVisibility(Object.entries(state.searchDestinationObservations).flatMap(([queryId, destinations]) => Object.values(destinations).filter(Boolean).map((observation) => ({ queryId, observation }))), { profile: state.profile, profileState: state.businessProfile })
@@ -509,7 +520,7 @@ export function summarizeCustomerScan(state: AuditState, items: AuditItem[], fix
     areas, findings, websiteCompleted: completed.length, websiteGood: good,
     confirmationCount: findings.filter((fix) => effectivePackageFit(fix) === 'owner_action').length,
     improvementCount: findings.filter((fix) => effectivePackageFit(fix) !== 'owner_action').length,
-    awaitingReview: fixes.filter((fix) => fix.status !== 'pass' && !isPresentedFinding(state, fix)).length,
+    awaitingReview: currentFixes.filter((fix) => fix.status !== 'pass' && !isPresentedFinding(state, fix)).length,
     cockpit: { confirmedIssues, knownFixes, deeperReview: cockpitVisibility.deeperReview, lookingGood: cockpitVisibility.lookingGood, searchRecommendations: cockpitVisibility.recommended, recommendedPlan },
     snapshot: { overall: snapshotOverall, detail: snapshotDetail, goodSignals, recommendedImprovements: findings.length, areasStillToVerify },
     strengths: {

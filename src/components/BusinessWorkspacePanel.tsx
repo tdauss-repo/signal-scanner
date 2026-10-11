@@ -36,7 +36,7 @@ export function BusinessWorkspacePanel(props: Props) {
   const completeness = profileCompleteness(props.state)
   const profile = completeness.profile
   const identityWarnings = profileProjectionWarnings(props.state)
-  const workspaceState = props.currentScanId ? props.dirty ? 'Unsaved changes' : 'Saved' : 'New workspace'
+  const workspaceState = props.dirty ? 'Unsaved workspace changes' : 'Workspace saved'
   return <div className="business-workspace-grid">
     <section className="business-workspace-switcher" aria-label="Current business workspace">
       <div><span>Workspace</span><strong>{profile.businessName || 'New business'}</strong><small>{workspaceState}</small></div>
@@ -44,7 +44,7 @@ export function BusinessWorkspacePanel(props: Props) {
     </section>
 
     {changingBusiness ? <section className="panel business-workspace-manager">
-      <div className="workspace-manager-actions"><button type="button" onClick={() => { props.onStartBlank(); setChangingBusiness(false) }}>New Business</button><button className="secondary" type="button" onClick={props.onSaveAsNew}>Save as new workspace</button><label className="import-scan-button">Import Full Scan JSON<input accept="application/json,.json" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) props.onImport(file); event.currentTarget.value = '' }} /></label></div>
+      <div className="workspace-manager-actions"><button type="button" onClick={() => { props.onStartBlank(); setChangingBusiness(false) }}>New Business</button><button className="secondary" type="button" onClick={props.onSaveAsNew}>Save to browser workspace list</button><label className="import-scan-button">Import legacy workspace<input accept="application/json,.json" type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) props.onImport(file); event.currentTarget.value = '' }} /></label></div>
       <div className="workspace-compact-list">{props.scans.length ? props.scans.map((scan) => <article className={scan.id === props.currentScanId ? 'workspace-compact-active' : ''} key={scan.id}><div><strong>{scan.businessName || 'Untitled business'}</strong><span>{scan.website || 'No website'} · Updated {formatDate(scan.updatedAt)}</span></div><div><button type="button" onClick={() => { props.onLoad(scan.id); setChangingBusiness(false) }}>{scan.id === props.currentScanId ? 'Use current' : 'Open'}</button><button className="secondary" type="button" onClick={() => props.onDuplicate(scan.id)}>Duplicate</button><button className="secondary" type="button" onClick={() => props.onRename(scan.id)}>Rename</button><button className="secondary" type="button" onClick={() => props.onExport(scan.id)}>Export Full Scan JSON</button><button className="ghost" type="button" onClick={() => props.onDelete(scan.id)}>Delete</button></div></article>) : <p>No saved business workspaces yet.</p>}</div>
     </section> : null}
 
@@ -74,7 +74,7 @@ export function BusinessWorkspacePanel(props: Props) {
         <label className="full-width-label">Known listing URLs<textarea value={profile.existingDirectoryUrls} onChange={updateField(profile, props.onProfileChange, 'existingDirectoryUrls')} /></label>
         <label className="full-width-label">Internal operator note<textarea value={profile.operatorNote} onChange={updateField(profile, props.onProfileChange, 'operatorNote')} /></label>
       </div></details>
-      <div className="business-form-actions"><button type="button" onClick={props.onSaveCurrent}>Save Business</button><button className="customer-primary" type="button" disabled={!completeness.readyToScan} onClick={props.onGoScan}>Continue to Scan →</button></div>
+      <div className="business-form-actions"><button type="button" onClick={props.onSaveCurrent}>Save Business</button><span className="business-save-help">Saves reviewed business details in the open workspace. Save Workspace creates the restorable JSON file.</span><button className="customer-primary" type="button" disabled={!completeness.readyToScan} onClick={props.onGoScan}>Continue to Scan →</button></div>
       {props.saveNotice ? <p className={`business-save-notice business-save-notice-${props.saveNotice.kind}`} role="status">{props.saveNotice.text}</p> : null}
     </section>
   </div>
