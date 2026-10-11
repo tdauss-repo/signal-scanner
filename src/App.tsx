@@ -514,8 +514,13 @@ const savedScanFromWorkspace = (
   existing?: SavedScanRecord,
 ): SavedScanRecord => {
   const now = new Date().toISOString()
+  const retainedWorkspace = recoverRetainedBrandPresenceFromWorkspace(
+    auditState,
+    Date.parse(now),
+    existing?.payload,
+  )
   const payload = cloneAuditState({
-    ...auditState,
+    ...retainedWorkspace,
     lastUpdated: now,
   })
 
@@ -776,8 +781,12 @@ function App() {
     : true
 
   useEffect(() => {
-    writeStorageJson(localStorage, storageKey, auditState)
-  }, [auditState])
+    writeStorageJson(localStorage, storageKey, recoverRetainedBrandPresenceFromWorkspace(
+      auditState,
+      Date.now(),
+      currentSavedScan?.payload,
+    ))
+  }, [auditState, currentSavedScan])
 
   useEffect(() => {
     writeStorageText(localStorage, activeViewStorageKey, activeView)

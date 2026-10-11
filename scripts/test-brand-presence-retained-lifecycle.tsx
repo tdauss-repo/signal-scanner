@@ -27,9 +27,9 @@ import { projectSalesVisibility, salesCockpitVisibility } from '../src/utils/sal
 import { normalizeWebsiteAuditWorkspaceState } from '../src/utils/websiteAuditState.ts'
 import { normalizeWorkspaceProfile } from '../src/utils/workspaceProfile.ts'
 
-const now = Date.parse('2026-10-04T12:00:00.000Z')
-const verifiedAt = new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString()
-const currentAt = new Date(now - 60 * 60 * 1000).toISOString()
+const verifiedAt = '2026-10-05T16:00:00.000Z'
+const currentAt = '2026-10-11T15:00:00.000Z'
+const now = Date.parse('2026-10-11T16:00:00.000Z')
 const profile = normalizeWorkspaceProfile({
   businessName: 'Montessori Center of Downriver', primaryCategory: 'Montessori school',
   secondaryCategories: 'Preschool, Kindergarten', website: 'http://www.montessoridownriver.com/',
@@ -117,33 +117,38 @@ const loadedRunN = recoverRetainedBrandPresenceFromWorkspace(JSON.parse(JSON.str
 
 const unavailableAssessment = (): SearchEntityAssessment => ({
   matches: [], confidence: 'unavailable', automaticObservation: false, visibilityResult: 'unavailable', operatorReviewRequired: true,
-  resultRegionInspected: false, ambiguityReasons: ['Provider unavailable.'], blocker: 'runtime_unavailable', tier3Candidate: false,
+  resultRegionInspected: false, ambiguityReasons: ['Provider unavailable.'], blocker: 'network_failure', tier3Candidate: false,
 })
 const noMatchAssessment = (): SearchEntityAssessment => ({
   matches: [], confidence: 'low', automaticObservation: false, visibilityResult: 'review_required', operatorReviewRequired: true,
   resultRegionInspected: true, ambiguityReasons: ['No sufficient match.'], blocker: 'no_match', tier3Candidate: false,
 })
-const ambiguousCandidates = [
-  candidate('mary-place-one', { name: profile.businessName, website: profile.website, placeIdentity: 'place-one' }),
-  candidate('mary-place-two', { name: profile.businessName, website: profile.website, placeIdentity: 'place-two' }),
-]
 const current = {
-  'Google Search': observation('Google Search', assessed('Google Search', ambiguousCandidates), currentAt, 'run-n1-google'),
-  'Google Maps': observation('Google Maps', unavailableAssessment(), currentAt, 'run-n1-maps'),
+  'Google Search': observation('Google Search', assessed('Google Search', [matchedCandidate('run-n1-google-mary')]), currentAt, 'run-n1-google'),
+  'Google Maps': observation('Google Maps', assessed('Google Maps', [matchedCandidate('run-n1-maps-mary')]), currentAt, 'run-n1-maps'),
   'Bing Search': observation('Bing Search', noMatchAssessment(), currentAt, 'run-n1-bing'),
   DuckDuckGo: observation('DuckDuckGo', unavailableAssessment(), currentAt, 'run-n1-ddg'),
 } satisfies Partial<Record<SearchDestination, SearchDestinationObservation>>
 for (const destination of ['Apple Maps', 'Yelp', 'Facebook', 'Instagram'] as const) current[destination] = unresolved(destination) as never
+current['Bing Search'].automation!.captures[0].blocker = 'no_match'
+current.DuckDuckGo.automation!.captures[0] = {
+  ...current.DuckDuckGo.automation!.captures[0],
+  outcome: 'failed', confidence: 'unavailable', resultRegionInspected: false, blocker: 'network_failure',
+  error: 'Fixture network failure.',
+}
 
-assert.equal(current['Google Search'].automation?.assessment?.blocker, 'multiple_entities')
-assert.equal(assessmentHasTrueMaterialIdentityConflict(current['Google Search'].automation?.assessment), false,
-  'multiple plausible candidates without a same-entity identifier mismatch are inconclusive, not a true conflict')
+assert.equal(assessmentHasTrueMaterialIdentityConflict(current['Bing Search'].automation?.assessment), false,
+  'a generic no-match result is inconclusive, not a true identity conflict')
 
 // Run N+1 and the second restart keep the latest acquisition technical truth
 // while projecting each valid recent fact.
 const runNPlusOne = structuredClone(loadedRunN)
 runNPlusOne.searchDestinationObservations['search-brand-canonical'] = current
-const afterRunNPlusOne = recoverRetainedBrandPresenceFromWorkspace(runNPlusOne, now)
+delete runNPlusOne.brandPresenceLastKnownVerified
+for (const latest of Object.values(runNPlusOne.searchDestinationObservations['search-brand-canonical'])) {
+  if (latest) delete latest.retainedBrandVerification
+}
+const afterRunNPlusOne = recoverRetainedBrandPresenceFromWorkspace(runNPlusOne, now, loadedRunN)
 const reloaded = recoverRetainedBrandPresenceFromWorkspace(JSON.parse(JSON.stringify(afterRunNPlusOne)) as AuditState, now)
 for (const destination of supported) {
   const latest = reloaded.searchDestinationObservations['search-brand-canonical'][destination]!
@@ -151,16 +156,20 @@ for (const destination of supported) {
   assert.equal(projectSalesVisibility(latest, {
     profile: reloaded.profile, profileState: reloaded.businessProfile, now,
     googleSearchObservation: reloaded.searchDestinationObservations['search-brand-canonical']['Google Search'],
-  }).state, 'verified_recent', `${destination}: second save/reload restores verified_recent`)
+  }).state, ['Bing Search', 'DuckDuckGo'].includes(destination) ? 'verified_recent' : 'verified_correct',
+  `${destination}: second save/reload projects the expected effective state`)
   assert(reloaded.brandPresenceLastKnownVerified?.[brandPresenceRetainedKey(destination)], `${destination}: bounded fact survives second save`)
 }
-assert.equal(reloaded.searchDestinationObservations['search-brand-canonical']['Google Search']?.automation?.assessment?.blocker, 'multiple_entities')
 assert.equal(reloaded.searchDestinationObservations['search-brand-canonical']['Bing Search']?.automation?.assessment?.blocker, 'no_match')
+assert.equal(reloaded.searchDestinationObservations['search-brand-canonical']['Bing Search']?.automation?.captures[0].outcome, 'success')
+assert.equal(reloaded.searchDestinationObservations['search-brand-canonical'].DuckDuckGo?.automation?.assessment?.blocker, 'network_failure')
+assert.equal(reloaded.searchDestinationObservations['search-brand-canonical'].DuckDuckGo?.automation?.captures[0].outcome, 'failed')
 
 const records = allDestinations.map((destination) => ({ queryId: 'search-brand-canonical', observation: reloaded.searchDestinationObservations['search-brand-canonical'][destination]! }))
 const cockpit = salesCockpitVisibility(records, { profile: reloaded.profile, profileState: reloaded.businessProfile, now })
 assert.deepEqual(new Set(cockpit.lookingGood.map((item) => item.destination)), new Set(supported), 'four automatic destinations remain primary candidates')
 assert.deepEqual(new Set(cockpit.deeperReview.map((item) => item.destination)), new Set(['Apple Maps', 'Yelp', 'Facebook', 'Instagram']), 'only assisted destinations remain neutral')
+assert.equal(`${cockpit.lookingGood.length} primary candidates · ${cockpit.deeperReview.length} neutral destinations`, '4 primary candidates · 4 neutral destinations')
 const review = buildCustomerVisibilityReviewExport(reloaded, [], [])
 for (const destination of supported) {
   assert.equal(review.needsReview.includes(destination), false, `${destination}: excluded from needsReview`)
@@ -175,8 +184,11 @@ for (const internal of ['brandPresenceLastKnownVerified', 'retainedBrandVerifica
 const directFreshMaps = projectSalesVisibility(fresh['Google Maps']!, { profile, profileState, now, googleSearchObservation: fresh['Google Search'] })
 assert.equal(directFreshMaps.state, 'verified_correct')
 assert.equal(directFreshMaps.derivedGoogleMapsVerification, undefined)
-const recentDirectMaps = projectSalesVisibility(reloaded.searchDestinationObservations['search-brand-canonical']['Google Maps']!, {
-  profile, profileState, now, googleSearchObservation: reloaded.searchDestinationObservations['search-brand-canonical']['Google Search'],
+const recentDirectMapsWorkspace = structuredClone(loadedRunN)
+recentDirectMapsWorkspace.searchDestinationObservations['search-brand-canonical']['Google Maps'] = observation('Google Maps', unavailableAssessment(), currentAt, 'maps-recent')
+const recentDirectMapsState = recoverRetainedBrandPresenceFromWorkspace(recentDirectMapsWorkspace, now)
+const recentDirectMaps = projectSalesVisibility(recentDirectMapsState.searchDestinationObservations['search-brand-canonical']['Google Maps']!, {
+  profile, profileState, now, googleSearchObservation: recentDirectMapsState.searchDestinationObservations['search-brand-canonical']['Google Search'],
 })
 assert.equal(recentDirectMaps.state, 'verified_recent')
 assert.equal(recentDirectMaps.derivedGoogleMapsVerification, undefined)
@@ -184,8 +196,11 @@ const neutralMaps = observation('Google Maps', unavailableAssessment(), currentA
 const derivedFresh = projectSalesVisibility(neutralMaps, { profile, profileState, now, googleSearchObservation: fresh['Google Search'] })
 assert.equal(derivedFresh.state, 'verified_correct')
 assert.equal(derivedFresh.derivedGoogleMapsVerification?.freshness, 'fresh')
+const recentGoogleWorkspace = structuredClone(loadedRunN)
+recentGoogleWorkspace.searchDestinationObservations['search-brand-canonical']['Google Search'] = observation('Google Search', unavailableAssessment(), currentAt, 'google-recent')
+const recentGoogleState = recoverRetainedBrandPresenceFromWorkspace(recentGoogleWorkspace, now)
 const derivedRecent = projectSalesVisibility(neutralMaps, {
-  profile, profileState, now, googleSearchObservation: reloaded.searchDestinationObservations['search-brand-canonical']['Google Search'],
+  profile, profileState, now, googleSearchObservation: recentGoogleState.searchDestinationObservations['search-brand-canonical']['Google Search'],
 })
 assert.equal(derivedRecent.state, 'verified_recent')
 assert.equal(derivedRecent.derivedGoogleMapsVerification?.freshness, 'recent')
@@ -226,7 +241,13 @@ materialChange.businessProfile.values.phone = { value: '313-555-0100', source: '
 const afterMaterialChange = recoverRetainedBrandPresenceFromWorkspace(materialChange, now)
 for (const destination of supported) assert.equal(afterMaterialChange.brandPresenceLastKnownVerified?.[brandPresenceRetainedKey(destination)], undefined, `${destination}: material identity change invalidates`)
 
-const expired = recoverRetainedBrandPresenceFromWorkspace(reloaded, Date.parse(verifiedAt) + BRAND_PRESENCE_EVIDENCE_FRESHNESS_MS + 1)
+const expiringWorkspace = structuredClone(loadedRunN)
+for (const destination of supported) {
+  expiringWorkspace.searchDestinationObservations['search-brand-canonical'][destination] = observation(
+    destination, unavailableAssessment(), currentAt, `expired-${brandPresenceRetainedKey(destination)}`,
+  )
+}
+const expired = recoverRetainedBrandPresenceFromWorkspace(expiringWorkspace, Date.parse(verifiedAt) + BRAND_PRESENCE_EVIDENCE_FRESHNESS_MS + 1)
 for (const destination of supported) {
   assert.equal(expired.brandPresenceLastKnownVerified?.[brandPresenceRetainedKey(destination)], undefined, `${destination}: seven-day expiry is enforced`)
   assert.equal(projectSalesVisibility(expired.searchDestinationObservations['search-brand-canonical'][destination]!, {
@@ -260,6 +281,9 @@ const legacyGoogle: RetainedBrandAutomaticVerification = {
   automation: structuredClone(freshGoogle.automation!),
 }
 legacyGoogleWorkspace.brandPresenceLastKnownVerified = undefined
+legacyGoogleWorkspace.searchDestinationObservations['search-brand-canonical']['Google Search'] = observation(
+  'Google Search', unavailableAssessment(), currentAt, 'legacy-google-current',
+)
 legacyGoogleWorkspace.searchDestinationObservations['search-brand-canonical']['Google Search']!.retainedGoogleVerification = legacyGoogle
 legacyGoogleWorkspace.searchDestinationObservations['search-brand-canonical']['Google Search']!.retainedBrandVerification = undefined
 const migratedGoogle = recoverRetainedBrandPresenceFromWorkspace(legacyGoogleWorkspace, now)
@@ -270,5 +294,7 @@ const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8
 const loadSource = appSource.slice(appSource.indexOf('const loadState ='), appSource.indexOf('const savedScanFromWorkspace'))
 assert.match(loadSource, /recoverRetainedBrandPresenceFromWorkspace/)
 assert.doesNotMatch(loadSource, /runVisibilityScan|acquireGoogle|acquireBing|acquireDuck|fetch\(/, 'workspace load performs no external acquisition')
+const saveSource = appSource.slice(appSource.indexOf('const savedScanFromWorkspace'), appSource.indexOf('const normalizeSavedScan'))
+assert.match(saveSource, /recoverRetainedBrandPresenceFromWorkspace\([\s\S]*existing\?\.payload/, 'Save reconciles against the prior saved payload before overwriting it')
 
-console.log('Shared Brand Presence retained lifecycle PASS: four-destination Run N/Run N+1 persistence, ambiguity/conflict distinction, Maps precedence/derivation, expiry, identity/operator invalidation, migration, strengths, needsReview, and no load-time acquisition.')
+console.log('Shared Brand Presence retained lifecycle PASS: real Oct. 5/Oct. 11 two-save lifecycle, prior-payload preservation, latest Bing no-match and DuckDuckGo network failure, four neutral destinations, Maps precedence/derivation, expiry, identity/operator invalidation, migration, strengths, needsReview, and no load-time acquisition.')
