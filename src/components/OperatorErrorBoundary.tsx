@@ -10,14 +10,14 @@ export class OperatorErrorBoundary extends Component<Props, State> {
   static getDerivedStateFromError(): State { return { failed: true } }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('Found Local operator UI failed to render.', error, info)
+    console.error('Street & Signal operator UI failed to render.', error, info)
   }
 
   render() {
     if (this.state.failed) return <main className="operator-failure" role="alert">
-      <h1>Found Local could not display this workspace.</h1>
+      <h1>Street &amp; Signal could not display this workspace.</h1>
       <p>Captured browser data has not been intentionally cleared. Reload the application, then review the saved workspace or export before retrying the scan.</p>
-      <button type="button" onClick={() => window.location.reload()}>Reload Found Local</button>
+      <button type="button" onClick={() => window.location.reload()}>Reload Business Scanner Tool</button>
     </main>
     return this.props.children
   }

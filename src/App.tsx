@@ -21,6 +21,7 @@ import { VoiceReadinessPanel } from './components/VoiceReadinessPanel'
 import { SalesReadinessPanel } from './components/SalesReadinessPanel'
 import { CustomerScanView } from './components/CustomerScanView'
 import { CustomerFindingReview } from './components/CustomerFindingReview'
+import { StreetSignalMark } from './components/StreetSignalMark'
 import { buildCustomerFindingRefinement, canReviewFinding, customerReviewKey, effectiveCustomerFindingWording, isPresentedFinding, reconfirmCustomerFinding } from './utils/customerScan'
 import type { CustomerFindingWording, CustomerView } from './utils/customerScan'
 import { normalizeWorkspaceProfile } from './utils/workspaceProfile'
@@ -229,26 +230,6 @@ const navIconPaths: Record<ActiveView, React.ReactNode> = {
       <path d="M19 12a7.3 7.3 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a8 8 0 0 0-1.7-1L14.5 3h-5l-.3 3.1a8 8 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.5a7.3 7.3 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 1.7 1l.3 3.1h5l.3-3.1a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2-1.5a7.3 7.3 0 0 0 .1-1z" />
     </>
   ),
-}
-
-function FoundLocalMark() {
-  return (
-    <svg viewBox="0 0 48 48" aria-hidden="true" className="found-local-mark">
-      <path
-        d="M10 34c7-14 20-8 27-22"
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="3"
-      />
-      <path
-        d="M31 15c0-5 4-9 9-9s9 4 9 9c0 7-9 15-9 15s-9-8-9-15z"
-        transform="scale(.72) translate(16 0)"
-      />
-      <path d="m14 8 1.6 3.2 3.4.5-2.5 2.4.6 3.4L14 16l-3.1 1.6.6-3.4L9 11.7l3.4-.5z" />
-      <circle cx="10" cy="34" r="3" />
-    </svg>
-  )
 }
 
 function ScannerToolMark() {
@@ -1203,7 +1184,7 @@ function App() {
 
   const openWorkspaceFile = (file: File) => {
     const reader = new FileReader()
-    reader.onerror = () => setWorkspaceSaveNotice({ kind: 'error', text: 'Found Local could not read the selected workspace file.' })
+    reader.onerror = () => setWorkspaceSaveNotice({ kind: 'error', text: 'Street & Signal could not read the selected workspace file.' })
     reader.onload = () => {
       const parsed = parseWorkspaceFile(String(reader.result ?? ''))
       if (!parsed.ok) {
@@ -1215,7 +1196,7 @@ function App() {
         const imported = normalizeSavedScan(parsed.scan)
         restored = normalizeAuditState(imported.payload)
       } catch {
-        setWorkspaceSaveNotice({ kind: 'error', text: 'The selected Found Local workspace is incomplete or contains unsupported data.' })
+        setWorkspaceSaveNotice({ kind: 'error', text: 'The selected Business Scanner Tool workspace is incomplete or contains unsupported data.' })
         return
       }
       websiteRequestGeneration.current += 1
@@ -1896,7 +1877,7 @@ function App() {
                   </span>
                   {browserWebsiteObservation.recordedAt ? (
                     <span>
-                      Recorded in Found Local:{' '}
+                      Recorded in Business Scanner Tool:{' '}
                       {new Date(browserWebsiteObservation.recordedAt).toLocaleString()}
                     </span>
                   ) : null}
@@ -2156,11 +2137,11 @@ function App() {
       <aside className="sidebar">
         <div className="brand-block">
           <div className="brand-mark">
-            <FoundLocalMark />
+            <StreetSignalMark />
           </div>
           <div>
-            <strong>Found Local</strong>
-            <span>Helping local businesses get found.</span>
+            <strong>Street &amp; Signal</strong>
+            <span>Helping local businesses get found in search, maps, and AI.</span>
           </div>
         </div>
 
@@ -2212,7 +2193,7 @@ function App() {
       <main className="dashboard-main">
         <header className="main-header">
           <div>
-            <h1>Found Local Workbench</h1>
+            <h1>Business Scanner Tool</h1>
             <p>
               {auditState.profile.businessName} | scanned{' '}
               {new Date(auditState.lastUpdated).toLocaleString()}

@@ -98,7 +98,7 @@ function FindingCard({ state, fix, allowRefinement, onReview, onSaveRefinement, 
         <label>Customer-facing title<input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
         <label>Priority<select value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value as FixItem['priority'] })}><option>High</option><option>Medium</option><option>Low</option></select></label>
         <label>Why it matters / customer summary<textarea value={draft.summary} onChange={(event) => setDraft({ ...draft, summary: event.target.value })} /></label>
-        <label>Recommended Found Local action<textarea value={draft.recommendedAction} onChange={(event) => setDraft({ ...draft, recommendedAction: event.target.value })} /></label>
+        <label>Recommended Street &amp; Signal action<textarea value={draft.recommendedAction} onChange={(event) => setDraft({ ...draft, recommendedAction: event.target.value })} /></label>
         <div className="directory-actions"><button type="button" onClick={() => { onSaveRefinement(fix, draft); setEditing(false) }}>Save refinement</button><button className="secondary" type="button" onClick={() => setEditing(false)}>Cancel</button></div>
       </div> : <dl className="customer-wording-summary">
         <div><dt>Priority</dt><dd>{effective.priority}</dd></div>

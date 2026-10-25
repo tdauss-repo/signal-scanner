@@ -57,7 +57,7 @@ function PackageScopeCard({ item, fix, onSave, reconciliation = false }: { item:
   return <article className="fix-item package-scope-item">
     <div className="fix-title-cell"><p className="fix-area">{reconciliation ? 'Scope needing reconfirmation' : 'Approved finding'}</p><h3>{item.finding}</h3>{reconciliation ? <span className="method-pill">Previous scope</span> : item.overridden ? <span className="method-pill">Operator scope</span> : <span className="method-pill">Derived default</span>}</div>
     {!editing ? <>
-      <div className="fix-table-cell"><strong>What Found Local will do</strong><p>{item.remediationAction}</p></div>
+      <div className="fix-table-cell"><strong>What Street &amp; Signal will do</strong><p>{item.remediationAction}</p></div>
       <div className="fix-table-cell"><strong>Scope classification</strong><p>{scopeLabels[item.scopeClassification]}</p></div>
       <div className="fix-table-cell"><strong>Package assignment</strong><p>{item.packageAssignment}</p></div>
       <div className="fix-table-cell"><strong>Included scope</strong><span className="customer-small">Customer-facing package inclusion</span><p>{item.includedScope}</p></div>
@@ -69,7 +69,7 @@ function PackageScopeCard({ item, fix, onSave, reconciliation = false }: { item:
       <label>Scope classification<select value={scopeClassification} onChange={(event) => changeClassification(event.target.value as PackageScopeClassification)}><option value="starter">Included in Starter</option><option value="separate">Separate scope</option><option value="customer_action">Customer / third-party action required</option><option value="not_included">Not included</option></select></label>
       <label>Package assignment<select value={assignment} onChange={(event) => setAssignment(event.target.value as PackageAssignmentChoice)}>{scopeClassification === 'starter' ? <option>Starter Visibility Cleanup</option> : scopeClassification === 'separate' ? <option>Custom / separate project</option> : <option>None</option>}</select></label>
       {assignment === 'Custom / separate project' ? <label>Custom package name<input value={customAssignment} placeholder="Custom / separate project" onChange={(event) => setCustomAssignment(event.target.value)} /></label> : null}
-      <label className="full-width-label">What Found Local will do<textarea value={deliveryDescription} onChange={(event) => setDeliveryDescription(event.target.value)} /></label>
+      <label className="full-width-label">What Street &amp; Signal will do<textarea value={deliveryDescription} onChange={(event) => setDeliveryDescription(event.target.value)} /></label>
       <label className="full-width-label">Included scope <span>Customer-facing package inclusion shown under what is included in the package.</span><input value={includedScope} onChange={(event) => setIncludedScope(event.target.value)} /></label>
       <label className="full-width-label">Internal scope note <span>(operator-only)</span><textarea value={internalNote} onChange={(event) => setInternalNote(event.target.value)} /></label>
       <div className="package-scope-actions"><button type="button" onClick={save}>Save scope</button><button className="secondary" type="button" onClick={() => setEditing(false)}>Cancel</button></div>

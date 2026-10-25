@@ -152,7 +152,7 @@ const reopened = JSON.parse(JSON.stringify(state)) as AuditState
 assert.equal(activePackageScopeOverride(reopened, secure)?.includedScope, 'Website hosting modernization and migration')
 
 const panelSource = readFileSync(new URL('../src/components/PackagePreparationPanel.tsx', import.meta.url), 'utf8')
-for (const control of ['Edit scope', 'Scope classification', 'Package assignment', 'What Found Local will do', 'Included scope', 'Internal scope note', 'Save scope', 'Cancel']) assert(panelSource.includes(control), `${control} must remain available in Package Preparation`)
+for (const control of ['Edit scope', 'Scope classification', 'Package assignment', 'What Street &amp; Signal will do', 'Included scope', 'Internal scope note', 'Save scope', 'Cancel']) assert(panelSource.includes(control), `${control} must remain available in Package Preparation`)
 assert.equal(panelSource.includes('H-Sphere'), false, 'production UI contains no Montessori-specific hosting logic')
 
 console.log('Package scope override PASS: defaults, approved-only edits, separate scope, customer-safe delivery, stale invalidation, saved compatibility, Starter isolation, v1 export, and Montessori fixture.')

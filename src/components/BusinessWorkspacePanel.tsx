@@ -51,7 +51,7 @@ export function BusinessWorkspacePanel(props: Props) {
     {identityWarnings.length ? <section className="customer-review-warnings business-identity-warning"><strong>Confirm the current business identity</strong><ul>{identityWarnings.map((warning) => <li key={warning}>{warning}</li>)}</ul><button type="button" onClick={() => props.onProfileChange(profile)}>Confirm reviewed facts</button></section> : null}
 
     <section className="panel business-unified-form">
-      <div className="business-form-heading"><div><p className="eyebrow">Business</p><h1>{profile.businessName ? 'Business details' : 'Tell Found Local what you know about this business.'}</h1><p>Enter known facts once. Reviewed values remain the source for scanning, interpretation, package preparation, and customer output.</p></div><span className={`profile-status profile-status-${completeness.readyToScan ? 'ready' : 'review'}`}>{completeness.readyToScan ? 'Ready to scan' : 'Needs basic business information'}</span></div>
+      <div className="business-form-heading"><div><p className="eyebrow">Business</p><h1>{profile.businessName ? 'Business details' : 'Tell Street & Signal what you know about this business.'}</h1><p>Enter known facts once. Reviewed values remain the source for scanning, interpretation, package preparation, and customer output.</p></div><span className={`profile-status profile-status-${completeness.readyToScan ? 'ready' : 'review'}`}>{completeness.readyToScan ? 'Ready to scan' : 'Needs basic business information'}</span></div>
       <div className="business-primary-fields form-grid">
         <label>Business name<input autoFocus={!profile.businessName} value={profile.businessName} onChange={updateField(profile, props.onProfileChange, 'businessName')} /></label>
         <label>Website<input value={profile.website} onChange={updateField(profile, props.onProfileChange, 'website')} /></label>
@@ -62,8 +62,8 @@ export function BusinessWorkspacePanel(props: Props) {
         <label>Phone<input value={profile.phone} onChange={updateField(profile, props.onProfileChange, 'phone')} /></label>
         <label className="full-width-label">Primary category / business type<input value={profile.primaryCategory} onChange={updateField(profile, props.onProfileChange, 'primaryCategory')} /></label>
       </div>
-      {!profile.primaryCategory.trim() ? <p className="business-required-message" role="status">Primary category is required before scanning so Found Local can interpret results for the correct type of local business.</p> : null}
-      <details className="business-secondary-details"><summary>Additional business context</summary><p>These reviewed details help Found Local interpret local visibility in the right business context.</p><div className="form-grid">
+      {!profile.primaryCategory.trim() ? <p className="business-required-message" role="status">Primary category is required before scanning so Street & Signal can interpret results for the correct type of local business.</p> : null}
+      <details className="business-secondary-details"><summary>Additional business context</summary><p>These reviewed details help Street & Signal interpret local visibility in the right business context.</p><div className="form-grid">
         <label>Secondary categories<textarea value={profile.secondaryCategories} onChange={updateField(profile, props.onProfileChange, 'secondaryCategories')} /></label>
         <label>Programs / services<textarea value={profile.primaryServices} onChange={updateField(profile, props.onProfileChange, 'primaryServices')} /></label>
         <label>Local market<input value={profile.localMarket} onChange={updateField(profile, props.onProfileChange, 'localMarket')} /></label>
