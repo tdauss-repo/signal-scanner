@@ -56,6 +56,8 @@ export interface ScanDependencies {
   /** Brand Google Search override; explicit general test/runtime overrides still win when omitted. */
   googleBrandOperationTimeoutMs?: number
   overallTimeoutMs?: number
+  /** Injectable recording clock; timeout behavior continues to use the runtime clock. */
+  runClock?: { wallNow(): number; monotonicNow(): number }
 }
 
 export interface ApplicationVisibilityScanDependencies extends ScanDependencies {
@@ -229,8 +231,19 @@ export function mergeAutomatedObservation(
 /** One runner shared by customer, Workbench and proving CLI. Every progress transition follows real work. */
 export async function runVisibilityScan(initial: AuditState, dependencies: ScanDependencies, onUpdate: (update: StateUpdate) => void = () => undefined): Promise<VisibilityRun> {
   const enhanced = dependencies.automationVersion === 2
-  const startedAt = new Date().toISOString()
+  const wallNow = () => dependencies.runClock?.wallNow() ?? Date.now()
+  const monotonicNow = () => dependencies.runClock?.monotonicNow() ?? (typeof performance === 'undefined' ? Date.now() : performance.now())
+  const startedWallTime = wallNow()
+  const startedMonotonicTime = monotonicNow()
+  const startedAt = new Date(startedWallTime).toISOString()
   const run: VisibilityRun = { version: enhanced ? 2 : 1, ...(enhanced ? { profileReviewKey: evidenceFingerprint(initial.businessProfile) } : {}), id: `visibility-${startedAt}-${Math.random().toString(36).slice(2, 8)}`, profileKey: scanProfileKey(initial.profile), startedAt, status: 'running', checks: [], businessEvidence: [] }
+  const finishRunTiming = () => {
+    if (run.endedAt) return run.endedAt
+    run.endedAt = new Date(Math.max(startedWallTime, wallNow())).toISOString()
+    const elapsedMs = monotonicNow() - startedMonotonicTime
+    run.elapsedMs = Number.isFinite(elapsedMs) ? Math.max(0, Math.round(elapsedMs)) : undefined
+    return run.endedAt
+  }
   const profile = structuredClone(initial.profile)
   let state = structuredClone(initial)
   const deadline = Date.now() + Math.max(1, dependencies.overallTimeoutMs ?? defaultOverallTimeoutMs)
@@ -640,7 +653,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
     machine.state = machine.evidenceCaptured ? 'evidence_captured' : 'not_checked'
     end(machine)
   }
-  run.endedAt = new Date().toISOString()
+  finishRunTiming()
   run.status = run.checks.some((item) => ['failed', 'interactive_review_required', 'not_checked'].includes(item.state)) ? 'completed_with_review' : 'completed'
   const candidateFindings = website.evidenceCaptured ? workspaceFindings(state)
     .filter((fix) => ['website', 'ai_geo_readiness'].includes(fix.sourceArea || '') &&
@@ -663,7 +676,7 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
   return run
   } catch (error) {
     if (!alive()) return run
-    const endedAt = new Date().toISOString()
+    const endedAt = finishRunTiming()
     const message = error instanceof Error ? error.message : String(error)
     run.checks.forEach((item) => {
       if (item.state === 'scanning') {
@@ -676,7 +689,6 @@ export async function runVisibilityScan(initial: AuditState, dependencies: ScanD
         item.error = 'This check did not begin before the scan stopped.'
       }
     })
-    run.endedAt = endedAt
     run.status = 'failed'
     run.failure = message
     run.summary = {

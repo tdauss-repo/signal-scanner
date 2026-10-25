@@ -45,6 +45,8 @@ export interface VisibilityRun {
   profileKey: string
   startedAt: string
   endedAt?: string
+  /** Monotonic elapsed execution time. Optional for historical workspace compatibility. */
+  elapsedMs?: number
   /** Optional for saved-scan compatibility; derived from timestamps when absent. */
   status?: VisibilityRunStatus
   failure?: string

@@ -17,11 +17,11 @@
   padding-left: 40px;
   padding-right: 40px;
 }
-.customer-header { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 16px; padding-top: 16px; padding-bottom: 16px; }
-.customer-brand { display: flex; align-items: center; gap: 14px; }
-.customer-brand > div { display: flex; align-items: baseline; gap: 9px; }
-.customer-brand strong { font-size: 19px; letter-spacing: -.4px; }
-.customer-brand > div > span { color: var(--customer-muted); font-size: 12px; padding-left: 9px; border-left: 1px solid #bccdc5; }
+.customer-header { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, auto) auto auto; align-items: center; gap: 16px; padding-top: 16px; padding-bottom: 16px; }
+.customer-brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.customer-brand-copy { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
+.customer-brand-wordmark { flex: 0 0 auto; white-space: nowrap; font-size: 19px; letter-spacing: -.4px; }
+.customer-product-name { color: var(--customer-muted); font-size: 12px; padding-left: 9px; border-left: 1px solid #bccdc5; white-space: nowrap; }
 .customer-brand-mark { --street-signal-grid: #0b2d5b; display: block; width: 38px; height: 38px; flex: 0 0 38px; padding: 3px; border: 1px solid #d7e0eb; border-radius: 10px; background: #faf9f6; }
 .customer-header-context { display: flex; align-items: center; gap: 10px; color: var(--customer-muted); font-size: 12px; }
 .customer-header-context span { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -81,6 +81,10 @@
 .operator-scan-card { padding: 24px; border: 1px solid #d8e3dc; border-radius: 14px; background: #fff; box-shadow: 0 3px 20px #163b2808; }
 .operator-scan-card h3 { margin: 5px 0 8px; font-size: 24px; }
 .operator-scan-card > p:not(.customer-eyebrow) { color: var(--customer-muted); font-size: 13px; }
+.operator-scan-timing { display: grid; grid-template-columns: minmax(110px, .6fr) minmax(180px, 1fr); gap: 10px; margin: 18px 0 10px; }
+.operator-scan-timing div { padding: 10px 12px; border-radius: 9px; background: #f3f6f2; }
+.operator-scan-timing dt { color: var(--customer-muted); font-size: 10px; text-transform: uppercase; letter-spacing: .7px; }
+.operator-scan-timing dd { margin: 2px 0 0; color: var(--customer-ink); font-size: 13px; font-weight: 750; }
 .operator-scan-card .customer-primary { margin-top: 12px; }
 .operator-area-list { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .operator-area-list > div { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 9px; background: #f3f6f2; }
@@ -284,12 +288,12 @@
 .customer-qa-readiness { display: flex; justify-content: space-between; gap: 20px; padding: 16px 22px; font-size: 13px; }
 .customer-qa-readiness-ready { color: #17653c; background: #e5f5eb; }
 .customer-qa-readiness-not-ready { color: #7a5315; background: #fff4d8; }
-@media (max-width: 1000px) {
+@media (max-width: 1160px) {
   .customer-area-grid { grid-template-columns: repeat(2, 1fr); }
   .customer-scan-hero { grid-template-columns: minmax(200px, .8fr) 1.3fr; }.customer-scan-breakout { grid-column: 1 / -1; grid-template-columns: repeat(4, 1fr); }.customer-fix-package { grid-template-columns: 1fr 1fr; }.customer-fix-package button { grid-column: 1 / -1; justify-self: start; }
   .operator-workflow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .customer-readiness { grid-template-columns: 1fr; }.customer-readiness dl { grid-template-columns: repeat(4, 1fr); }
-  .customer-header { grid-template-columns: 1fr auto; }.customer-header-context { grid-column: 1 / -1; grid-row: 2; }.customer-workspace-actions { grid-column: 1 / 2; grid-row: 3; }
+  .customer-header { grid-template-columns: minmax(0, 1fr) auto; }.customer-header-context { grid-column: 1 / -1; grid-row: 2; }.customer-workspace-actions { grid-column: 1 / -1; grid-row: 3; }.customer-shell .customer-workbench { grid-column: 2; grid-row: 1; }
 }
 @media (max-width: 640px) {
   .operator-primary-nav { grid-template-columns: repeat(2, 1fr); }
@@ -307,11 +311,14 @@
   .workspace-compact-list article > div:last-child { justify-content: flex-start; }
   .profile-completeness-list > div { grid-template-columns: 1fr; }
   .customer-header, .customer-nav, .customer-content, .customer-footer { padding-left: 20px; padding-right: 20px; }
-  .customer-header { align-items: flex-start; gap: 12px; }
+  .customer-header { grid-template-columns: minmax(0, 1fr); align-items: flex-start; gap: 12px; }
   .customer-workspace-actions, .customer-next-actions, .workspace-storage-warning { align-items: stretch; flex-direction: column; }
-  .customer-brand > div { display: grid; gap: 0; }.customer-brand > div > span { padding: 0; border: 0; }
+  .customer-brand-copy { display: grid; gap: 0; }.customer-product-name { padding: 0; border: 0; }
   .customer-brand-mark { display: none; }
-  .customer-shell .customer-workbench { font-size: 11px; padding: 8px 10px; }
+  .customer-header-context, .customer-workspace-actions, .customer-shell .customer-workbench { grid-column: 1; }
+  .customer-header-context { grid-row: 3; flex-wrap: wrap; }
+  .customer-workspace-actions { grid-row: 4; }
+  .customer-shell .customer-workbench { grid-row: 2; justify-self: start; font-size: 11px; padding: 8px 10px; }
   .customer-context-label { display: none; }
   .customer-nav { gap: 0; }
   .customer-shell .customer-nav button { font-size: 13px; }
@@ -322,6 +329,7 @@
   .customer-review-export { align-items: flex-start; flex-direction: column; gap: 8px; }.customer-review-export > div:last-of-type { gap: 14px; }
   .operator-workflow { grid-template-columns: 1fr 1fr; }.operator-scan-grid, .operator-area-list { grid-template-columns: 1fr; }.customer-readiness { padding: 20px; }.customer-readiness dl { grid-template-columns: 1fr 1fr; }.customer-readiness-actions { align-items: stretch; flex-direction: column; gap: 4px; }.customer-readiness-actions .customer-text-button { text-align: left; }
   .customer-snapshot-counts > div, .customer-snapshot-counts > div:first-child { border: 0; padding: 0; }
+  .operator-scan-timing { grid-template-columns: 1fr; }
   .customer-area-grid, .customer-finding-details, .customer-results-path ol { grid-template-columns: 1fr; }
   .customer-strength-card { grid-template-columns: 1fr; }
   .customer-strength-source { padding-right: 0; padding-bottom: 14px; border-right: 0; border-bottom: 1px solid #e1e8e2; }

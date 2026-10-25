@@ -15,6 +15,7 @@ import { packagePricingKey } from '../src/utils/packagePricing.ts'
 import { normalizeSalesReadiness } from '../src/utils/salesReadiness.ts'
 import { defaultSearchDestinationObservation } from '../src/utils/searchVisibility.ts'
 import { normalizeWebsiteAuditWorkspaceState } from '../src/utils/websiteAuditState.ts'
+import { formatVisibilityRunDuration, restoreVisibilityRuns } from '../src/utils/visibilityScanState.ts'
 import { buildWorkspaceFile, parseWorkspaceFile, serializeWorkspaceFile, workspaceFilename, workspaceRecordFromState } from '../src/utils/workspaceFile.ts'
 import { normalizeWorkspaceProfile } from '../src/utils/workspaceProfile.ts'
 
@@ -63,7 +64,7 @@ let state: AuditState = {
   voicePromptTests: {}, voiceAssistantObservations: [], directories: { activeRows: [], ignoredSuggestionIds: [] }, manualFixes: fixes,
   salesReadiness: normalizeSalesReadiness(undefined, profile), visibilityRuns: [{
     version: 2, id: 'run-oct-11', profileKey: evidenceFingerprint(profile), startedAt: '2026-10-11T17:30:00.000Z', endedAt: scanAt,
-    status: 'completed_with_review', checks: [], businessEvidence: [], summary: {
+    elapsedMs: 240_000, status: 'completed_with_review', checks: [], businessEvidence: [], summary: {
       attempted: 12, successful: 10, evidenceCaptured: 10, operatorReview: 4, interactiveReview: 2,
       manualInterventionsRequired: 2, acquisitionFailures: 1, providerEscalations: 0,
       candidateFindings: 4, candidateFindingIds: fixes.map((fix) => fix.id), customerApprovedFindings: 0,
@@ -122,6 +123,8 @@ const restored = recoverRetainedBrandPresenceFromWorkspace(opened.scan.payload a
 
 assert.equal(restored.profile.businessName, profile.businessName)
 assert.equal(restored.visibilityRuns?.at(-1)?.endedAt, scanAt)
+assert.equal(restored.visibilityRuns?.at(-1)?.elapsedMs, 240_000)
+assert.equal(formatVisibilityRunDuration(restored.visibilityRuns?.at(-1)?.elapsedMs), '4m 0s')
 assert.equal(restored.visibilityRuns?.at(-1)?.summary?.candidateFindingIds?.length, 4)
 assert.equal(restored.customerFindingReviews && Object.keys(restored.customerFindingReviews).length, 4)
 assert.equal(restored.customerFindingRefinements?.['website-location']?.title, 'Clear Southgate identity')
@@ -133,7 +136,18 @@ const customerReview = buildCustomerVisibilityReviewExport(restored, [], fixes)
 assert.equal(customerReview.recommendedPackage.price?.display, '$499 one-time')
 assert.equal(customerReview.additionalRecommendedWork?.[0].price?.display, '$349 one-time')
 assert.equal(customerReview.pricingSummary?.initialTotal?.display, '$848 one-time')
-assert(serializeCustomerVisibilityReview(customerReview).includes('Clear Southgate identity'))
+const serializedCustomerReview = serializeCustomerVisibilityReview(customerReview)
+assert(serializedCustomerReview.includes('Clear Southgate identity'))
+assert(!serializedCustomerReview.includes('elapsedMs'), 'Customer Review JSON excludes operator scan duration')
+assert(!serializedCustomerReview.includes('visibilityRuns'), 'Customer Review JSON excludes operator run history')
+
+const persistedVisibilityRun = restored.visibilityRuns?.at(-1)
+assert(persistedVisibilityRun)
+const historicalRun = structuredClone(persistedVisibilityRun)
+delete historicalRun.elapsedMs
+const restoredHistoricalRun = restoreVisibilityRuns([historicalRun])?.[0]
+assert.equal(restoredHistoricalRun?.elapsedMs, undefined, 'historical workspaces remain valid without elapsed timing')
+assert.equal(formatVisibilityRunDuration(restoredHistoricalRun?.elapsedMs), 'Not recorded')
 
 assert.equal(parseWorkspaceFile(JSON.stringify({ ...buildWorkspaceFile(record, scanAt), version: 99 })).ok, false)
 assert.equal(parseWorkspaceFile('{broken').ok, false)
