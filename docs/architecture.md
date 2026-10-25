@@ -2,23 +2,29 @@
 
 ## Document Authority
 
-[`FOUND_LOCAL_DOCTRINE.md`](FOUND_LOCAL_DOCTRINE.md) governs product strategy,
+[`STREET_SIGNAL_DOCTRINE.md`](STREET_SIGNAL_DOCTRINE.md) governs current product strategy,
 scope, operator/customer boundaries, service design, and prioritization. This
 document is the implementation Source of Truth: it records current architecture,
 workflow, constraints, and operational state. When implementation conflicts
 with doctrine, the conflict must be surfaced as follow-up work rather than
 silently changing the doctrine.
 
+[`FOUND_LOCAL_DOCTRINE.md`](FOUND_LOCAL_DOCTRINE.md) is a preserved historical
+pre-rebrand reference. It is not the current naming authority.
+
 ## Overview
-The current repository contains Found Local's private/internal Business Scanner
+The current repository contains Street & Signal's private internal Business Scanner
 Tool, built with React, TypeScript, Vite, and a small Express API. It supports
 operator-managed business profiles, bounded evidence acquisition, findings
 review, customer-finding approval, package preparation, saved operational state,
 and a sanitized Customer Visibility Review JSON export.
 
-The scanner is not the external customer-presentation surface. Found Local
-Sites consumes the reviewed customer-safe JSON contract and presents the
-Customer Visibility Review. Scanner/provider/debug evidence remains internal.
+Street & Signal is a service-led business, not a public scanner SaaS. The
+scanner is not the public website or external customer-presentation surface.
+It produces the reviewed customer-safe JSON handoff, while the public Street &
+Signal website and customer-facing review presentation remain separate from
+this repository. No external Lovable Customer Review JSON loader is implemented
+or implied here. Scanner, provider, and debug evidence remains internal.
 
 ## Current Stack
 - Frontend: React 19 with TypeScript
@@ -36,11 +42,14 @@ The product follows a bounded handoff architecture:
    - Prepares packages and customer-safe exports
 
 2. API layer
-   - Supports bounded, authorized acquisition
+   - Automatically scans only customer-entered or otherwise authorized websites
+   - Supports bounded third-party observations under their existing provider,
+     evidence, and verification restrictions
    - Returns structured evidence without redefining finding truth
 
-3. Customer Visibility Review / Sites
-   - Receives sanitized Customer Visibility Review JSON
+3. External Customer Review presentation
+   - May receive sanitized Customer Visibility Review JSON through a separately
+     implemented integration
    - Presents strengths, confirmed issues, local relevance, and recommended work
    - Does not receive raw provider, matcher, capture, or operator-only data
 
@@ -107,8 +116,10 @@ Review → Verification`:
    an approved finding to Starter, separate scope, customer/third-party action,
    or no proposed scope, records delivery-planning detail, and optionally
    refines the concise customer-facing Included scope label. The detailed
-   `Found Local will` action remains owned by the effective Review wording and
-   is not overwritten by Package fields. Overrides are bound to the finding evidence identity;
+   customer action, displayed as `Street & Signal will`, remains owned by the
+   effective Review wording and is stored under the retained
+   `foundLocalAction` contract property. It is not overwritten by Package
+   fields. Overrides are bound to the finding evidence identity;
    stale overrides cannot enter active package scope. Previous scope remains
    visible in a separate reconciliation queue until the current finding and
    its delivery scope are reconfirmed. Snapshot-backed decisions also keep a
@@ -128,8 +139,8 @@ Review → Verification`:
    scope. The version 1.0 contract keeps Starter line items in
    `recommendedPackage.included`; separate assignments use each approved
    issue's existing customer-safe package label and delivery-action fields, so
-   separate work is not misrepresented as Starter scope. Additive optional
-   `confirmedIssues[].foundLocalAction` comes from Review while
+   separate work is not misrepresented as Starter scope. The retained v1.0
+   `confirmedIssues[].foundLocalAction` property comes from Review while
    `recommendedPackage.included[]` comes from Package; editing either concept
    never rewrites the other. Additive optional pricing fields carry the exact operator-entered offer without changing the
    version 1.0 customer contract or requiring historical workspaces to invent a
@@ -137,10 +148,33 @@ Review → Verification`:
 6. **Verification** records completed outcomes only after execution and a
    follow-up check.
 
-Found Local Sites then renders the external Customer Visibility Review. The
-Workbench remains available as a secondary internal evidence/configuration
-surface. Legacy Business Profile and Settings routes remain compatibility
-details and are hidden from normal navigation.
+The public Street & Signal website and customer-facing review presentation are
+separate implementation concerns. This repository ends at the JSON handoff and
+does not contain a Lovable Customer Review loader. The Workbench remains
+available as a secondary internal evidence/configuration surface. Legacy
+Business Profile and Settings routes remain compatibility details and are
+hidden from normal navigation.
+
+## Compatibility Boundaries
+
+The Street & Signal brand transition does not redefine persisted or exported
+contracts:
+
+- Customer Review `reviewVersion: "1.0"` remains supported.
+- `confirmedIssues[].foundLocalAction` remains the legacy field name while its
+  newly generated value may use Street & Signal wording.
+- `business.websitePreview.imageUrl` is optional; exports without an image
+  remain valid.
+- Workspace envelope `fileType`, `app`, and version identifiers are preserved.
+- LocalStorage keys, provider IDs, finding IDs, evidence fingerprints, approval
+  identity, reconciliation, and verification behavior are preserved.
+- Legacy Found Local workspaces remain importable regardless of exported
+  filename. Historical Customer Review JSON remains valid under the v1.0
+  contract; the scanner does not provide a Customer Review JSON import path.
+- Historical operator-authored customer wording is not silently rewritten.
+
+New Customer Review and workspace downloads use Street & Signal filenames, but
+the JSON structure and compatibility identifiers remain unchanged.
 
 ## Design Principles
 - Keep the operator workflow efficient and evidence-preserving
@@ -155,7 +189,7 @@ details and are hidden from normal navigation.
 Package pricing is operator-controlled proposal and presentation metadata. It
 does not influence evidence, finding truth, approval, verification, customer
 wording identity, package-scope classification, or any reconciliation
-fingerprint. Prices are not global Found Local defaults; each workspace records
+fingerprint. Prices are not global Street & Signal defaults; each workspace records
 only the commercial terms the operator intentionally enters for that customer.
 
 Internal amounts use integer cents and the bounded v1 currency `USD`. A price
@@ -171,7 +205,7 @@ many approved findings it includes. Active separate-scope assignments are
 grouped by their concise customer package name and may each carry their own
 one-time price, optional recurring price, customer-facing pricing note, and
 operator-only internal note. Customer/third-party action and not-included scope
-do not create a Found Local price. If separate scope leaves the offer, its price
+do not create a Street & Signal price. If separate scope leaves the offer, its price
 does not contribute; the keyed terms may be reused if the same material package
 identity is restored.
 
@@ -186,10 +220,10 @@ from the same customer-safe projection. Version 1.0 keeps its existing fields
 and adds optional package price, additional recommended work, and pricing
 summary fields. Exported amounts use customer-readable dollar values and
 display strings; cents storage, pricing state keys, and internal pricing notes
-never cross the customer boundary or Sites handoff.
+never cross the customer JSON boundary.
 
 Missing pricing produces an operator warning rather than blocking Ready for
-Customer Presentation. This allows Found Local to review or present approved
+Customer Presentation. This allows Street & Signal to review or present approved
 scope before commercial terms are finalized while making the omission clear.
 No subscription billing, payment processing, or invoicing is part of this
 model.
@@ -701,7 +735,7 @@ customer JSON.
 
 ### Facebook Brand Presence verification
 
-Facebook Brand Presence is profile-URL first. Found Local never constructs or
+Facebook Brand Presence is profile-URL first. The Business Scanner Tool never constructs or
 guesses a Facebook handle from a business name. It first looks for an explicit
 public Facebook URL in the latest successful first-party website audit, then
 in current automatically verified search evidence whose candidate name matches
@@ -748,7 +782,7 @@ specific public route and one-approved-redirect policy.
 ### Instagram Brand Presence verification
 
 Instagram Brand Presence follows the same profile-URL-first architecture as
-Facebook. Found Local never derives or guesses an Instagram handle from a
+Facebook. The Business Scanner Tool never derives or guesses an Instagram handle from a
 business name. It discovers only an explicit public Instagram profile link in
 the latest successful first-party website audit, in current automatically
 verified search evidence whose candidate name matches the reviewed business,
@@ -803,7 +837,7 @@ JSON.
 Facebook and Instagram are candidates for a future authenticated operator-
 assisted verification layer using the operator's normal logged-in browser
 context. That future capability would sit above the current bounded public
-acquisition layer and is not implemented. Found Local stores no Meta
+acquisition layer and is not implemented. The Business Scanner Tool stores no Meta
 credentials and performs no automated login. No guessed handles are permitted
 in either the public or future operator-assisted flow.
 
@@ -953,9 +987,11 @@ identity, provider details, fingerprints, provenance internals, and acquisition
 history remain outside Customer Visibility Review JSON.
 
 ## Deployment Considerations
-The internal scanner and bounded API may be operated separately from Found
-Local Sites. The customer-safe JSON contract is the handoff boundary; direct
-exposure of scanner state is not required.
+The internal scanner and bounded API operate separately from the public Street
+& Signal website and customer-facing review presentation. The customer-safe
+JSON contract is the handoff boundary; direct exposure of scanner state is not
+required. Any external loader or presentation integration must be implemented
+and validated separately.
 
 ## Evolution Path
 The current scanner can evolve through stronger local-intent evidence,

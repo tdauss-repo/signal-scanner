@@ -2,6 +2,11 @@
 
 **Effective date:** 2026-09-22
 
+> **Legacy historical document.** This doctrine records the pre-rebrand Found
+> Local product direction and is preserved without a naming rewrite. The
+> current authority is [`STREET_SIGNAL_DOCTRINE.md`](STREET_SIGNAL_DOCTRINE.md).
+> Historical brand language, decisions, and examples below remain intentional.
+
 > This document governs Found Local product direction, feature prioritization,
 > operator/customer boundaries, service design, and competitive evaluation.
 > When older project documentation conflicts with this doctrine, this doctrine

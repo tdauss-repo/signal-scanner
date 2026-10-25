@@ -1,190 +1,125 @@
-# Found Local Branding Direction
+# Street & Signal Brand Direction
 
-## Brand name
+## Authority and status
 
-**Found Local**
+This document is the current identity and visual-language source of truth for
+Street & Signal and the internal Business Scanner Tool.
 
-## Tagline
+The business name, tagline, internal product name, logo direction, and palette
+below are approved. The customer-facing headline and journey are marketing
+language under consideration; they are not required application fields and
+must not be hardcoded across scanner screens or exports.
 
-**Helping local businesses get found in search, maps, and AI.**
+## Approved identity
 
-## Product / tool name
+**Business brand:** Street & Signal
 
-**Business Scanner Tool**
+**Tagline:** Helping local businesses get found in search, maps, and AI.
 
-## Brand purpose
+**Internal application:** Business Scanner Tool
 
-Found Local helps small, local, owner-operated businesses identify and fix the practical visibility gaps that keep customers from finding them online. The service focuses on search, maps, business listings, website SEO clarity, AI answer visibility, and action-oriented cleanup packages.
+Street & Signal is a service-led local visibility business. It helps locally
+operated businesses identify, prioritize, correct, and verify practical
+visibility gaps. It is not positioned as a public self-service scanner SaaS.
 
-The Business Scanner Tool is the internal audit and sales tool used to run pre-call scans, identify gaps, show evidence during customer conversations, and recommend starter cleanup or monitoring packages.
+The Business Scanner Tool is the private operator application used to manage
+reviewed business information, acquire bounded evidence, approve findings,
+prepare packages, export customer-safe JSON, and support verification.
 
-## Target customer
+## Established workflow and doctrine
 
-Primary target customers are local service businesses and small owner-operated companies that may not have strong technical or marketing support. Many may have incomplete listings, inconsistent business information, weak local SEO signals, outdated website content, limited reviews, or poor visibility in search/maps/AI answers.
+The operator workflow is:
 
-The brand should feel approachable, practical, and helpful rather than overly technical.
+**Business → Scan → Review → Package → Customer Review → Verification**
 
-## Preferred logo directions
+The operating doctrine is:
 
-### Concept 2 — Business Scanner Tool icon direction
+**Find → Prove → Explain → Fix → Verify**
 
-Use Concept 2 as inspiration for the internal scanner/tool icon.
+These are established product concepts, not optional marketing copy.
 
-Visual idea:
+## Marketing language under consideration
 
-- Magnifying glass
-- Map/local grid
-- Location pin
-- Check mark
-- Search/audit/verification feel
-- Communicates scan, diagnosis, and fix
+**Customer-facing positioning:** Help More Local Customers Find Your Business.
 
-Best use cases:
+**Customer journey:** Get Found → Build Trust → Get Contacted
 
-- Business Scanner Tool icon
-- Dashboard/sidebar icon
-- Audit/report scan visuals
-- Small UI favicon-style mark
+This language may guide future public-site and customer-presentation work, but
+it is not yet a required Customer Review JSON field. It must not alter scan
+logic, evidence interpretation, package calculations, or verification behavior.
 
-Interpretation:
+## Approved logo direction
 
-This concept represents the act of scanning a business presence and confirming whether the business is findable, accurate, and ready for customer discovery.
+The approved mark combines:
 
-### Concept 4 — Primary Found Local brand direction
+- a precise street-grid or intersection motif;
+- a bright-blue location pin; and
+- restrained signal-green arcs.
 
-Use Concept 4 as the preferred primary Found Local brand direction.
+The mark should communicate local place, signal visibility, and practical
+guidance. It should remain recognizable at favicon and sidebar sizes. Use the
+shared React/SVG implementation for scanner UI rather than maintaining divergent
+marks.
 
-Visual idea:
+Avoid robot heads, generic AI brains, neon/cyberpunk styling, or imagery that
+implies a public software platform.
 
-- Local route/path
-- Location pin
-- Star/found marker
-- Path or route leading to visibility
-- Friendly local-business feel
-- Less technical than a pure AI/software mark
+## Approved palette
 
-Best use cases:
+| Role | Color | Hex |
+| --- | --- | --- |
+| Primary foundation | Deep navy | `#0B2D5B` |
+| Search/location accent | Bright blue | `#2563EB` |
+| Signal/success accent | Signal green | `#22C55E` |
+| Primary light surface | Warm off-white | `#FAF9F6` |
 
-- Found Local primary logo
-- Customer-facing reports
-- Proposals
-- Future website/landing page
-- Social/profile branding
-
-Interpretation:
-
-This concept represents helping a local business become easier to find. The route/path suggests guidance, the pin suggests local presence, and the star/found marker suggests being discovered.
+Issue, warning, review, and verified-status colors retain their semantic
+meaning. The brand palette does not turn every status into a brand color.
 
 ## Brand hierarchy
 
-Use this hierarchy in the UI and future materials:
+1. **Street & Signal** — service and business brand
+2. **Business Scanner Tool** — internal operator application
+3. **Customer Review** — reviewed customer-safe presentation and JSON handoff
+4. **Starter Visibility Cleanup** — bounded initial implementation package
 
-1. **Found Local** = service/business brand
-2. **Business Scanner Tool** = internal scanner/audit tool
-3. **Starter Visibility Cleanup** = initial one-time cleanup offer
-4. **Monthly Visibility Monitoring** = future recurring monitoring offer
-5. **Website SEO Implementation** = future larger implementation/upsell offer
+The public Street & Signal website and customer-facing review presentation are
+separate from this scanner repository. The scanner produces the JSON contract;
+this repository does not contain or claim an implemented Lovable JSON loader.
 
-Example usage:
+## Voice and visual character
 
-**Found Local**  
-*Helping local businesses get found in search, maps, and AI.*
+Use language and presentation that are:
 
-**Business Scanner Tool**  
-Internal visibility audit and sales tool.
+- clear, practical, and evidence-led;
+- approachable to a local business owner;
+- professional without enterprise-software jargon;
+- careful about uncertainty and verification; and
+- focused on useful action rather than scores or promises.
 
-## Recommended visual style
+Useful phrases include “get found,” “fix visibility gaps,” “search, maps, and
+AI,” “business information cleanup,” and “verify the result.” Explain technical
+terms when they are necessary.
 
-The visual direction should be:
+Do not claim guaranteed rankings, guaranteed AI recommendations, direct control
+of third-party platforms, or completed remediation before verification.
 
-- Clean
-- Friendly
-- Professional
-- Local-business approachable
-- Practical rather than futuristic
-- Clear enough for non-technical business owners
-- Polished enough for customer-facing reports and sales conversations
+## Compatibility and historical identity
 
-## Color direction
+The Street & Signal transition changed visible operator branding, newly
+generated customer wording, and new export filenames. It did not rename
+compatibility identifiers.
 
-Recommended palette direction:
+In particular:
 
-- Deep navy or slate blue for trust and professionalism
-- Bright blue for search/technology accent
-- Soft green for found/success/positive status
-- Warm off-white or light gray backgrounds
-- Red/yellow/green/gray status colors for audit traffic-light states
+- Customer Review `reviewVersion: "1.0"` remains supported.
+- `confirmedIssues[].foundLocalAction` remains the legacy property name.
+- Workspace envelope identifiers, LocalStorage keys, provider IDs, finding IDs,
+  and evidence fingerprints remain stable.
+- Historical Found Local workspaces, Customer Review JSON, operator-authored
+  wording, proving records, and acceptance artifacts are not rewritten.
+- `business.websitePreview.imageUrl` is optional and is not fabricated when no
+  screenshot source exists.
 
-Avoid overly neon, cyberpunk, or high-contrast AI styles.
-
-## Typography direction
-
-Use modern, readable, business-friendly sans-serif typography.
-
-The brand should feel closer to a practical local marketing consultancy than a futuristic AI startup.
-
-## Avoid
-
-Avoid these visual and messaging directions:
-
-- Robot heads
-- Generic AI brain icons
-- Neon purple AI clichés
-- Cyber/security-looking marks
-- Overly technical language
-- Enterprise SaaS jargon
-- Claims that Found Local can directly “add keywords” to ChatGPT, Siri, Alexa, Gemini, or other AI/search platforms
-
-## Messaging principles
-
-Use clear, practical language:
-
-- “Get found”
-- “Fix visibility gaps”
-- “Search, maps, and AI”
-- “Business listing cleanup”
-- “Website SEO clarity”
-- “AI answer accuracy”
-- “Local search visibility”
-
-Avoid technical-first language unless needed:
-
-- “Generative engine optimization”
-- “Entity graph optimization”
-- “Schema implementation” without explanation
-- “SERP automation” in customer-facing copy
-
-## Core customer-facing message
-
-Found Local helps local businesses get found in search, maps, and AI by identifying practical visibility gaps and fixing the highest-impact items first.
-
-## Internal tool positioning
-
-The Business Scanner Tool is used internally to:
-
-- Run pre-call scans
-- Review website SEO signals
-- Generate search visibility evidence links
-- Guide listings verification
-- Test AI answer visibility using prompts
-- Identify potential fixes
-- Build an action plan
-- Recommend starter cleanup, monthly monitoring, or website implementation services
-
-## Logo implementation guidance for prototype
-
-For the current app prototype, do not require final logo assets yet.
-
-Use a simple inline SVG or placeholder mark inspired by Concept 4:
-
-- Route/path shape
-- Location pin
-- Small star/found marker
-
-If a secondary icon is needed for the Business Scanner Tool, use a simple mark inspired by Concept 2:
-
-- Magnifying glass
-- Check mark
-- Map/grid reference
-
-Do not attempt to recreate the generated concepts exactly. Use them as visual inspiration for a clean placeholder mark until final logo assets are created.
+These retained identifiers describe compatibility, not the current business
+brand.

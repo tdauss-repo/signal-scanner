@@ -1,25 +1,62 @@
 # Business Scanner Tool
 
-Business Scanner Tool v02 is Found Local's private/internal operator system for preparing local visibility work. Its primary workflow is Business → Scan → Review → Package → Customer Review → Verification. Operators work in an isolated business workspace, run available checks, review evidence, approve customer findings, prepare a bounded package, and export a sanitized Customer Visibility Review JSON payload.
+Business Scanner Tool is Street & Signal's private internal operator application
+for preparing local visibility work.
 
-The Business Scanner Tool is not the polished customer-presentation surface. The current handoff is: reviewed scanner state → customer-safe JSON → Found Local Sites → customer presentation and sales conversation.
+**Street & Signal**
+*Helping local businesses get found in search, maps, and AI.*
+
+Its established workflow is **Business → Scan → Review → Package → Customer
+Review → Verification**. Operators work in an isolated business workspace, run
+available checks, review evidence, approve customer findings, prepare a bounded
+package, and export a sanitized Customer Visibility Review JSON payload.
+
+Street & Signal is a service-led business, not a public scanner SaaS. The
+Business Scanner Tool is not the public website or the polished customer
+presentation. The repository currently owns the reviewed customer-safe JSON
+export boundary; the public Street & Signal website and customer-facing review
+presentation are separate. This repository does not implement or imply an
+external Lovable Customer Review JSON loader.
 
 ## Document Authority
 
-- [`docs/FOUND_LOCAL_DOCTRINE.md`](docs/FOUND_LOCAL_DOCTRINE.md) governs product strategy, scope, boundaries, service design, and prioritization.
+- [`docs/STREET_SIGNAL_DOCTRINE.md`](docs/STREET_SIGNAL_DOCTRINE.md) governs current product strategy, scope, boundaries, service design, and prioritization.
 - [`docs/architecture.md`](docs/architecture.md) is the current implementation Source of Truth for architecture, workflow, constraints, and operational state.
+- [`docs/branding/branding.md`](docs/branding/branding.md) governs approved identity, visual language, and the distinction between approved and proposed marketing language.
+- [`docs/FOUND_LOCAL_DOCTRINE.md`](docs/FOUND_LOCAL_DOCTRINE.md) is retained as a historical pre-rebrand doctrine.
 
 If implementation drifts from the doctrine, record and address the conflict; do not change the doctrine silently to match implementation.
 
-The app keeps third-party platform checks manual with generated evidence links. It does not scrape Google, Apple, Bing, Yelp, Facebook, Instagram, ChatGPT, Gemini, Claude, Perplexity, Copilot, or Grok.
+Automatic first-party website auditing is limited to the website entered by the
+customer or otherwise authorized for scanning. Third-party destination
+observations use only the bounded acquisition routes documented in the
+architecture; their provider, verification, evidence, and uncertainty rules
+remain in force. Acquisition failure is neutral and is never proof of absence.
 
 ## What Runs Locally
 
 - React + TypeScript frontend with localStorage persistence
-- Small Node/Express API for an authorized customer website scan
-- One backend endpoint: `POST /api/audit-website`
+- Small Node/Express API for authorized website acquisition and bounded
+  third-party observations
 
-The website auto-audit fetches only the business website URL entered in the intake form. It analyzes the homepage only and checks signals such as title, meta description, headings, visible text, phone matches, service phrases, service-area phrases, JSON-LD schema, FAQ indicators, contact links, social links, sitemap.xml, and robots.txt.
+The website auto-audit fetches only the authorized business website URL entered
+in the intake form. It analyzes the homepage and bounded supporting files and
+checks signals such as title, meta description, headings, visible text, phone
+matches, service phrases, service-area phrases, JSON-LD schema, FAQ indicators,
+contact links, social links, sitemap.xml, and robots.txt.
+
+## Compatibility Boundaries
+
+Customer Review exports remain JSON-driven. Version `1.0` is supported, and
+`confirmedIssues[].foundLocalAction` remains the legacy contract property even
+though newly generated wording uses Street & Signal. The optional
+`business.websitePreview.imageUrl` field may be absent.
+
+Workspace envelope identifiers, LocalStorage keys, provider IDs, and evidence
+fingerprints intentionally retain their established values. Legacy Found Local
+workspace files remain importable regardless of filename, and historical
+Customer Review JSON remains valid under the v1.0 contract. The scanner does
+not import Customer Review JSON.
 
 ## Install
 
