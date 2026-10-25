@@ -30,6 +30,8 @@ import { normalizeWorkspaceProfile } from '../src/utils/workspaceProfile.ts'
 const verifiedAt = '2026-10-05T16:00:00.000Z'
 const currentAt = '2026-10-11T15:00:00.000Z'
 const now = Date.parse('2026-10-11T16:00:00.000Z')
+const runtimeNow = Date.now
+Date.now = () => now
 const profile = normalizeWorkspaceProfile({
   businessName: 'Montessori Center of Downriver', primaryCategory: 'Montessori school',
   secondaryCategories: 'Preschool, Kindergarten', website: 'http://www.montessoridownriver.com/',
@@ -297,4 +299,5 @@ assert.doesNotMatch(loadSource, /runVisibilityScan|acquireGoogle|acquireBing|acq
 const saveSource = appSource.slice(appSource.indexOf('const savedScanFromWorkspace'), appSource.indexOf('const normalizeSavedScan'))
 assert.match(saveSource, /recoverRetainedBrandPresenceFromWorkspace\([\s\S]*existing\?\.payload/, 'Save reconciles against the prior saved payload before overwriting it')
 
+Date.now = runtimeNow
 console.log('Shared Brand Presence retained lifecycle PASS: real Oct. 5/Oct. 11 two-save lifecycle, prior-payload preservation, latest Bing no-match and DuckDuckGo network failure, four neutral destinations, Maps precedence/derivation, expiry, identity/operator invalidation, migration, strengths, needsReview, and no load-time acquisition.')
