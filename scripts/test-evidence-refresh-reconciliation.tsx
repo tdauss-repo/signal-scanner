@@ -103,6 +103,11 @@ const unchangedFindings = [unchangedSecure, local, schema, description]
 for (const finding of unchangedFindings) assert.equal(isPresentedFinding(unchanged, finding), true, `${finding.id} approval survives a semantically identical rescan`)
 assert.equal(activeCustomerFindingRefinement(unchanged, unchangedSecure)?.recommendedAction, wording.recommendedAction)
 assert.equal(activePackageScopeOverride(unchanged, unchangedSecure)?.packageAssignment, 'Website Hosting Modernization & Migration')
+assert.equal(
+  buildCustomerVisibilityReviewExport(unchanged, [], unchangedFindings).confirmedIssues.find((issue) => issue.id === unchangedSecure.id)?.foundLocalAction,
+  wording.recommendedAction,
+  'a saved operator-authored Found Local action remains unchanged after the brand transition',
+)
 let preparation = derivePackagePreparation(unchanged, unchangedFindings)
 assert.equal(preparation.starterItems.length, 3)
 assert.equal(preparation.separateScopeItems.length, 1)

@@ -243,7 +243,7 @@ export function ReportView({
         <div className="customer-report">
           <header className="report-hero panel">
             <div>
-              <p className="eyebrow">Found Local</p>
+              <p className="eyebrow">Street &amp; Signal</p>
               <h1>Local Visibility Snapshot</h1>
               <p>Helping local businesses get found in search, maps, and AI.</p>
             </div>

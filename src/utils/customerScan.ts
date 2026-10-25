@@ -167,10 +167,10 @@ export const defaultCustomerFindingWording = (fix: FixItem, state?: AuditState):
       ? `The homepage includes some local context, but it could connect the ${noun} more clearly to its primary location or community.`
       : `The homepage does not currently make the ${noun}'s primary location or market clear enough for nearby customers and search or AI systems.`,
     recommendedAction: model === 'physical_location'
-      ? 'Found Local will clarify the physical location and community served and make the public address easier to verify.'
+      ? 'Street & Signal will clarify the physical location and community served and make the public address easier to verify.'
       : model === 'service_area'
-        ? 'Found Local will clarify the cities and areas served using accurate, natural homepage language.'
-        : 'Found Local will clarify the business location or local market using accurate homepage language.',
+        ? 'Street & Signal will clarify the cities and areas served using accurate, natural homepage language.'
+        : 'Street & Signal will clarify the business location or local market using accurate homepage language.',
   }
   if (fix.id === 'website-service-pages') return {
     title: model === 'physical_location' ? 'Programs and offerings visibility' : 'Services visibility',
@@ -178,13 +178,13 @@ export const defaultCustomerFindingWording = (fix: FixItem, state?: AuditState):
     summary: fix.status === 'partial'
       ? `The website shows some ${model === 'physical_location' ? 'program or offering' : 'service'} information, but the path from the homepage could be clearer.`
       : `The homepage does not clearly show where customers can learn about the ${model === 'physical_location' ? 'programs or offerings' : 'services'} available. This does not prove that dedicated pages are missing.`,
-    recommendedAction: `Found Local will review the existing ${model === 'physical_location' ? 'program or offering' : 'service'} pages and strengthen homepage links or summary wording where needed.`,
+    recommendedAction: `Street & Signal will review the existing ${model === 'physical_location' ? 'program or offering' : 'service'} pages and strengthen homepage links or summary wording where needed.`,
   }
   if (fix.id === 'website-schema') return {
     title: `Help search and AI understand your ${noun}`,
     priority: fix.priority,
     summary: `Search engines and AI tools can see parts of the website, but the site does not clearly connect the ${noun}'s name, location, contact details, and website. Clear business information helps these systems understand which local business the site represents and where it is located.`,
-    recommendedAction: `Found Local will add clear business information so search engines and AI tools can better understand the ${noun}'s name, location, contact details, and website.`,
+    recommendedAction: `Street & Signal will add clear business information so search engines and AI tools can better understand the ${noun}'s name, location, contact details, and website.`,
   }
   return {
     title: fix.intelligence?.customer.title || fix.issue,
@@ -349,7 +349,7 @@ export const findingsNeedingReconciliation = (state: AuditState, currentFixes: F
 
 export const customerFindingGroup = (fix: FixItem) => {
   const fit = effectivePackageFit(fix)
-  return fit === 'starter' ? 'Found Local can help fix'
+  return fit === 'starter' ? 'Street & Signal can help fix'
     : fit === 'owner_action' ? 'Customer confirmation / input needed'
       : 'Future / additional opportunity'
 }

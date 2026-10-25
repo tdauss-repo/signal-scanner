@@ -25,7 +25,7 @@ export interface CustomerVisibilityAdditionalWork {
 }
 
 /**
- * The intentionally small, customer-safe contract consumed by Found Local
+ * The intentionally small, customer-safe contract consumed by Street & Signal
  * Sites. This is a whitelist projection: raw captures, providers, blockers,
  * evidence notes, confidence, and operator notes never cross this boundary.
  */
@@ -38,7 +38,7 @@ export interface CustomerVisibilityReviewExport {
     state: string
     website: string
     displayWebsite: string
-    websitePreview: { headline: string; subheadline: string }
+    websitePreview: { headline: string; subheadline: string; imageUrl?: string }
   }
   overall: { state: CustomerVisibilityReviewOverallState; headline: string; summary: string }
   scanAreas: Array<{ id: CustomerVisibilityReviewAreaId; name: string; state: CustomerVisibilityReviewAreaState; summary: string }>
@@ -193,7 +193,7 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
     needsReview,
     recommendedPackage: hasStarterPackage ? {
       name: 'Starter Visibility Cleanup',
-      summary: 'Found Local can address the approved visibility work and verify the agreed changes after implementation.',
+      summary: 'Street & Signal can address the approved visibility work and verify the agreed changes after implementation.',
       ...(starterOffer?.pricing?.oneTimePrice ? { price: customerPrice(starterOffer.pricing.oneTimePrice) } : {}),
       ...(starterOffer?.pricing?.recurringPrice ? { recurringPrice: customerPrice(starterOffer.pricing.recurringPrice) } : {}),
       ...(starterOffer?.pricing?.customerPricingNote ? { pricingNote: starterOffer.pricing.customerPricingNote } : {}),
@@ -256,7 +256,7 @@ export const customerVisibilityReviewQaText = (
           `${index + 1}. ${issue.title}`,
           'Why it matters:',
           issue.summary,
-          'Found Local will:',
+          'Street & Signal will:',
           issue.foundLocalAction,
           '',
         ])
@@ -294,5 +294,5 @@ export const customerVisibilityReviewQaText = (
 export const customerVisibilityReviewFilename = (review: CustomerVisibilityReviewExport, date = new Date()) => {
   const slug = review.business.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'business'
   const day = date.toISOString().slice(0, 10)
-  return `found-local-customer-review-${slug}-${day}.json`
+  return `street-and-signal-customer-review-${slug}-${day}.json`
 }

@@ -40,7 +40,7 @@ export interface SalesVisibilityProjection {
   nextAction: string
   customerFindingEligible: boolean
   starterPackageEligible: boolean
-  deliveryResponsibility: 'Found Local can implement' | 'Found Local can assist/guide' | 'Customer/platform ownership required' | 'Manual verification required before recommendation'
+  deliveryResponsibility: 'Street & Signal can implement' | 'Street & Signal can assist/guide' | 'Customer/platform ownership required' | 'Manual verification required before recommendation'
   operatorReviewRequired: boolean
   automationSummary?: string
   evidenceSourceSummary?: string
@@ -291,7 +291,7 @@ export function projectSalesVisibility(
     nextAction,
     customerFindingEligible,
     starterPackageEligible: state === 'verified_correction_needed',
-    deliveryResponsibility: state === 'verified_correction_needed' ? 'Found Local can implement'
+    deliveryResponsibility: state === 'verified_correction_needed' ? 'Street & Signal can implement'
       : ['operator_correction_needed', 'operator_not_found'].includes(state) ? 'Customer/platform ownership required'
         : ['verified_correct', 'verified_recent', 'verified_by_operator'].includes(state) ? 'Customer/platform ownership required'
           : 'Manual verification required before recommendation',

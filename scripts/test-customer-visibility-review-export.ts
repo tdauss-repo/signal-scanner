@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import type { AuditState, FixItem, SearchDestinationObservation } from '../src/types/audit.ts'
-import { buildCustomerVisibilityReviewExport, customerVisibilityReviewQaText, serializeCustomerVisibilityReview } from '../src/utils/customerVisibilityReviewExport.ts'
+import { buildCustomerVisibilityReviewExport, customerVisibilityReviewFilename, customerVisibilityReviewQaText, serializeCustomerVisibilityReview } from '../src/utils/customerVisibilityReviewExport.ts'
 import { customerReviewKey, customerReviewReadiness, summarizeCustomerScan } from '../src/utils/customerScan.ts'
 import { defaultSearchDestinationObservation } from '../src/utils/searchVisibility.ts'
 import { normalizeSalesReadiness } from '../src/utils/salesReadiness.ts'
@@ -67,6 +67,8 @@ assert.equal(afterDisposition.needsReview, 2)
 
 const review = buildCustomerVisibilityReviewExport(state, [{ id: 'website-robots', area: 'website', label: 'Robots file', description: '', weight: 1, fix: '' }], fixes)
 assert.equal(review.reviewVersion, '1.0')
+assert.equal(customerVisibilityReviewFilename(review, new Date('2026-10-11T16:00:00.000Z')), 'street-and-signal-customer-review-montessori-center-of-downriver-2026-10-11.json')
+assert.equal(review.business.websitePreview.imageUrl, undefined, 'new exports do not fabricate an optional website screenshot URL')
 assert.deepEqual(review.business, { name: 'Montessori Center of Downriver', category: 'Montessori school', city: 'Southgate', state: 'MI', website: 'http://www.montessoridownriver.com/', displayWebsite: 'montessoridownriver.com', websitePreview: { headline: 'Montessori Center of Downriver', subheadline: 'Montessori school in Southgate, MI' } })
 assert.equal(review.confirmedIssues.length, 3, 'only explicitly approved findings export')
 assert.equal(review.confirmedIssues.some((item) => item.id.startsWith('unapproved')), false, 'dismissed and unresolved findings never export')

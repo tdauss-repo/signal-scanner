@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { PackagePreparationPanel } from '../src/components/PackagePreparationPanel.tsx'
-import type { AuditState, FixItem, PackageCommercialPricing } from '../src/types/audit.ts'
+import type { AuditItem, AuditState, FixItem, PackageCommercialPricing, SearchDestination, SearchDestinationObservation } from '../src/types/audit.ts'
+import { buildBrandPresenceVerification } from '../src/utils/brandPresenceVerification.ts'
 import { buildCustomerFindingRefinement, customerReviewKey, defaultCustomerFindingWording, isPresentedFinding } from '../src/utils/customerScan.ts'
 import {
   buildCustomerVisibilityReviewExport,
+  customerVisibilityReviewFilename,
   customerVisibilityReviewQaText,
   serializeCustomerVisibilityReview,
 } from '../src/utils/customerVisibilityReviewExport.ts'
@@ -21,6 +23,7 @@ import {
   parseUsdAmount,
 } from '../src/utils/packagePricing.ts'
 import { normalizeSalesReadiness } from '../src/utils/salesReadiness.ts'
+import { defaultSearchDestinationObservation } from '../src/utils/searchVisibility.ts'
 import { normalizeWebsiteAuditWorkspaceState } from '../src/utils/websiteAuditState.ts'
 import { normalizeWorkspaceProfile } from '../src/utils/workspaceProfile.ts'
 
@@ -61,6 +64,39 @@ const fixes = [hosting, location, identity, description]
 
 const state = makeState()
 for (const fix of fixes) state.customerFindingReviews = { ...state.customerFindingReviews, [fix.id]: customerReviewKey(state, fix) }
+
+const strengthItems: AuditItem[] = [
+  ['website-faq', 'Helpful website content'],
+  ['website-sitemap-robots', 'Search accessibility'],
+  ['website-contact', 'Clear contact information'],
+  ['website-mobile', 'Mobile-friendly website'],
+  ['website-navigation', 'Clear website navigation'],
+  ['website-programs', 'Program information'],
+].map(([id, label]) => ({ id, area: 'website', label, description: `${label} was verified.`, weight: 1, access: 'public', evidenceLinks: [], fix: '' }))
+for (const item of strengthItems) {
+  state.checks[item.id] = 'pass'
+  state.notes[item.id] = `${item.label} was verified for the accepted review.`
+  state.evidenceConfidence[item.id] = 'operator_observation'
+}
+const verifiedSearchObservation = (destination: SearchDestination): SearchDestinationObservation => {
+  const observation = {
+    ...defaultSearchDestinationObservation(destination, profile.businessName),
+    overallResult: 'found_match' as const,
+    reviewed: true,
+    evidenceNotes: `${destination} matched the reviewed business information.`,
+  }
+  const verification = buildBrandPresenceVerification(observation, state.profile, state.businessProfile, {
+    outcome: 'found_correct',
+    reviewedAt: '2026-10-11T16:00:00.000Z',
+  })
+  assert(verification.ok)
+  return { ...observation, operatorVerification: verification.verification }
+}
+state.searchDestinationObservations = {
+  'search-brand-canonical': Object.fromEntries(
+    (['Google Search', 'Google Maps', 'Bing Search'] as const).map((destination) => [destination, verifiedSearchObservation(destination)]),
+  ),
+}
 
 const override = (fix: FixItem, scopeClassification: 'starter' | 'separate' | 'customer_action' | 'not_included', packageAssignment: string, includedScope: string) => {
   const built = buildPackageScopeOverride(state, fix, {
@@ -134,9 +170,27 @@ assert.equal(recurringReview.pricingSummary?.recurringCharges?.[0].price.display
 assert.equal(recurringReview.pricingSummary?.initialTotal?.display, '$848 one-time')
 
 // Mary acceptance fixture: exact customer-safe package structure and no invented recurring line.
-const review = buildCustomerVisibilityReviewExport(state, [], fixes)
+const review = buildCustomerVisibilityReviewExport(state, strengthItems, fixes)
 const json = serializeCustomerVisibilityReview(review)
 const qa = customerVisibilityReviewQaText(review, true)
+assert.equal(review.reviewVersion, '1.0')
+assert.equal(review.verifiedStrengths.length, 9)
+assert.equal(review.confirmedIssues.length, 4)
+assert.deepEqual(review.confirmedIssues.map((issue) => issue.id), [location.id, identity.id, description.id, hosting.id])
+assert.deepEqual(review.needsReview, [])
+assert.deepEqual(Object.keys(review), [
+  'reviewVersion', 'business', 'overall', 'scanAreas', 'verifiedStrengths', 'confirmedIssues', 'needsReview',
+  'recommendedPackage', 'additionalRecommendedWork', 'pricingSummary',
+])
+assert.deepEqual(Object.keys(review.business), ['name', 'category', 'city', 'state', 'website', 'displayWebsite', 'websitePreview'])
+assert.deepEqual(Object.keys(review.business.websitePreview), ['headline', 'subheadline'])
+assert.equal(review.business.websitePreview.imageUrl, undefined, 'the additive screenshot field remains optional and is not fabricated')
+for (const issue of review.confirmedIssues) {
+  assert.deepEqual(Object.keys(issue), ['id', 'title', 'label', 'summary', 'foundLocalAction'])
+  assert.equal('streetSignalAction' in issue, false, 'the v1 foundLocalAction compatibility field is retained')
+}
+assert.equal(customerVisibilityReviewFilename(review, new Date('2026-10-11T16:00:00.000Z')), 'street-and-signal-customer-review-montessori-center-of-downriver-2026-10-11.json')
+assert.deepEqual(JSON.parse(json), review, 'the full accepted v1 review structure survives JSON serialization')
 assert.deepEqual(review.recommendedPackage.included, [
   'Homepage location and local identity improvement',
   'Search and AI business identity improvement',
@@ -189,7 +243,7 @@ assert(includedEditedReview.recommendedPackage.included.includes('Updated homepa
 assert.equal(includedEditedReview.recommendedPackage.pricingNote, 'One-time implementation price.', 'changing Included scope does not rewrite pricingNote')
 assert.equal(includedEditedReview.confirmedIssues.find((issue) => issue.id === location.id)?.foundLocalAction,
   notedReview.confirmedIssues.find((issue) => issue.id === location.id)?.foundLocalAction,
-  'changing Included scope does not rewrite Found Local will')
+  'changing Included scope does not rewrite the customer action')
 
 const actionEdited = structuredClone(notedState)
 const actionDefaults = defaultCustomerFindingWording(location, actionEdited)
@@ -198,8 +252,8 @@ actionEdited.customerFindingRefinements = { ...actionEdited.customerFindingRefin
   [location.id]: buildCustomerFindingRefinement(actionEdited, location, { ...actionDefaults, recommendedAction: changedAction })!,
 }
 actionEdited.customerFindingReviews![location.id] = customerReviewKey(actionEdited, location)
-assert.equal(actionEdited.packageScopeOverrides![location.id].includedScope, 'Homepage location and local identity improvement', 'changing Found Local will does not rewrite stored Included scope')
-assert.equal(actionEdited.packagePricing!.packages[starter.key].customerPricingNote, 'One-time implementation price.', 'changing Found Local will does not rewrite stored pricingNote')
+assert.equal(actionEdited.packageScopeOverrides![location.id].includedScope, 'Homepage location and local identity improvement', 'changing the customer action does not rewrite stored Included scope')
+assert.equal(actionEdited.packagePricing!.packages[starter.key].customerPricingNote, 'One-time implementation price.', 'changing the customer action does not rewrite stored pricingNote')
 actionEdited.packageScopeOverrides![location.id] = buildPackageScopeOverride(actionEdited, location, {
   ...actionEdited.packageScopeOverrides![location.id],
   scopeClassification: 'starter',
@@ -207,8 +261,8 @@ actionEdited.packageScopeOverrides![location.id] = buildPackageScopeOverride(act
 })!
 const actionEditedReview = buildCustomerVisibilityReviewExport(actionEdited, [], fixes)
 assert.equal(actionEditedReview.confirmedIssues.find((issue) => issue.id === location.id)?.foundLocalAction, changedAction)
-assert(actionEditedReview.recommendedPackage.included.includes('Homepage location and local identity improvement'), 'changing Found Local will does not rewrite Included scope')
-assert.equal(actionEditedReview.recommendedPackage.pricingNote, 'One-time implementation price.', 'changing Found Local will does not rewrite pricingNote')
+assert(actionEditedReview.recommendedPackage.included.includes('Homepage location and local identity improvement'), 'changing the customer action does not rewrite Included scope')
+assert.equal(actionEditedReview.recommendedPackage.pricingNote, 'One-time implementation price.', 'changing the customer action does not rewrite pricingNote')
 
 // Editing either price deterministically updates the total.
 const starterEdited = structuredClone(state)

@@ -69,12 +69,14 @@ const wording = defaultCustomerFindingWording(localFinding, baseState)
 assert.equal(wording.title, 'Homepage local identity clarity')
 assert.match(wording.summary, /includes some local context/)
 assert.match(wording.recommendedAction, /physical location and community served/)
+assert.match(wording.recommendedAction, /^Street & Signal will/)
 assert.equal(`${wording.summary} ${wording.recommendedAction}`.toLowerCase().includes('photograph'), false)
 
 const photographerState = { ...baseState, profile: staleJemProfile, businessProfile: { schemaVersion: 1 as const, values: {} } }
 const photographerWording = defaultCustomerFindingWording(localFinding, photographerState)
 assert.equal(photographerWording.title, 'Service-area clarity')
 assert.match(photographerWording.recommendedAction, /cities and areas served/)
+assert.match(photographerWording.recommendedAction, /^Street & Signal will/)
 
 const programFinding: FixItem = { ...localFinding, id: 'website-service-pages', issue: 'Service pages/content indicators' }
 const programWording = defaultCustomerFindingWording(programFinding, baseState)
@@ -82,11 +84,13 @@ assert.equal(programWording.title, 'Programs and offerings visibility')
 assert.match(programWording.summary, /path from the homepage could be clearer/)
 assert.equal(/program pages are missing/i.test(programWording.summary), false)
 assert.match(programWording.recommendedAction, /existing program or offering pages/)
+assert.match(programWording.recommendedAction, /^Street & Signal will/)
 
 const schemaWording = defaultCustomerFindingWording({ ...localFinding, id: 'website-schema', issue: 'Incomplete machine-readable business identity', fix: 'Add entity-appropriate LocalBusiness schema.' }, baseState)
 assert.equal(schemaWording.title, 'Help search and AI understand your school')
 assert.match(schemaWording.summary, /name, location, contact details, and website/)
 assert.match(schemaWording.recommendedAction, /add clear business information/)
+assert.match(schemaWording.recommendedAction, /^Street & Signal will/)
 assert.equal(/entity-appropriate|LocalBusiness|machine-readable/i.test(`${schemaWording.title} ${schemaWording.summary} ${schemaWording.recommendedAction}`), false)
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/website-audit-montessori-2026-09-16.json', import.meta.url), 'utf8')) as { response: WebsiteAuditResult }

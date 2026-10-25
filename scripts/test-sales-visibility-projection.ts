@@ -20,7 +20,7 @@ const discrepancy = projectSalesVisibility({ ...automated(base(), 'found'), over
 assert.equal(discrepancy.state, 'verified_correction_needed')
 assert.equal(discrepancy.customerFindingEligible, true)
 assert.equal(discrepancy.starterPackageEligible, true)
-assert.equal(discrepancy.deliveryResponsibility, 'Found Local can implement')
+assert.equal(discrepancy.deliveryResponsibility, 'Street & Signal can implement')
 
 const absence = projectSalesVisibility({ ...automated(base(), 'not_found'), overallResult: 'not_found' })
 assert.equal(absence.state, 'manual_verification_needed')

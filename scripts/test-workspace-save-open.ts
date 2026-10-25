@@ -108,7 +108,7 @@ assert.match(workspaceStorageFailureMessage(quota.error), /current work remains 
 
 const record = workspaceRecordFromState(state, { id: 'workspace-mary', now: scanAt })
 const serialized = serializeWorkspaceFile(record, scanAt)
-assert.equal(workspaceFilename(record), 'found-local-montessori-center-of-downriver-2026-10-11.json')
+assert.equal(workspaceFilename(record), 'street-and-signal-montessori-center-of-downriver-2026-10-11.json')
 assert.equal(buildWorkspaceFile(record, scanAt).version, 1)
 const opened = parseWorkspaceFile(serialized)
 assert.equal(opened.ok, true)

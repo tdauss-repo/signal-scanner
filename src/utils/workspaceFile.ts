@@ -49,7 +49,7 @@ export const serializeWorkspaceFile = (scan: SavedScanRecord, exportedAt = new D
   JSON.stringify(buildWorkspaceFile(scan, exportedAt), null, 2)
 
 export const workspaceFilename = (scan: SavedScanRecord) =>
-  `found-local-${slugify(scan.businessName)}-${dateSlug(scan.scanDate || scan.updatedAt)}.json`
+  `street-and-signal-${slugify(scan.businessName)}-${dateSlug(scan.scanDate || scan.updatedAt)}.json`
 
 const objectValue = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object' && !Array.isArray(value))
 const savedRecordShape = (value: unknown): value is Partial<SavedScanRecord> => objectValue(value) && objectValue(value.payload) &&
