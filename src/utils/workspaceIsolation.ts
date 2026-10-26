@@ -55,6 +55,7 @@ export const createIsolatedBusinessWorkspace = (
   bingLastKnownVerified: undefined,
   customerFindingDecisionSnapshots: undefined,
   customerStrengthPresentations: undefined,
+  customerLocalPresencePublication: undefined,
   profileProjectionConflicts: undefined,
   lastUpdated: recordedAt,
 })

@@ -171,6 +171,14 @@
 .customer-review-row p { white-space: pre-line; overflow-wrap: anywhere; }
 .operator-primary-nav { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .business-workspace-grid, .customer-review-handoff { display: grid; gap: 22px; }
+.local-presence-publication { display: grid; gap: 16px; }
+.local-presence-reconciliation { margin: 0; padding: 12px 15px; border-left: 4px solid #b97816; border-radius: 8px; background: #fff8e8; }
+.local-presence-group { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 16px; border: 1px solid #d7e0d9; border-radius: 10px; }
+.local-presence-group legend { padding: 0 5px; color: var(--customer-navy); font-weight: 700; }
+.local-presence-choice, .local-presence-url-choice { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.local-presence-choice span, .local-presence-listing { display: grid; gap: 3px; min-width: 0; }
+.local-presence-choice small, .local-presence-url-choice span { overflow-wrap: anywhere; color: var(--customer-muted); }
+.local-presence-url-choice { margin-left: 27px; font-size: 13px; }
 .business-workspace-switcher { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 10px 14px; border: 1px solid #d8e3dc; border-radius: 11px; background: #f0f4ef; }
 .business-workspace-switcher > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; }
 .business-workspace-switcher span { color: var(--customer-muted); font-size: 11px; font-weight: 750; text-transform: uppercase; }

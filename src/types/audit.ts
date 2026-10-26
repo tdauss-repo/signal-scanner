@@ -154,8 +154,35 @@ export interface AuditState {
   customerFindingDecisionSnapshots?: Record<string, CustomerFindingDecisionSnapshot>
   /** Customer-only strength inclusion and wording, bound to material positive evidence. */
   customerStrengthPresentations?: Record<string, CustomerStrengthPresentation>
+  /** Explicit customer-publication decision for the current reviewed primary location. */
+  customerLocalPresencePublication?: CustomerLocalPresencePublication
   /** Load-time identity conflicts retained after the compatibility profile is safely reconciled. */
   profileProjectionConflicts?: string[]
+}
+
+export type CustomerLocalPresencePlatform = 'Google Maps' | 'Apple Maps' | 'Yelp' | 'Facebook' | 'Instagram'
+
+export interface CustomerLocalPresenceListingPublication {
+  status: 'approved'
+  evidenceKey: string
+  approvedAt: string
+  includeProfileUrl: boolean
+}
+
+/**
+ * Customer-publication approval is deliberately separate from technical
+ * verification. Evidence keys are internal reconciliation material and are
+ * never copied into Customer Review JSON.
+ */
+export interface CustomerLocalPresencePublication {
+  version: 1
+  status: 'approved'
+  locationId: 'primary'
+  locationEvidenceKey: string
+  approvedAt: string
+  includeAddress: boolean
+  listings: Partial<Record<CustomerLocalPresencePlatform, CustomerLocalPresenceListingPublication>>
+  relatedFindingIds: string[]
 }
 
 export interface CustomerStrengthPresentation {

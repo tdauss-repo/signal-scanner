@@ -165,6 +165,8 @@ contracts:
   newly generated value may use Street & Signal wording.
 - `business.websitePreview.imageUrl` is optional; exports without an image
   remain valid.
+- `localPresence` is an optional additive v1.0 projection. Historical exports
+  omit it and remain valid.
 - Workspace envelope `fileType`, `app`, and version identifiers are preserved.
 - LocalStorage keys, provider IDs, finding IDs, evidence fingerprints, approval
   identity, reconciliation, and verification behavior are preserved.
@@ -227,6 +229,33 @@ Customer Presentation. This allows Street & Signal to review or present approved
 scope before commercial terms are finalized while making the omission clear.
 No subscription billing, payment processing, or invoicing is part of this
 model.
+
+## Customer-safe Local Presence publication
+
+Local Presence publication is a distinct operator approval boundary layered on
+top of reviewed Business Profile identity and effective Brand Presence
+verification. The initial implementation supports one `primary` location while
+the optional Customer Review `localPresence.locations[]` shape permits future
+multi-location exports. A current operator-reviewed or owner-confirmed business
+name, street address, city, and state establish the location candidate. The
+address, each verified platform presence, and each canonical profile URL remain
+separate publication choices.
+
+Publication decisions are persisted in the workspace and bound to material
+location and listing evidence keys. Changed reviewed identity, changed listing
+evidence, a stale verification, or a no-longer-effective positive destination
+cannot inherit a prior customer-publication decision. The prior decision remains
+available for operator reconciliation, while the stale detail is omitted from
+Customer Review JSON. Existing approved findings may be linked only through an
+explicit operator selection and are re-filtered against current effective
+finding approvals during export.
+
+The customer projection contains only a stable location ID, public label,
+approved reviewed address, approved effective listing status, an independently
+approved safe canonical profile URL, customer-safe source label and date, and
+current approved finding IDs. Coordinates are not modeled or inferred. Raw
+captures, providers, evidence fingerprints and keys, run IDs, credentials,
+private notes, and raw provider payloads remain inside the scanner workspace.
 
 ## Brand Presence Evidence URL Contract
 

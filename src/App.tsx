@@ -76,6 +76,7 @@ import { buildCustomerStrengthPresentation, type CustomerStrengthCandidate, type
 import { normalizePackagePricingState } from './utils/packagePricing'
 import { recoverRetainedBrandPresenceFromWorkspace } from './utils/brandPresenceWorkspaceRetention'
 import { parseWorkspaceFile, serializeWorkspaceFile, workspaceFilename, workspaceRecordFromState } from './utils/workspaceFile'
+import { buildCustomerLocalPresencePublication, normalizeCustomerLocalPresencePublication, type CustomerLocalPresencePublicationInput } from './utils/customerLocalPresence'
 
 const storageKey = 'local-signal-scanner-state'
 const activeViewStorageKey = 'business-scanner-active-view'
@@ -453,6 +454,7 @@ const normalizeAuditState = (parsed: Partial<AuditState>): AuditState => {
         ),
       salesReadiness: normalizeSalesReadiness(parsed.salesReadiness, profile),
       packagePricing: normalizePackagePricingState(parsed.packagePricing),
+      customerLocalPresencePublication: normalizeCustomerLocalPresencePublication(parsed.customerLocalPresencePublication),
     }
     return recoverRetainedBrandPresenceFromWorkspace(normalized)
 }
@@ -705,6 +707,14 @@ function App() {
         currency: 'USD',
         packages: { ...current.packagePricing?.packages, [key]: pricing },
       },
+      lastUpdated: new Date().toISOString(),
+    }))
+  }
+
+  const saveCustomerLocalPresencePublication = (input: CustomerLocalPresencePublicationInput) => {
+    setAuditState((current) => ({
+      ...current,
+      customerLocalPresencePublication: buildCustomerLocalPresencePublication(current, input),
       lastUpdated: new Date().toISOString(),
     }))
   }
@@ -2112,6 +2122,7 @@ function App() {
       onSaveStrength={saveCustomerStrength}
       onSavePackageScope={savePackageScope}
       onSavePackagePricing={savePackagePricing}
+      onSaveLocalPresencePublication={saveCustomerLocalPresencePublication}
       onSaveWorkspace={saveWorkspaceFile}
       onOpenWorkspace={openWorkspaceFile}
       workspaceDirty={hasUnsavedWorkspaceChanges}

@@ -4,6 +4,7 @@ import { derivePackagePreparation, type PackagePreparationItem } from './package
 import { reviewedBusinessProfile } from './businessProfileState'
 import { effectiveCustomerStrengths } from './customerStrengths'
 import { deriveEffectivePackageOffers, formatPriceDisplay, initialProjectTotal } from './packagePricing'
+import { projectCustomerLocalPresence, type CustomerLocalPresenceExport } from './customerLocalPresence'
 
 export type CustomerVisibilityReviewAreaId = 'website' | 'search_maps' | 'business_information' | 'ai_discovery'
 export type CustomerVisibilityReviewAreaState = 'good' | 'review' | 'issue'
@@ -60,6 +61,8 @@ export interface CustomerVisibilityReviewExport {
     initialTotal?: CustomerVisibilityPrice
     recurringCharges?: Array<{ name: string; price: CustomerVisibilityPrice }>
   }
+  /** Additive customer-approved location/listing projection. Historical exports omit it. */
+  localPresence?: CustomerLocalPresenceExport
 }
 
 const customerPrice = (price: import('../types/audit').PackagePrice): CustomerVisibilityPrice => ({
@@ -140,6 +143,7 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
   // candidate list remains useful in-product, but does not bypass approval here.
   const packagePreparation = derivePackagePreparation(state, currentFixes)
   const confirmedFixes = packagePreparation.approvedFindings
+  const localPresence = projectCustomerLocalPresence(state, confirmedFixes.map((fix) => fix.id))
   const packageItems = new Map(packagePreparation.items.map((item) => [item.findingId, item]))
   const confirmedIssues = confirmedFixes.map((fix) => safeIssue(fix, packageItems.get(fix.id)!))
   const needsReview = [...new Set(summary.cockpit.deeperReview.map((entry) => entry.displayDestination))]
@@ -212,6 +216,7 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
         ...(recurringCharges.length ? { recurringCharges } : {}),
       },
     } : {}),
+    ...(localPresence ? { localPresence } : {}),
   }
 }
 
@@ -244,6 +249,16 @@ export const customerVisibilityReviewQaText = (
     review.business.category,
     [review.business.city, review.business.state].filter(Boolean).join(', '),
     review.business.website,
+    ...(review.localPresence?.locations.length ? [
+      '',
+      'Local presence:',
+      ...review.localPresence.locations.flatMap((location) => [
+        `- ${location.label}`,
+        ...(location.address ? [`  Address: ${location.address.display}`] : []),
+        ...(location.listings?.map((listing) => `  ${listing.platform}: ${listing.status === 'verified_recent' ? 'Verified from recent evidence' : 'Verified'}${listing.profileUrl ? ` — ${listing.profileUrl}` : ''}`) || []),
+        ...(location.relatedFindingIds?.length ? [`  Related approved findings: ${location.relatedFindingIds.join(', ')}`] : []),
+      ]),
+    ] : []),
     '',
     'What’s working:',
     ...(review.verifiedStrengths.length

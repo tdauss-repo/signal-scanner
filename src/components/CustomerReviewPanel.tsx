@@ -6,6 +6,8 @@ import { derivePackagePreparation } from '../utils/packagePreparation'
 import { profileCompleteness, profileProjectionWarnings } from '../utils/profileCompleteness'
 import { copyText } from '../utils/copyText'
 import { deriveEffectivePackageOffers, packagePricingIsComplete } from '../utils/packagePricing'
+import { LocalPresencePublicationPanel } from './LocalPresencePublicationPanel'
+import { customerLocalPresenceCandidate, type CustomerLocalPresencePublicationInput } from '../utils/customerLocalPresence'
 
 export function ManualCopyFallback({ label, content }: { label: string; content: string }) {
   return <section className="customer-manual-copy" aria-label="Manual copy fallback">
@@ -14,7 +16,7 @@ export function ManualCopyFallback({ label, content }: { label: string; content:
   </section>
 }
 
-export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: AuditState; items: AuditItem[]; fixes: FixItem[]; onReview: () => void }) {
+export function CustomerReviewPanel({ state, items, fixes, onReview, onSaveLocalPresencePublication }: { state: AuditState; items: AuditItem[]; fixes: FixItem[]; onReview: () => void; onSaveLocalPresencePublication: (input: CustomerLocalPresencePublicationInput) => void }) {
   const [status, setStatus] = useState('')
   const [manualCopy, setManualCopy] = useState<{ label: string; content: string } | null>(null)
   const summary = summarizeCustomerScan(state, items, fixes)
@@ -51,6 +53,7 @@ export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: 
   const additionalWork = customerVisibilityReviewAdditionalWork(review)
   const additionalWorkDetails: CustomerVisibilityAdditionalWork[] = review.additionalRecommendedWork ?? additionalWork.map((name) => ({ name, included: [] }))
   const customerActions = customerVisibilityReviewCustomerActions(review)
+  const localPresenceCandidate = customerLocalPresenceCandidate(state)
   const copyForOperator = async (content: string, label: string, successMessage: string) => {
     const result = await copyText(content)
     if (result.copied) {
@@ -71,6 +74,7 @@ export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: 
     setStatus('Customer Review JSON downloaded.')
   }
   return <div className="customer-review-handoff">
+    <LocalPresencePublicationPanel key={`${localPresenceCandidate?.evidenceKey || 'unavailable'}:${state.customerLocalPresencePublication?.locationEvidenceKey || 'none'}`} state={state} fixes={fixes} onSave={onSaveLocalPresencePublication} />
     <section className={`customer-readiness customer-readiness-${ready ? 'ready' : 'not_ready'}`} aria-label="Customer Review Readiness">
       <div><p className="customer-eyebrow">Final quality gate</p><h2>{ready ? 'Ready for customer presentation' : 'Not ready'}</h2><p>{warnings[0] || pricingNotice || readiness.message}</p></div>
       <dl><div><dt>Candidate findings</dt><dd>{readiness.candidateFindings}</dd></div><div><dt>Approved</dt><dd>{readiness.approvedFindings}</dd></div><div><dt>Dismissed</dt><dd>{readiness.dismissedFindings}</dd></div><div><dt>Awaiting review</dt><dd>{readiness.awaitingDisposition}</dd></div><div><dt>Verified strengths</dt><dd>{readiness.verifiedStrengths}</dd></div><div><dt>Needs review</dt><dd>{readiness.needsReview}</dd></div></dl>
@@ -82,6 +86,7 @@ export function CustomerReviewPanel({ state, items, fixes, onReview }: { state: 
     <section className="panel customer-qa-frame" aria-label="Customer Review operator QA">
       <div className="customer-qa-heading"><div><p className="eyebrow">Customer Review — operator QA</p><h2>Exact customer-safe preview</h2><p>This frame and the Sites JSON below use the same projection.</p></div><button className="customer-primary" type="button" onClick={() => void copyForOperator(qaText, 'Customer Review text', 'Review text copied')}>Copy Review Text</button></div>
       <div className="customer-qa-section"><h3>Business</h3><p><strong>{review.business.name}</strong><br />{review.business.category}<br />{[review.business.city, review.business.state].filter(Boolean).join(', ')}<br />{review.business.website}</p></div>
+      {review.localPresence?.locations.length ? <div className="customer-qa-section"><h3>Local presence</h3>{review.localPresence.locations.map((location) => <div key={location.id}><p><strong>{location.label}</strong>{location.address ? <><br />{location.address.display}<br /><small>{location.address.verification.source}</small></> : null}</p>{location.listings?.length ? <ul>{location.listings.map((listing) => <li key={listing.platform}><strong>{listing.platform}</strong><span>{listing.status === 'verified_recent' ? 'Verified from recent evidence' : 'Verified'}{listing.profileUrl ? ` · ${listing.profileUrl}` : ''}</span></li>)}</ul> : null}{location.relatedFindingIds?.length ? <p><strong>Related approved findings:</strong> {location.relatedFindingIds.join(', ')}</p> : null}</div>)}</div> : null}
       <div className="customer-qa-section"><h3>What’s working</h3>{review.verifiedStrengths.length ? <ul>{review.verifiedStrengths.map((strength) => <li key={strength.title}><strong>{strength.title}</strong><span>{strength.summary}</span></li>)}</ul> : <p>No verified strengths are included yet.</p>}</div>
       <div className="customer-qa-section"><h3>Recommended improvements</h3>{review.confirmedIssues.length ? <ol className="customer-qa-findings">{review.confirmedIssues.map((issue) => <li key={issue.id}><h4>{issue.title}</h4><span>{issue.label}</span><strong>Why it matters</strong><p>{issue.summary}</p><strong>Street & Signal will</strong><p>{issue.foundLocalAction}</p></li>)}</ol> : <p>No approved customer improvements.</p>}</div>
       <div className="customer-qa-section"><h3>Still being verified</h3>{review.needsReview.length ? <ul>{review.needsReview.map((item) => <li key={item}>{item}</li>)}</ul> : <p>Nothing currently listed.</p>}</div>

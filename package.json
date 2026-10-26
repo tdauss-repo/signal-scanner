@@ -81,7 +81,8 @@
     "test:yelp-auto-verification": "node --import tsx scripts/test-yelp-auto-verification.tsx",
     "test:facebook-auto-verification": "node --import tsx scripts/test-facebook-auto-verification.tsx",
     "test:instagram-production-wiring": "node --import tsx scripts/test-instagram-production-wiring.ts",
-    "test:instagram-auto-verification": "node --import tsx scripts/test-instagram-auto-verification.tsx"
+    "test:instagram-auto-verification": "node --import tsx scripts/test-instagram-auto-verification.tsx",
+    "test:customer-local-presence": "node --import tsx scripts/test-customer-local-presence.ts"
   },
   "dependencies": {
     "express": "^5.2.1",
