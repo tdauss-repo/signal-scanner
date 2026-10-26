@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { LocalPresencePublicationPanel } from '../src/components/LocalPresencePublicationPanel.tsx'
 import type { AuditState, BusinessProfileState, FixItem, SearchDestinationObservation } from '../src/types/audit.ts'
 import { buildBrandPresenceVerification } from '../src/utils/brandPresenceVerification.ts'
 import { customerReviewKey } from '../src/utils/customerScan.ts'
@@ -10,10 +14,18 @@ import {
 } from '../src/utils/customerLocalPresence.ts'
 import { buildCustomerVisibilityReviewExport, serializeCustomerVisibilityReview } from '../src/utils/customerVisibilityReviewExport.ts'
 import { normalizeSalesReadiness } from '../src/utils/salesReadiness.ts'
+import {
+  localPresencePublicationDraft,
+  localPresencePublicationHasUnsavedChanges,
+  localPresencePublicationNeedsReconfirmation,
+  summarizeLocalPresencePublication,
+} from '../src/utils/localPresencePublicationUi.ts'
 import { defaultSearchDestinationObservation } from '../src/utils/searchVisibility.ts'
 import { normalizeWebsiteAuditWorkspaceState } from '../src/utils/websiteAuditState.ts'
 import { buildWorkspaceFile, parseWorkspaceFile, serializeWorkspaceFile, workspaceRecordFromState } from '../src/utils/workspaceFile.ts'
 import { normalizeWorkspaceProfile } from '../src/utils/workspaceProfile.ts'
+
+Object.assign(globalThis, { React })
 
 const reviewedAt = '2026-10-11T16:00:00.000Z'
 const profile = normalizeWorkspaceProfile({
@@ -173,4 +185,89 @@ assert(listingReconciliation.locations[0].address, 'unchanged approved address r
 assert.equal(listingReconciliation.locations[0].listings, undefined, 'materially changed listing evidence cannot inherit URL or presence approval')
 assert(changedListing.customerLocalPresencePublication?.listings['Google Maps'], 'the prior listing decision remains stored for reconciliation')
 
-console.log('Customer Local Presence PASS: explicit publication, address and URL separation, approved finding links, stale-evidence invalidation, workspace compatibility, no coordinates, and no internal evidence leakage.')
+const savedDraft = localPresencePublicationDraft(state.customerLocalPresencePublication)
+assert.equal(localPresencePublicationHasUnsavedChanges(state.customerLocalPresencePublication, savedDraft), false, 'the restored draft matches the saved publication decision')
+assert.equal(localPresencePublicationHasUnsavedChanges(state.customerLocalPresencePublication, { ...savedDraft, includeAddress: false }), true, 'editing a publication detail is reported as unsaved')
+assert.deepEqual(summarizeLocalPresencePublication(candidate, savedDraft, fixes.map((fix) => fix.id)), {
+  reviewedAddresses: 1,
+  platformPresences: 1,
+  profileLinks: 1,
+  relatedFindings: 2,
+}, 'the live summary counts only currently selected eligible details')
+assert.equal(localPresencePublicationNeedsReconfirmation(state, candidate), false)
+const changedListingCandidate = customerLocalPresenceCandidate(changedListing)
+assert(changedListingCandidate)
+assert.equal(localPresencePublicationNeedsReconfirmation(changedListing, changedListingCandidate), true, 'material listing evidence changes are identified for UI reconfirmation')
+
+const urlWithoutPresence = {
+  includeAddress: true,
+  listings: { 'Google Maps': { include: false, includeProfileUrl: true } },
+  relatedFindingIds: [],
+}
+assert.deepEqual(summarizeLocalPresencePublication(candidate, urlWithoutPresence, []), {
+  reviewedAddresses: 1,
+  platformPresences: 0,
+  profileLinks: 0,
+  relatedFindings: 0,
+}, 'a selected URL never counts as publishable without its platform presence')
+const urlWithoutPresenceDecision = buildCustomerLocalPresencePublication(state, urlWithoutPresence, reviewedAt)
+assert(urlWithoutPresenceDecision)
+assert.equal(urlWithoutPresenceDecision.listings['Google Maps'], undefined, 'URL approval does not implicitly approve platform publication')
+
+const panelMarkup = renderToStaticMarkup(React.createElement(LocalPresencePublicationPanel, {
+  state,
+  fixes,
+  onSave: () => undefined,
+}))
+for (const expected of [
+  profile.businessName,
+  candidate.address.display,
+  'Include reviewed address in customer review.',
+  'Google Maps',
+  'Include platform presence',
+  'Include verified profile link',
+  'Inspect URL',
+  'Open profile in new tab',
+  'Homepage local identity clarity',
+  'Help search and AI understand your school',
+  'Starter Visibility Cleanup',
+  'Publication summary',
+  'Matches saved decision',
+]) assert(panelMarkup.includes(expected), `publication panel renders ${expected}`)
+assert.match(panelMarkup, /<details class="local-presence-url-inspector"><summary>Inspect URL<\/summary>/, 'the complete profile destination stays collapsed behind an inspection action')
+
+const noUrlState = makeState()
+const noUrlObservation: SearchDestinationObservation = {
+  ...defaultSearchDestinationObservation('Google Maps', noUrlState.profile.businessName),
+  overallResult: 'found_match',
+  observedResultTypes: ['knowledge_panel'],
+  observedAt: reviewedAt,
+  evidenceNotes: 'The listing identity was reviewed without a publishable canonical URL.',
+  reviewed: true,
+}
+const noUrlVerification = buildBrandPresenceVerification(
+  noUrlObservation,
+  noUrlState.profile,
+  noUrlState.businessProfile,
+  { outcome: 'found_correct', reviewedAt },
+)
+assert(noUrlVerification.ok)
+noUrlObservation.operatorVerification = noUrlVerification.verification
+noUrlState.searchDestinationObservations = { 'search-brand-canonical': { 'Google Maps': noUrlObservation } }
+const noUrlCandidate = customerLocalPresenceCandidate(noUrlState)
+assert(noUrlCandidate)
+assert.equal(noUrlCandidate.listings[0]?.profileUrl, undefined)
+const noUrlMarkup = renderToStaticMarkup(React.createElement(LocalPresencePublicationPanel, {
+  state: noUrlState,
+  fixes: [],
+  onSave: () => undefined,
+}))
+assert.match(noUrlMarkup, /No eligible canonical profile URL is available\./)
+assert.doesNotMatch(noUrlMarkup, /Include verified profile link/)
+
+const panelCss = readFileSync(new URL('../src/components/CustomerScanView.css', import.meta.url), 'utf8')
+assert.match(panelCss, /\.local-presence-layout \{ display: grid; grid-template-columns:/, 'desktop publication controls use the existing responsive grid')
+assert.match(panelCss, /@media \(max-width: 860px\)[\s\S]*?\.local-presence-layout \{ grid-template-columns: 1fr; \}/, 'tablet and mobile publication controls stack without separating labels')
+assert.match(panelCss, /\.local-presence-url-inspector code \{[^}]*overflow-wrap: anywhere;/, 'inspected URLs cannot force horizontal scrolling')
+
+console.log('Customer Local Presence PASS: explicit publication, compact operator controls, address and URL separation, live summary state, approved finding links, stale-evidence invalidation, workspace compatibility, responsive layout, no coordinates, and no internal evidence leakage.')

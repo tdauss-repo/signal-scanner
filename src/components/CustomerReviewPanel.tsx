@@ -74,7 +74,7 @@ export function CustomerReviewPanel({ state, items, fixes, onReview, onSaveLocal
     setStatus('Customer Review JSON downloaded.')
   }
   return <div className="customer-review-handoff">
-    <LocalPresencePublicationPanel key={`${localPresenceCandidate?.evidenceKey || 'unavailable'}:${state.customerLocalPresencePublication?.locationEvidenceKey || 'none'}`} state={state} fixes={fixes} onSave={onSaveLocalPresencePublication} />
+    <LocalPresencePublicationPanel key={[localPresenceCandidate?.evidenceKey || 'unavailable', ...(localPresenceCandidate?.listings.map((listing) => listing.evidenceKey) || []), JSON.stringify(state.customerLocalPresencePublication || null)].join(':')} state={state} fixes={fixes} onSave={onSaveLocalPresencePublication} />
     <section className={`customer-readiness customer-readiness-${ready ? 'ready' : 'not_ready'}`} aria-label="Customer Review Readiness">
       <div><p className="customer-eyebrow">Final quality gate</p><h2>{ready ? 'Ready for customer presentation' : 'Not ready'}</h2><p>{warnings[0] || pricingNotice || readiness.message}</p></div>
       <dl><div><dt>Candidate findings</dt><dd>{readiness.candidateFindings}</dd></div><div><dt>Approved</dt><dd>{readiness.approvedFindings}</dd></div><div><dt>Dismissed</dt><dd>{readiness.dismissedFindings}</dd></div><div><dt>Awaiting review</dt><dd>{readiness.awaitingDisposition}</dd></div><div><dt>Verified strengths</dt><dd>{readiness.verifiedStrengths}</dd></div><div><dt>Needs review</dt><dd>{readiness.needsReview}</dd></div></dl>
