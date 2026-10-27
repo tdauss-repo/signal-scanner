@@ -124,6 +124,39 @@ const materialSearchEvidence = (
 
 const websiteDefaultWording = (state: AuditState, item: AuditItem) => {
   const profile = reviewedBusinessProfile(state.profile, state.businessProfile)
+  if (item.id === 'website-https') return {
+    title: 'Secure website connection',
+    summary: 'The reviewed website is available through a secure HTTPS connection.',
+  }
+  if (item.id === 'website-title') return {
+    title: 'Clear homepage title',
+    summary: 'The homepage title provides a useful business, service, or local signal.',
+  }
+  if (item.id === 'website-meta-description') return {
+    title: 'Helpful search description',
+    summary: 'The homepage includes a descriptive summary that can help customers and search systems understand the business.',
+  }
+  if (item.id === 'website-homepage-clarity') return {
+    title: 'Clear homepage information',
+    summary: 'The homepage provides useful business, service, location, and contact context.',
+  }
+  if (item.id === 'website-service-pages') {
+    const noun = customerBusinessNoun(profile)
+    return {
+      title: localBusinessModel(profile) === 'physical_location' ? 'Programs and offerings visibility' : 'Services visibility',
+      summary: `The website makes existing ${localBusinessModel(profile) === 'physical_location' ? 'program or offering' : 'service'} information accessible from the homepage so customers can learn more about the ${noun}.`,
+    }
+  }
+  if (item.id === 'website-local-content') return {
+    title: localBusinessModel(profile) === 'service_area' ? 'Service-area clarity' : 'Local identity clarity',
+    summary: localBusinessModel(profile) === 'service_area'
+      ? 'The homepage includes clear, reviewed information about the areas the business serves.'
+      : 'The homepage includes clear, reviewed information about the business location or local community.',
+  }
+  if (item.id === 'website-schema') return {
+    title: 'Structured business information',
+    summary: 'The website includes structured information that helps search and AI systems understand the business identity.',
+  }
   if (item.id === 'website-faq') {
     const noun = customerBusinessNoun(profile)
     const detail = noun === 'school' ? 'FAQ and program information that helps families understand the school'
@@ -135,7 +168,15 @@ const websiteDefaultWording = (state: AuditState, item: AuditItem) => {
     title: 'Search accessibility',
     summary: 'The website includes the basic files search engines use to discover and access its pages.',
   }
-  return { title: item.label, summary: 'This reviewed check is looking good.' }
+  if (item.id === 'website-mobile-conversion') return {
+    title: 'Clear contact paths',
+    summary: 'The homepage provides visible contact information and a clear next step for customers.',
+  }
+  if (item.id === 'website-social-links') return {
+    title: 'Connected social profiles',
+    summary: 'The website links to official social profiles that support the reviewed business identity.',
+  }
+  return undefined
 }
 
 const materialWebsiteEvidence = (state: AuditState, item: AuditItem) => {
@@ -188,18 +229,26 @@ export function customerStrengthCandidates(state: AuditState, items: AuditItem[]
       evidenceKey: evidenceFingerprint(material),
     }
   })
-  const websiteStrengths = items.filter((item) => state.checks[item.id] === 'pass').slice(0, 6).map((item) => {
-    const defaults = websiteDefaultWording(state, item)
-    return {
-      id: `check:${item.id}`,
-      source: 'website_check' as const,
-      sourceTitle: item.label,
-      evidenceSummary: state.notes[item.id] || item.description,
-      defaultTitle: defaults.title,
-      defaultSummary: defaults.summary,
-      evidenceKey: evidenceFingerprint(materialWebsiteEvidence(state, item)),
-    }
-  })
+  // Search/listing/AI/voice checks have their own evidence projections. Only
+  // genuine website checks belong in this generated website-strength path;
+  // otherwise a passed discovery query can be auto-published with its raw
+  // query label instead of meaningful customer-facing wording.
+  const websiteStrengths = items
+    .filter((item) => item.area === 'website' && state.checks[item.id] === 'pass')
+    .flatMap((item) => {
+      const defaults = websiteDefaultWording(state, item)
+      if (!defaults) return []
+      return [{
+        id: `check:${item.id}`,
+        source: 'website_check' as const,
+        sourceTitle: item.label,
+        evidenceSummary: state.notes[item.id] || item.description,
+        defaultTitle: defaults.title,
+        defaultSummary: defaults.summary,
+        evidenceKey: evidenceFingerprint(materialWebsiteEvidence(state, item)),
+      }]
+    })
+    .slice(0, 6)
   return [...searchStrengths, ...websiteStrengths]
 }
 

@@ -120,7 +120,13 @@ assert.equal(customerReview.confirmedIssues[0]?.title, 'Homepage local identity 
 assert.equal(customerReview.scanAreas.find((area) => area.id === 'website')?.state, 'issue')
 for (const area of ['search_maps', 'business_information', 'ai_discovery'] as const) {
   assert.equal(customerReview.scanAreas.find((entry) => entry.id === area)?.state, 'review', `${area} must not inherit a website issue`)
+  assert.equal(
+    customerReview.scanAreas.find((entry) => entry.id === area)?.summary,
+    'This area was assessed without a confirmed issue. Its Review classification does not by itself indicate an outstanding action.',
+    `${area} does not imply an individual follow-up item when needsReview is empty`,
+  )
 }
+assert.deepEqual(customerReview.needsReview, [])
 const customerJson = serializeCustomerVisibilityReview(customerReview)
 const qaText = customerVisibilityReviewQaText(customerReview, true)
 assert.match(qaText, /CUSTOMER REVIEW — OPERATOR QA/)

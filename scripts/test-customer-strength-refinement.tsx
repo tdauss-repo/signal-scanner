@@ -102,6 +102,42 @@ const serviceFaq = customerStrengthReviewItems(serviceState, items).find((streng
 assert.match(serviceFaq.summary, /FAQ and service information/)
 assert.doesNotMatch(serviceFaq.summary, /families|school/, 'generated FAQ wording follows bounded business context rather than hard-coded Montessori copy')
 
+const discoveryItem: AuditItem = {
+  id: 'search-core-category-market',
+  area: 'keywords',
+  label: 'Emergency plumber Sampletown ZZ',
+  description: 'Guided local discovery query.',
+  weight: 10,
+  access: 'public',
+  evidenceLinks: [],
+  fix: '',
+}
+const discoveryState = makeState()
+discoveryState.checks[discoveryItem.id] = 'pass'
+discoveryState.notes[discoveryItem.id] = 'The reviewed discovery query returned a matching result.'
+discoveryState.customerStrengthPresentations = {
+  [`check:${discoveryItem.id}`]: {
+    evidenceKey: 'preserved-historical-decision',
+    included: true,
+    title: discoveryItem.label,
+    summary: 'This reviewed check is looking good.',
+  },
+}
+const preservedDiscoveryEvidence = structuredClone({
+  check: discoveryState.checks[discoveryItem.id],
+  note: discoveryState.notes[discoveryItem.id],
+  presentation: discoveryState.customerStrengthPresentations[`check:${discoveryItem.id}`],
+})
+assert.equal(customerStrengthCandidates(discoveryState, [discoveryItem]).some((strength) => strength.id === `check:${discoveryItem.id}`), false, 'a passed discovery query is evidence, not an independently meaningful customer strength')
+const discoveryReview = buildCustomerVisibilityReviewExport(discoveryState, [discoveryItem], [])
+assert.equal(discoveryReview.verifiedStrengths.some((strength) => strength.title === discoveryItem.label), false)
+assert.equal(discoveryReview.verifiedStrengths.some((strength) => strength.summary === 'This reviewed check is looking good.'), false, 'generic fallback wording cannot enter the customer strength list through a discovery query')
+assert.deepEqual({
+  check: discoveryState.checks[discoveryItem.id],
+  note: discoveryState.notes[discoveryItem.id],
+  presentation: discoveryState.customerStrengthPresentations[`check:${discoveryItem.id}`],
+}, preservedDiscoveryEvidence, 'qualification leaves original query evidence and historical operator presentation state intact')
+
 const candidates = new Map(customerStrengthCandidates(state, items).map((strength) => [strength.id, strength]))
 const refinements = {
   'search:Google Search': {

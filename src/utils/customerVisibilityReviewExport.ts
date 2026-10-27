@@ -157,9 +157,11 @@ export function buildCustomerVisibilityReviewExport(state: AuditState, items: Au
     const area = summary.areas.find((entry) => entry.title === areaTitle[definition.id])
     const state: CustomerVisibilityReviewAreaState = hasIssue ? 'issue'
       : area?.snapshotStatus === 'Looking good' && !(definition.id === 'search_maps' && needsReview.length) ? 'good' : 'review'
+    const hasIndividualReviewItems = definition.id === 'search_maps' && needsReview.length > 0
     const areaSummary = state === 'issue' ? 'We found confirmed improvements worth addressing.'
-      : state === 'review' ? 'A few details still need review before recommending changes.'
-        : 'This area has verified strengths and no confirmed issues to address.'
+      : state === 'review' && hasIndividualReviewItems ? 'Some search or map observations are listed separately for follow-up.'
+        : state === 'review' ? 'This area was assessed without a confirmed issue. Its Review classification does not by itself indicate an outstanding action.'
+          : 'This area has verified strengths and no confirmed issues to address.'
     return { ...definition, state, summary: areaSummary }
   })
   const strengths = effectiveCustomerStrengths(state, items)

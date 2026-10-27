@@ -68,10 +68,10 @@ for (const fix of fixes) state.customerFindingReviews = { ...state.customerFindi
 const strengthItems: AuditItem[] = [
   ['website-faq', 'Helpful website content'],
   ['website-sitemap-robots', 'Search accessibility'],
-  ['website-contact', 'Clear contact information'],
-  ['website-mobile', 'Mobile-friendly website'],
-  ['website-navigation', 'Clear website navigation'],
-  ['website-programs', 'Program information'],
+  ['website-mobile-conversion', 'Clear contact information'],
+  ['website-title', 'Clear homepage title'],
+  ['website-service-pages', 'Program information'],
+  ['website-social-links', 'Connected social profiles'],
 ].map(([id, label]) => ({ id, area: 'website', label, description: `${label} was verified.`, weight: 1, access: 'public', evidenceLinks: [], fix: '' }))
 for (const item of strengthItems) {
   state.checks[item.id] = 'pass'
@@ -175,6 +175,7 @@ const json = serializeCustomerVisibilityReview(review)
 const qa = customerVisibilityReviewQaText(review, true)
 assert.equal(review.reviewVersion, '1.0')
 assert.equal(review.verifiedStrengths.length, 9)
+assert.equal(review.verifiedStrengths.some((strength) => strength.summary === 'This reviewed check is looking good.'), false, 'accepted customer strengths never use the generic fallback')
 assert.equal(review.confirmedIssues.length, 4)
 assert.deepEqual(review.confirmedIssues.map((issue) => issue.id), [location.id, identity.id, description.id, hosting.id])
 assert.deepEqual(review.needsReview, [])

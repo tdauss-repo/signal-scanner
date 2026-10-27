@@ -81,6 +81,12 @@ assert.equal(review.scanAreas.find((area) => area.id === 'website')?.state, 'iss
 assert.equal(review.scanAreas.find((area) => area.id === 'search_maps')?.state, 'review', 'Neutral destination uncertainty is review, not issue')
 assert.equal(review.scanAreas.find((area) => area.id === 'business_information')?.state, 'review', 'Website findings do not mark unrelated business information as issue')
 assert.equal(review.scanAreas.find((area) => area.id === 'ai_discovery')?.state, 'review', 'Website findings do not mark unrelated AI discovery as issue')
+assert.equal(review.scanAreas.find((area) => area.id === 'search_maps')?.summary, 'Some search or map observations are listed separately for follow-up.', 'actual individual review items are described separately from the area classification')
+for (const area of ['business_information', 'ai_discovery'] as const) assert.equal(
+  review.scanAreas.find((entry) => entry.id === area)?.summary,
+  'This area was assessed without a confirmed issue. Its Review classification does not by itself indicate an outstanding action.',
+  `${area} review classification does not invent an outstanding item`,
+)
 assert.equal(review.verifiedStrengths.filter((item) => item.title === 'Google Search').length, 1, 'strengths deduplicate destinations')
 assert.equal(review.needsReview.filter((item) => item === 'Yelp').length, 1, 'review labels deduplicate destinations')
 assert(review.needsReview.includes('Apple Maps'))
@@ -102,9 +108,16 @@ assert.equal(jem.confirmedIssues.length, 0)
 assert.equal(jem.recommendedPackage.name, 'No package recommended yet')
 assert.equal(jem.recommendedPackage.included.length, 0)
 assert.equal(jem.overall.state, 'not_fully_verified')
+assert.deepEqual(jem.needsReview, [])
+for (const area of jem.scanAreas.filter((entry) => entry.state === 'review')) assert.equal(
+  area.summary,
+  'This area was assessed without a confirmed issue. Its Review classification does not by itself indicate an outstanding action.',
+  'a Review area with no individual follow-up queue uses neutral classification wording',
+)
+assert.equal(JSON.stringify(jem).includes('A few details still need review before recommending changes.'), false)
 assert.equal(customerReviewReadiness(jemState, summarizeCustomerScan(jemState, [], [])).state, 'not_ready', 'an unscanned workspace is not ready merely because it has no candidates')
 
-const jemCheck = { id: 'website-homepage', area: 'website' as const, label: 'Website homepage', description: '', weight: 1, fix: '' }
+const jemCheck = { id: 'website-title', area: 'website' as const, label: 'Homepage title quality', description: '', weight: 1, fix: '' }
 jemState.checks[jemCheck.id] = 'pass'
 assert.equal(customerReviewReadiness(jemState, summarizeCustomerScan(jemState, [jemCheck], [])).state, 'ready', 'a reviewed all-clear payload can be ready without inventing an issue')
 
